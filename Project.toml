@@ -1,0 +1,6 @@
+authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
+name = "SplayedDimsArrays"
+uuid = "6997b572-c796-11e8-2991-b59c2857380c"
+version = "0.1.0"
+
+[deps]
