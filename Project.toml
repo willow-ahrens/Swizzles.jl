@@ -1,6 +1,12 @@
 authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
-name = "SplayedDimsArrays"
+name = "SwizzledDimsArrays"
 uuid = "6997b572-c796-11e8-2991-b59c2857380c"
 version = "0.1.0"
 
 [deps]
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
