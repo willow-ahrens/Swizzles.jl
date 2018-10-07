@@ -54,7 +54,7 @@ Base.axes(sz::Swizzled{N,s}) where {N,s} = swizzle_elems(broadcast_axes(sz.data)
     data_inds = swizzle_elems(inds, 1, si)
     @boundscheck begin
       for 
-      checkindex
+      checkindex(Bool, ind, 
     end
     @boundscheck checkbounds_indices(Bool, data_axes, swizzle_elems(inds, 1, si)) || throw_boundserror(sz, I)
     iter = eachindex(bc′)

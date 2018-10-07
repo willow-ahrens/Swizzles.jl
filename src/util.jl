@@ -44,54 +44,74 @@ is_smallest_swizzle_mask(s::Union{AbstractVector, Tuple}) =
   length(s) == 0 || (last(s) != 0 && is_swizzle_mask(s))
 
 """
-    swizzle_elems(v, v0, s)
-Swizzle `v` according to the mask `s` and return the resulting collection `r`.
-`r` should be similar to `s` and satisfy `r[i] = v[s[i]]` when `s[i] != 0` and
-`r[i] = v0` when `s[i] == 0`. `v` must be at least as long as `maximum(s)`. No
-checking is done to determine whether `s` is a valid mask.
+    swizzle_elems(v, w, w0, s)
+Swizzle `w` into `v` according to the mask `s` and return the resulting
+collection `r`.  `r` should be similar to `v` and satisfy `r[i] = b[s[i]]` when
+`s[i] != 0` and `r[i] = a[i]` when `s[i] == 0` or when `i > length(s)`. `b`
+must be at least as long as `maximum(s)`. No checking is done to determine
+whether `s` is a valid mask.
 # Examples
 ```jldoctest
 julia> s = [2; 4; 0; 3; 1];
-julia> v = [3; 3; 3; 3];
-julia> swizzle_elems(v, 4, s)
-5-element Array{Int64,1}:
- 3
- 3
- 4
- 3
- 3
+julia> a = [5; 5; 5; 5];
+julia> b = [-1; -2; -3; -4];
+julia> swizzle_elems(a, b, s)
+4-element Array{Int64,1}:
+ -2
+ -4
+ 5
+ -3
+julia> a = [5; 5; 5; 5; 5; 5];
+julia> swizzle_elems(a, b, s)
+6-element Array{Int64,1}:
+ -2
+ -4
+ 5
+ -3
+ -1
+ 5
 ```
 """
 swizzle_elems
 
-function swizzle_elems(v::Union{AbstractVector{T}, NTuple{M, T}}, v0::T0, s::AbstractVector{Int}) where {M, T, T0}
-    return swizzle_elems!(similar(s, Union{T, T0}), v, v0, s)
+function swizzle_elems(a, b::AbstractVector, s)
+    return swizzle_elems!(similar(b, Union{eltype(a), eltype(b)}), a, b, s)
 end
 
-@inline function swizzle_elems(v, v0, s::NTuple{N, Int}) where {N}
-    v isa AbstractVector && @assert !Base.has_offset_axes(v)
-    ntuple(i -> (s[i] == 0 || s[i] > length(v)) ? v0 : v[s[i]], Val(N))
+@inline function swizzle_elems(a, b::NTuple{N}, s) where {N}
+    a isa AbstractVector && @assert !Base.has_offset_axes(a)
+    ntuple(i -> (i > length(s) || s[i] == 0) ? b[i] : a[s[i]], Val(N))
 end
 
 """
-    swizzle_elems!(r, v, v0, s)
-Swizzle `v` into mutable `r` according to the mask `s` and return `r`.  The
-final state of `r` should satisfy `r[i] = v[s[i]]` when `s[i] != 0` and `r[i] =
-v0` when `s[i] == 0`. `r` and `s` should have the same length. No checking is
-done to determine whether `s` is a valid mask. `v` must be at least as long as
+    swizzle_elems!(a, b, s)
+Swizzle `b` into mutable `a` according to the mask `s` and return `a`.  The
+final state of `a` should satisfy `a[i] = b[s[i]]` when `s[i] != 0` and `a[i]`
+should be unmodified when `s[i] == 0` or when `i > length(s)`. No checking is
+done to determine whether `s` is a valid mask. 
 `maximum(s)`.
+# Examples
 # Examples
 ```jldoctest
 julia> s = [2; 4; 0; 3; 1];
-julia> v = [3; 3; 3; 3];
-julia> r = [1; 1; 1; 1; 1];
-julia> swizzle_elems!(r, v, 4, s)
-5-element Array{Int64,1}:
- 3
- 3
- 4
- 3
- 3
+julia> a = [5; 5; 5; 5];
+julia> b = [-1; -2; -3; -4];
+julia> swizzle_elems!(a, b, s); a
+4-element Array{Int64,1}:
+ -2
+ -4
+ 5
+ -3
+julia> a = [5; 5; 5; 5; 5; 5];
+julia> swizzle_elems!(a, b, s); a
+6-element Array{Int64,1}:
+ -2
+ -4
+ 5
+ -3
+ -1
+ 5
+```
 ```
 """
 function swizzle_elems!(r::AbstractVector, v, v0, s::AbstractVector{Int}) where {M, T, T0, S <: Union{T, T0}}
