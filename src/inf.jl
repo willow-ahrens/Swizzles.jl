@@ -1,117 +1,38 @@
-struct Sequence{T, C, R}
-  cache::C
-  rest::R
-end
-
-function getindex(a::Sequence, i::Int)
-    @boundscheck i >= 0 || throw
-    if i <= length(a.cache)
-        return a.cache[i]
-    else
-        return a.rest[i - length(a.cache)]
-    end
-end
-
-getindex(a, i::Sequence{Int}) = Sequence(a[i.cache], a[i.rest])
-
-
-
 struct Skip end
 
 const skip = Skip()
 
-getindexinto(a, b, ::Skip) = a
+getindexinto(a, b, i::Int) = b[i]
+getindexinto(a, b, i::Skip) = a
 
-setindexinto(a, b, ::Skip) = a
+setindexinto(a, b, i::Int) = map((j, x) -> j == i ? b : x, enumerate(a))
+setindexinto(a, b, i::Skip) = a
 
-#A = B[I]
+getindexinto(a, b, i::Tuple{}) = ()
+getindexinto(a, b, i::Union{NTuple{<:Any, <:Union{Int, Skip}}, AbstractVector{<:Union{Int, Skip}}}) = map((a, j)->getindex(a, b, j), a, j)
 
-#getindexinto stops caching when all of the remaining iterator comes from either a's rest or b's rest
-
-    a_unrest = findlast(j -> !isa(i[j], Skip), 1:length(a.cache))
-    a_unrest = a_unrest == nothing ? 0 : a_unrest
-
-getindexinto_receiver_cache(a::Sequence{<:T}, i::Sequence{<:Union{Int, Skip}}
-getindexinto_sender_cache(
-getindexinto_receiver_length(
-
-function getindexinto(a::Sequence{<:T},
-                      b::Sequence{<:T},
-                      i::Sequence{<:Union{Int, Skip}, <:AbstractVector}) where {T}
-    c_cache = similar(i.cache, T, 0)
-    for i in 
-    
-
-
-    b_unrest = findlast(j -> !isa(i[j], Skip), 1:length(b.cache))
-    a_unrest = a_unrest == nothing ? 0 : a_unrest
-
-    b_unrest = findlast(!isequal(a.rest[0]), i.cache)
-    a_unrest = a_unrest == nothing ? 0 : a_unrest
-    b_unrest = 
-    c_cache = similar(b.cache, T, findfirst(j -> i[j] isa Skip ? i[j] < length(b.cache) : j < length(a.cache), 1:))
-    v! = similar(v, Union{eltype(v), typeof(v0), eltype(w), typeof(w0)})
-    v![1:length(v)] = v
-    v[(length(v) + 1):end] = v0
-    return swizzle_elems!(v!, w, w0, s)
+setindexinto(a, b, i::Union{NTuple{<:Any, Skip}, AbstractVector{Skip}}) = @boundscheck length(b) == length(i)
+function setindexinto(a, b, i::Tuple{Int}) =
+  @boundscheck length(b) == 1
+  setindexinto(a, b[1], i[1])
 end
-
-@inline function swizzle_elems(v::AbstractVector, v0, w, w0, s::NTuple{N, Int}) where {N}
-    w isa AbstractVector && @assert !Base.has_offset_axes(w)
-    ntuple(i -> (s[i] == 0) ? (i <= length(v) ? v[i] : v0) : (s[i] <= length(w) ? w[s[i]] : w0), length(s))
+function setindexinto(a, b, i::Tuple{Int, Skip}) =
+  @boundscheck length(b) == 2
+  setindexinto(a, b[1], i[1])
 end
-
-"""
-    swizzle_elems!(a, b, s)
-Swizzle `b` into mutable `a` according to the mask `s` and return `a`.  The
-final state of `a` should satisfy `a[i] = b[s[i]]` when `s[i] != 0` and `a[i]`
-should be unmodified when `s[i] == 0` or when `i > length(s)`. No checking is
-done to determine whether `s` is a valid mask. 
-`maximum(s)`.
-# Examples
-# Examples
-```jldoctest
-julia> s = [2; 4; 0; 3; 1];
-julia> a = [5; 5; 5; 5];
-julia> b = [-1; -2; -3; -4];
-julia> swizzle_elems!(a, b, s); a
-4-element Array{Int64,1}:
- -2
- -4
- 5
- -3
-julia> a = [5; 5; 5; 5; 5; 5];
-julia> swizzle_elems!(a, b, s); a
-6-element Array{Int64,1}:
- -2
- -4
- 5
- -3
- -1
- 5
-```
-```
-"""
-function swizzle_elems!(r::AbstractVector, v, v0, s::AbstractVector{Int}) where {M, T, T0, S <: Union{T, T0}}
-    @assert !Base.has_offset_axes(v)
-    @boundscheck @assert 0 <= maximum(s)
-    @boundscheck @assert length(s) == length(r)
-    @inbounds for (si, i) in enumerate(s)
-        r[i] = (si == 0 || si > length(v)) ? v0 : v[si]
-    end
-    r
+function setindexinto(a, b, i::Tuple{Skip, Int}) =
+  @boundscheck length(b) == 2
+  setindexinto(a, b[2], i[2])
 end
-
-#skip should return a and res be similar to b
-axes(sz) = getindexinto(Sequence(repeated(1:1)), Sequence(axes(sz.data), repeated(1:1)), sz.dims)
-
-#skip should return a and res be similar to a but if it is similar to b it should be similar to a so shrug
-inds(sz.data) = getindexinto(Sequence((inds), repeated(don't call)), axes(sz.data), inds, sz.idims)
-
-#A[I] = B
-
-function setindexinto(a::Sequence{<:T}, b::Sequence{<:T}, i::Sequence{<:Union{Int, Skip}}) 
-  
+function setindexinto(a, b, i::Tuple{Int, Int}) =
+  @boundscheck length(b) == 2
+  map((j, x) -> j == i[2] ? b[2] : (j == i[1] ? b[1] : x), enumerate(a))
+end
+function setindexinto(a, b, i::Union{NTuple{<:Any, <:Union{Int, Skip}}, AbstractVector{<:Union{Int, Skip}}}) =
+  @boundscheck length(b) == length(i)
+  state = Dict(j => x for (j, x) in zip(i, b))
+  map((j, x) -> haskey(state, j) ? state[j] : x, enumerate(a))
+end
 
 
 # Basic Functions for working with swizzles
