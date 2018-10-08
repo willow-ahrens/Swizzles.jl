@@ -26,61 +26,42 @@ is_swizzle_mask(s::Tuple{Int}) = s[1] >= 0
 is_swizzle_mask(s::Tuple{Int,Int}) = s[1] >= 0 && s[2] >= 0 && s[1] != s[2]
 
 """
-    is_smallest_swizzle_mask(s) -> Bool
-Return `true` if `s` is a valid swizzle mask, and the smallest of its kind.
-# Examples
-```jldoctest
-julia> is_smallest_swizzle_mask([1; 3])
-true
-julia> is_swizzle_mask([1; 1])
-false
-julia> is_swizzle_mask([1; 0; 0; 2])
-true
-julia> is_swizzle_mask([1; 0; 0; 1])
-false
-```
-"""
-is_smallest_swizzle_mask(s::Union{AbstractVector, Tuple}) =
-  length(s) == 0 || (last(s) != 0 && is_swizzle_mask(s))
-
-"""
-    swizzle_elems(v, w, w0, s)
+    swizzle_elems(v, v0, w, w0, s)
 Swizzle `w` into `v` according to the mask `s` and return the resulting
-collection `r`.  `r` should be similar to `v` and satisfy `r[i] = b[s[i]]` when
-`s[i] != 0` and `r[i] = a[i]` when `s[i] == 0` or when `i > length(s)`. `b`
-must be at least as long as `maximum(s)`. No checking is done to determine
-whether `s` is a valid mask.
+collection `r`.  `v` and `w` are treated as infinitely long sequences which end
+with repeating values of `v0` and `w0`, respectively. `r` should be similar to
+`v` and satisfy the following properties:
+  `r[i] === w[s[i]]` when `1 <= s[i] <= length(w)`
+  `r[i] === w0` when `s[i] > length(w)`
+  `r[i] === v[i]` when `s[i] == 0` and `i <= length(v)`
+  `r[i] === v0` when `s[i] == 0` and `i > length(v)`
+No checking is done to determine whether `s` is a valid swizzle mask.
 # Examples
 ```jldoctest
-julia> s = [2; 4; 0; 3; 1];
-julia> a = [5; 5; 5; 5];
-julia> b = [-1; -2; -3; -4];
-julia> swizzle_elems(a, b, s)
-4-element Array{Int64,1}:
+julia> s = [2; 4; 0; 3; 0];
+julia> v = [5; 6; 7];
+julia> w = [-1; -2; -3];
+julia> swizzle_elems(v, 8, w, -4, s)
+5-element Array{Int64,1}:
  -2
  -4
- 5
+ 7
  -3
-julia> a = [5; 5; 5; 5; 5; 5];
-julia> swizzle_elems(a, b, s)
-6-element Array{Int64,1}:
- -2
- -4
- 5
- -3
- -1
- 5
+ 8
 ```
 """
 swizzle_elems
 
-function swizzle_elems(a, b::AbstractVector, s)
-    return swizzle_elems!(similar(b, Union{eltype(a), eltype(b)}), a, b, s)
+function swizzle_elems(v::AbstractVector, v0, w, w0, s)
+    v! = similar(v, Union{eltype(v), typeof(v0), eltype(w), typeof(w0)})
+    v![1:length(v)] = v
+    v[(length(v) + 1):end] = v0
+    return swizzle_elems!(v!, w, w0, s)
 end
 
-@inline function swizzle_elems(a, b::NTuple{N}, s) where {N}
-    a isa AbstractVector && @assert !Base.has_offset_axes(a)
-    ntuple(i -> (i > length(s) || s[i] == 0) ? b[i] : a[s[i]], Val(N))
+@inline function swizzle_elems(v::AbstractVector, v0, w, w0, s::NTuple{N, Int}) where {N}
+    w isa AbstractVector && @assert !Base.has_offset_axes(w)
+    ntuple(i -> (s[i] == 0) ? (i <= length(v) ? v[i] : v0) : (s[i] <= length(w) ? w[s[i]] : w0), length(s))
 end
 
 """

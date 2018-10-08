@@ -49,40 +49,33 @@ Base.data(sz::Swizzled) = sz.data
 Base.size(sz::Swizzled) = map(size, broadcast_axes(sz))
 Base.axes(sz::Swizzled{N,s}) where {N,s} = swizzle_elems(broadcast_axes(sz.data), Base.OneTo(1), s)
 
+@inline Base.eachindex(sz::Swizzled) = _eachindex(axes(sz))
+_eachindex(t::Tuple{Any}) = t[1]
+_eachindex(t::Tuple) = CartesianIndices(t)
+
+function Base.iterate(sz::Swizzled)
+    iter = eachindex(sz)
+    iterate(sz, (iter,))
+end
+Base.@propagate_inbounds function Base.iterate(sz::Swizzled, s)
+    y = iterate(s...)
+    y === nothing && return nothing
+    i, newstate = y
+    return (bc[i], (s[1], newstate))
+end
+
 @inline function Base.getindex(sz::Swizzled{N,s,M,si}, inds::Vararg{Int,N}) where {T,N,s,M,si}
     data_axes = broadcast_axes(sz.data)
-    data_inds = swizzle_elems(inds, 1, si)
-    @boundscheck begin
-      for 
-      checkindex(Bool, ind, 
+    data_inds = _eachindex(swizzle_elems(axes(sz), inds, si))
+    y = iterate(data_inds)
+    (i, newstate) = y
+    res = sz.data[i]
+    for i in rest(data_inds, newstate)
+        res = sz.op(res, sz.data[i])
     end
-    @boundscheck checkbounds_indices(Bool, data_axes, swizzle_elems(inds, 1, si)) || throw_boundserror(sz, I)
-    iter = eachindex(bc′)
-    for 
-    ElType = combine_eltypes(bc.f, bc.args)
-    if Base.isconcretetype(ElType)
-        # We can trust it and defer to the simpler `copyto!`
-        return copyto!(similar(bc, ElType), bc)
-    end
-    # When ElType is not concrete, use narrowing. Use the first output
-    # value to determine the starting output eltype; copyto_nonleaf!
-    # will widen `dest` as needed to accommodate later values.
-    bc′ = preprocess(nothing, bc)
-    y = iterate(iter)
-    if y === nothing
-        # if empty, take the ElType at face value
-        return similar(bc′, ElType)
-    end
-    # Initialize using the first value
-    I, state = y
-    @inbounds val = bc′[I]
-    dest = similar(bc′, typeof(val))
-    @inbounds dest[I] = val
-    # Now handle the remaining values
-return copyto_nonleaf!(dest, bc′, iter, state, 1)
-    @inbounds val = getindex(A.data, swizzle_elems(I, Colon(), si)...)
-    val
 end
+
+copyto!(x, y::Swizzled) = copyto!(x, Base.Broadcasted(identity, (y,)))
 
 @inline function Base.setindex!(A::Swizzled{T,N,s,si,<:AbstractArray}, val, I::Vararg{Int,N}) where {T,N,s,si}
     @boundscheck checkbounds_indices(Bool, sz.data, swizzle_elems(I, 1, si)...) || throw_boundserror(sz, I)
