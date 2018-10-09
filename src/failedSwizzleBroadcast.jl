@@ -39,10 +39,17 @@ end
 
 @inline inv_swizzle_dims(sw::Swizzled{Style, Axes, N, Arg, dims, idims}) where {Style,Axes,N,Arg,dims,idims} = idims
 
+Broadcasted(f::F, args::Args, axes=nothing) where {F, Args<:Tuple} =
+    Broadcasted{typeof(combine_styles(args...))}(f, args, axes)
+function Broadcasted{Style}(f::F, args::Args, axes=nothing) where {Style, F, Args<:Tuple}
+    # using Core.Typeof rather than F preserves inferrability when f is a type
+    Broadcasted{Style, typeof(axes), Core.Typeof(f), Args}(f, args, axes)
+end
+
 Swizzled(arg, dims, op=unspecifiedop, axes=nothing) =
     Swizzled{typeof(swizzle_style(arg, dims, op))}(arg, dims, op, axes)
-Swizzled{Style}(arg, dims::NTuple{<:Any, Int}, op=unspecifiedop, axes=nothing) where {Style} =
-    Swizzled{Style}(arg, (dims...), op, axes)
+Swizzled{Style}(arg, dims, op=unspecifiedop, axes=nothing) where {Style} =
+    Swizzled{Style, typeof(axes), (arg, dims, op, axes)
 function Swizzled{Style}(arg, dims::NTuple{N, Int}, op=unspecifiedop, axes=nothing) where {Style, N}
     is_swizzle_dims(dims) || throw(ArgumentError("$dims are not a valid swizzle dims"))
     Swizzled{Style, typeof(axes), N, typeof(arg), dims, inv_swizzle_dims(dims), typeof(op)}(arg, op, axes)

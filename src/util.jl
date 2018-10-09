@@ -2,6 +2,13 @@ struct Skip end
 
 const skip = Skip()
 
+Base.isequal(::Skip, ::Skip) = true
+Base.isequal(::Skip, ::Int) = false
+Base.isequal(::Int, ::Skip) = false
+Base.isless(::Skip, ::Int) = true
+Base.isless(::Int, ::Skip) = false
+Base.isless(::Skip, ::Skip) = false
+
 getindexinto(a, b, i::Int) = b[i]
 getindexinto(a, b, i::Skip) = a
 
