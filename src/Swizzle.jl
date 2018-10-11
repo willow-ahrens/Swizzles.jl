@@ -1,10 +1,12 @@
 module Swizzle
 
-export swizzle, invswizzle
-export inverse_swizzle_mask
-export SwizzledArray
-export beam
+export swizzle, swizzle!
+export Swizzler
+export Reduce, Sum
+export Beam
 
-
+include("base.jl")
+include("util.jl")
+include("Swizzleds.jl")
 
 end # module
