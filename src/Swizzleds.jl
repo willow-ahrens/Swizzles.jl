@@ -42,7 +42,7 @@ end
 _mask(::Type{<:Swizzled{<:Any, <:Any, <:Any, <:Any, mask}}) where {mask} = mask
 _mask(sz::Swizzled) = _mask(typeof(sz))
 _imask(::Type{<:Swizzled{<:Any, <:Any, imask}}) where {imask} = imask
-_imask(sz::Swizzled) = _mask(typeof(sz))
+_imask(sz::Swizzled) = _imask(typeof(sz))
 
 #= TODO do we need this?
 BroadcastStyle(::Type{<:Swizzled{Style}}) where {Style} = Style()
@@ -55,11 +55,7 @@ argtype(sz::Swizzled) = argtype(typeof(sz))
 
 Swizzled(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) =
     Swizzled{typeof(swizzle_style(BroadcastStyle(typeof(arg)), mask, op))}(arg, mask, op, axes, imask)
-function Swizzled{Style}(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) where {Style} =
-    arg = instantiate(arg)
-    mask = (take(mask, ndims(arg))...,)
-    imask = _instantiate_imask(sz, _imask(sz), mask)
-    axes = _axes(sz, sz.axes, imask)
+Swizzled{Style}(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) where {Style} =
     Swizzled{Style, typeof(axes), imask, typeof(arg), mask, Core.Typeof(op)}(arg, op, axes)
 
 Base.convert(::Type{Swizzled{Style}}, sz::Swizzled) where {Style} =
@@ -89,7 +85,7 @@ Base.similar(sz::Swizzled{ArrayConflict}, ::Type{Bool}) =
 ## Computing the result's axes. Most types probably won't need to specialize this.
 instantiate_mask(sz::Swizzled) = _instantiate_mask(sz, _mask(sz))
 _instantiate_mask(sz::Swizzled, mask::Tuple) = mask
-_instantiate_mask(sz::Swizzled, mask) = (take(mask, ndims(sz.arg))...,)
+_instantiate_mask(sz::Swizzled, mask) = (take(mask, length(broadcast_axes(sz.arg)))...,)
 
 instantiate_imask(sz::Swizzled) = _instantiate_imask(sz, _imask(sz), _mask(sz))
 _instantiate_imask(sz::Swizzled, imask::Tuple, mask) = imask
@@ -302,14 +298,14 @@ Base.copy(sz::Swizzled{Nothing}) = copy(instantiate(Broadcasted(identity, (sz,))
 
 Base.copyto!(dest, sz::Swizzled{Nothing}) = copyto(dest, instantiate(Broadcasted(identity, (sz,))))
 
-Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(preprocess(dest, sz.arg), _mask(sz), sz.op, sz.axes, _imask(sz)))
+Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(sz.arg, _mask(sz), sz.op, sz.axes, _imask(sz))) #TODO problem here too.
 
 struct Swizzler
     mask
     op
 end
 
-Base.Broadcast.broadcasted(style, szr::Swizzler, arg) = Swizzled{style}(szr.mask, szr.op)
+Base.Broadcast.broadcasted(style::BroadcastStyle, szr::Swizzler, arg) = Swizzled(arg, szr.mask, szr.op) #Should use style here duh.
 
 
 
@@ -319,9 +315,9 @@ end
 
 function Reduce(dims, op)
     m = maximum((0, dims...))
-    s = set(dims)
+    s = Set(dims)
     c = 1
-    Swizzler(flattened((ntuple(d -> d in s ? Pass : c += 1, m), countfrom(m - length(s) + 1))), op)
+    Swizzler(flatten((ntuple(d -> d in s ? pass : c += 1, m), countfrom(m - length(s) + 1))), op)
 end
 
 
