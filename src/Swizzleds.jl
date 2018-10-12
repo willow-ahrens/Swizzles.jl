@@ -7,7 +7,7 @@ export broadcast, broadcast!, BroadcastStyle, broadcast_axes, broadcastable, dot
 =#
 using Base.Iterators: repeated, countfrom, flatten, take, peel
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
-using Base.Broadcast: materialize, materialize!
+using Base.Broadcast: materialize, materialize!, instantiate, preprocess, broadcast_axes, _broadcast_getindex
 
 ### An operator which does not expect to be called.
 
@@ -32,14 +32,17 @@ unspecifiedop(a, b) = throw(ArgumentError("unspecified reduction operator"))
 # is not long enough, remaining dimensions are passped. `mask` is lifted into
 # the type domain
 
-struct Swizzled{Style<:Union{Nothing,BroadcastStyle}, Axes, IMask, Arg, Mask, Op}
+struct Swizzled{Style<:Union{Nothing,BroadcastStyle}, Axes, imask, Arg, mask, Op}
     arg::Arg
-    mask::Mask
     op::Op
     axes::Axes
-    imask::IMask
     #TODO enforce inv swizzle/other properties?
 end
+
+_mask(::Type{<:Swizzled{<:Any, <:Any, <:Any, <:Any, mask}}) where {mask} = mask
+_mask(sz::Swizzled) = _mask(typeof(sz))
+_imask(::Type{<:Swizzled{<:Any, <:Any, imask}}) where {imask} = imask
+_imask(sz::Swizzled) = _mask(typeof(sz))
 
 #= TODO do we need this?
 BroadcastStyle(::Type{<:Swizzled{Style}}) where {Style} = Style()
@@ -52,11 +55,15 @@ argtype(sz::Swizzled) = argtype(typeof(sz))
 
 Swizzled(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) =
     Swizzled{typeof(swizzle_style(BroadcastStyle(typeof(arg)), mask, op))}(arg, mask, op, axes, imask)
-Swizzled{Style}(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) where {Style} =
-    Swizzled{Style, typeof(axes), typeof(imask), typeof(arg), typeof(mask), Core.Typeof(op)}(arg, mask, op, axes, imask)
+function Swizzled{Style}(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) where {Style} =
+    arg = instantiate(arg)
+    mask = (take(mask, ndims(arg))...,)
+    imask = _instantiate_imask(sz, _imask(sz), mask)
+    axes = _axes(sz, sz.axes, imask)
+    Swizzled{Style, typeof(axes), imask, typeof(arg), mask, Core.Typeof(op)}(arg, op, axes)
 
-Base.convert(::Type{Swizzled{NewStyle}}, sz::Swizzled{Style,Axes,IMask,Arg,Mask,Op}) where {NewStyle,Style,Axes,IMask,Arg,Mask,Op} =
-    Swizzled{NewStyle,Axes,IMask,Arg,Mask,Op}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask)
+Base.convert(::Type{Swizzled{Style}}, sz::Swizzled) where {Style} =
+    Swizzled{Style}(sz.arg, _mask(sz), sz.op, sz.axes, _imask(sz))
 
 function Base.show(io::IO, sz::Swizzled{Style}) where {Style}
     print(io, Swizzled)
@@ -64,7 +71,7 @@ function Base.show(io::IO, sz::Swizzled{Style}) where {Style}
     # "outermost" Swizzled. The styles of nested Broadcasteds represent an intermediate
     # computation that is not relevant for dispatch, confusing, and just extra line noise.
     sz.axes isa Tuple && print(io, '{', Style, '}')
-    print(io, '(', sz.arg, ", ", sz.mask, ", ", sz.op, ')')
+    print(io, '(', sz.arg, ", ", _mask(sz), ", ", sz.op, ')')
     nothing
 end
 
@@ -80,28 +87,26 @@ Base.similar(sz::Swizzled{ArrayConflict}, ::Type{Bool}) =
     similar(BitArray, axes(sz))
 
 ## Computing the result's axes. Most types probably won't need to specialize this.
-instantiate_mask(sz::Swizzled) = _instantiate_mask(sz, sz.mask)
+instantiate_mask(sz::Swizzled) = _instantiate_mask(sz, _mask(sz))
 _instantiate_mask(sz::Swizzled, mask::Tuple) = mask
-_instantiate_mask(sz::Swizzled, ::Nothing) = (take(sz.mask, ndims(sz.arg))...,)
+_instantiate_mask(sz::Swizzled, mask) = (take(mask, ndims(sz.arg))...,)
 
-instantiate_imask(sz::Swizzled) = _instantiate_imask(sz, sz.imask, sz.mask)
-_instantiate_imask(sz::Swizzled, imask::Tuple, mask::Nothing) = imask
+instantiate_imask(sz::Swizzled) = _instantiate_imask(sz, _imask(sz), _mask(sz))
+_instantiate_imask(sz::Swizzled, imask::Tuple, mask) = imask
 _instantiate_imask(sz::Swizzled, imask::Nothing, mask::Tuple) = setindexinto((repeated(pass, max(0, maximum(mask)))...,), 1:length(mask), mask)
-_instantiate_imask(sz::Swizzled, imask::Nothing, mask::Nothing) = _imask(sz, imask, instantiate_mask(sz))
+_instantiate_imask(sz::Swizzled, imask::Nothing, mask) = _instantiate_imask(sz, imask, _instantiate_mask(sz, mask))
 
-@inline Base.axes(sz::Swizzled) = _axes(sz, sz.axes, sz.imask, sz.mask)
-_axes(::Swizzled, axes::Tuple, imask, mask) = axes
-_axes(::Swizzled, axes::Nothing, imask::Tuple, mask) = getindexinto((repeated(Base.OneTo(1), length(imask))...,), broadcast_axes(sz.arg), imask)
-_axes(::Swizzled, axes::Nothing, imask::Nothing) = _axes(sz, nothing, instantiate_imask(sz))
+@inline Base.axes(sz::Swizzled) = _axes(sz, sz.axes, _imask(sz))
+_axes(sz::Swizzled, axes::Tuple, imask) = axes
+_axes(sz::Swizzled, axes::Nothing, imask::Tuple) = getindexinto((repeated(Base.OneTo(1), length(imask))...,), broadcast_axes(sz.arg), imask)
+_axes(sz::Swizzled, axes::Nothing, imask::Nothing) = _axes(sz, nothing, instantiate_imask(sz))
 
 @inline Base.eachindex(sz::Swizzled) = _eachindex(axes(sz))
 _eachindex(t::Tuple{Any}) = t[1]
 _eachindex(t::Tuple) = CartesianIndices(t)
 
-Base.ndims(::Swizzled{<:Any,<:NTuple{N,Any}}) where {N} = N
-Base.ndims(::Type{<:Swizzled{<:Any,<:NTuple{N,Any}}}) where {N} = N
-Base.ndims(::Swizzled{<:Any,Nothing,<:NTuple{N,Any}}) where {N} = N
-Base.ndims(::Type{<:Swizzled{<:Any,Nothing,<:NTuple{N,Any}}}) where {N} = N
+Base.ndims(::Swizzled{<:Any,<:Tuple{Vararg{<:Any}}}) where {N} = N
+Base.ndims(::Type{<:Swizzled{<:Any,<:Tuple{Vararg{<:Any}}}}) where {N} = N
 
 Base.length(sz::Swizzled) = prod(map(length, axes(sz)))
 
@@ -116,7 +121,7 @@ Base.@propagate_inbounds function Base.iterate(sz::Swizzled, s)
     return (sz[i], (s[1], newstate))
 end
 
-Base.IteratorSize(::Type{<:Swizzled{<:Any,<:NTuple{N,Base.OneTo}}}) where {N} = Base.HasShape{N}()
+Base.IteratorSize(::Type{<:Swizzled{<:Any,<:NTuple{N}}}) where {N} = Base.HasShape{N}()
 Base.IteratorEltype(::Type{<:Swizzled}) = Base.EltypeUnknown()
 
 ## Instantiation fills in the "missing" fields in Swizzled.
@@ -129,10 +134,10 @@ to compute and verify the resulting `axes` on-demand, leaving the `axis` field
 of the `Swizzled` object empty (populated with [`nothing`](@ref)).
 """
 @inline function Base.Broadcast.instantiate(sz::Swizzled{Style}) where {Style}
-    if sz.axes isa Nothing || sz.imask isa Nothing || !(sz.mask isa Tuple)
+    if sz.axes isa Nothing || _imask(sz) isa Nothing || !(_mask(sz) isa Tuple)
         mask = instantiate_mask(sz)
-        imask = _instantiate_imask(sz, sz.imask, mask)
-        axes = _axes(sz, sz.axes, sz.imask)
+        imask = _instantiate_imask(sz, _imask(sz), mask)
+        axes = _axes(sz, sz.axes, imask)
         return Swizzled{Style}(sz.arg, mask, sz.op, axes, imask)
     else
         check_swizzle(sz)
@@ -141,13 +146,13 @@ of the `Swizzled` object empty (populated with [`nothing`](@ref)).
 end
 
 function check_swizzle(sz)
-    @assert sz.mask isa Tuple{Vararg{<:Union{Int, Pass}}}
-    @assert sz.imask isa Tuple{Vararg{<:Union{Int, Pass}}}
+    #= FIXME
+    @assert mask(sz) isa Tuple{Vararg{<:Union{Int, Pass}}}
+    @assert _imask(sz) isa Tuple{Vararg{<:Union{Int, Pass}}}
     @assert length(mask) == length(axes(sz.arg))
     @assert length(imask) == length(sz.axes)
     @assert max(0, maximum(mask)) == length(imask)
     @assert max(0, maximum(imask)) == length(mask)
-    #= FIXME
     @assert all(map(d -> d isa Pass || 1 <= d, mask))
     @assert any(map(d -> d isa Int && d == maximum(mask)))
     @assert (minimum(mask) isa Int && minimum(mask) >= 1) || minimum(mask) isa Pass
@@ -178,11 +183,12 @@ swizzle_style(style::Broadcast.AbstractArrayStyle{Any}, mask, op) = style
 swizzle_style(::BroadcastStyle, mask, op) = Broadcast.Unknown()
 swizzle_style(::ArrayConflict, mask, op) = Broadcast.ArrayConflict() #FIXME
 
-Broadcast.BroadcastStyle(::Swizzled) = swizzle_style(BroadcastStyle(sz.arg), sz.mask, sz.op)
+Broadcast.BroadcastStyle(::Type{<:Swizzled{Nothing, Axes, imask, Arg, mask, Op}}) where {Style, Axes, imask, Arg, mask, Op} = swizzle_style(BroadcastStyle(Arg), mask, Op)
+Broadcast.BroadcastStyle(::Type{<:Swizzled{Style}}) where {Style} = Style
 
 @inline function Base.getindex(sz::Swizzled, I::Union{Integer,CartesianIndex})
     @boundscheck checkbounds(sz, I)
-    inds = eachindex(getindexinto(axes(sz.arg), I, sz.mask))
+    inds = eachindex(getindexinto(axes(sz.arg), I, _mask(sz)))
     (i, inds) = peel(inds)
     res = @inbounds getindex(sz.arg, i)
     for i in inds
@@ -288,22 +294,22 @@ swizzle!(dest, A, mask, op=unspecifiedop) = (materialize!(dest, Swizzled(A, mask
 
 
 
-Base.copy(sz::Swizzled{Style}) where {Style} = copy(Swizzled{Nothing}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask))
+Base.copy(sz::Swizzled{Style}) where {Style} = copy(Swizzled{Nothing}(sz.arg, _mask(sz), sz.op, sz.axes, _imask(sz)))
 
-Base.copyto!(dest, sz::Swizzled{Style}) where {Style} = copyto!(dest, Swizzled{Nothing}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask))
+Base.copyto!(dest, sz::Swizzled{Style}) where {Style} = copyto!(dest, Swizzled{Nothing}(sz.arg, _mask(sz), sz.op, sz.axes, _imask(sz)))
 
-Base.copy(sz::Swizzled{Nothing}) = copy(instantiate(preprocess(Broadcasted(identity, (sz,)))))
+Base.copy(sz::Swizzled{Nothing}) = copy(instantiate(Broadcasted(identity, (sz,))))
 
-Base.copyto!(dest, sz::Swizzled{Nothing}) = copyto(dest, instantiate(preprocess(Broadcasted(identity, (sz,)))))
+Base.copyto!(dest, sz::Swizzled{Nothing}) = copyto(dest, instantiate(Broadcasted(identity, (sz,))))
 
-Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = extrude(instantiate(Swizzled{Style}(preprocess(dest, sz.arg), sz.mask, sz.op, sz.axes, sz.imask)))
+Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(preprocess(dest, sz.arg), _mask(sz), sz.op, sz.axes, _imask(sz)))
 
 struct Swizzler
     mask
     op
 end
 
-Base.Broadcast.broadcasted(style, sz::Swizzler, arg) = Swizzled{style}(sz.mask, sz.op)
+Base.Broadcast.broadcasted(style, szr::Swizzler, arg) = Swizzled{style}(szr.mask, szr.op)
 
 
 
