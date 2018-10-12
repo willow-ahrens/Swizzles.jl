@@ -1,6 +1,7 @@
 module Swizzle
 
 export swizzle, swizzle!
+export pass
 export Swizzler
 export Reduce, Sum
 export Beam

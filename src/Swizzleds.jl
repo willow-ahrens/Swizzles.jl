@@ -5,34 +5,39 @@ using .Base: Indices, OneTo, tail, to_shape, isoperator, promote_typejoin,
 import .Base: copy, copyto!
 export broadcast, broadcast!, BroadcastStyle, broadcast_axes, broadcastable, dotview, @__dot__
 =#
+using Base.Iterators: repeated, countfrom, flatten, take, peel
+using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
+using Base.Broadcast: materialize, materialize!
 
 ### An operator which does not expect to be called.
 
 """
   `unspecifiedop(a, b)` is a reduction operator which does not expect to be called. It startles easily.
 """
-function unspecifiedop(a, b) = throw(ArgumentError("unspecified reduction operator"))
+unspecifiedop(a, b) = throw(ArgumentError("unspecified reduction operator"))
 
 ### Lazy-wrapper for swizzling
 
-# `Swizzled` wraps the argument to `swizzle(A, dims, op=unspecifiedop)`. A
+# `Swizzled` wraps the argument to `swizzle(A, mask, op=unspecifiedop)`. A
 # statement like
 #    y = Swizzler((1,), +).(x .* (Swizzler((2, 1)).x .+ 1))
 # will result in code that is essentially
 #    y = copy(Swizzled(Broadcasted(*, Swizzled(x, (2, 1)), Broadcasted(+, x, 1)), (1,), +))
 # `swizzle!` results in `copyto!(dest, Swizzled(...))`.
-# `dims` is an iterator of nonnegative integers specifying where dimensions of
+# `mask` is an iterator of nonnegative integers specifying where dimensions of
 # the wrapped `A` will appear in the output array. Each dimension of `A` may be
-# used at most once in `dims`, but `skip` is a special value that may be used
+# used at most once in `mask`, but `pass` is a special value that may be used
 # to specify that a dimension is expected to be dropped. Uniqueness of integers
-# in `dims` cannot be checked, since `dims` may be infinitely long. If `dims`
-# is not long enough, remaining dimensions are skipped. `dims` is lifted into
+# in `mask` cannot be checked, since `mask` may be infinitely long. If `mask`
+# is not long enough, remaining dimensions are passped. `mask` is lifted into
 # the type domain
 
-struct Swizzled{Style<:Union{Nothing,BroadcastStyle}, Axes, mask, imask, Arg, dims, Op}
+struct Swizzled{Style<:Union{Nothing,BroadcastStyle}, Axes, IMask, Arg, Mask, Op}
     arg::Arg
+    mask::Mask
     op::Op
     axes::Axes
+    imask::IMask
     #TODO enforce inv swizzle/other properties?
 end
 
@@ -45,15 +50,13 @@ argtype(::Type{Swizzled{<:Any,<:Any,<:Any,<:Any,Arg}}) where {Arg} = Arg
 argtype(sz::Swizzled) = argtype(typeof(sz))
 =#
 
-Swizzled(arg, dims, op=unspecifiedop, axes=nothing, mask=nothing, imask=nothing) =
-    Swizzled{typeof(swizzle_style(arg, dims, op))}(arg, dims, op, axes, mask, imask)
-Swizzled{Style}(arg, dims, op=unspecifiedop, axes=nothing, mask=nothing, imask=nothing) where {Style} =
-    # using Core.Typeof rather than F preserves inferrability when f is a type, according to Matt I guess
-    Swizzled{Style, typeof(axes), mask, imask, typeof(arg), dims, Core.Typeof(op)}(arg, op, axes)
-end
+Swizzled(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) =
+    Swizzled{typeof(swizzle_style(BroadcastStyle(typeof(arg)), mask, op))}(arg, mask, op, axes, imask)
+Swizzled{Style}(arg, mask, op=unspecifiedop, axes=nothing, imask=nothing) where {Style} =
+    Swizzled{Style, typeof(axes), typeof(imask), typeof(arg), typeof(mask), Core.Typeof(op)}(arg, mask, op, axes, imask)
 
-Base.convert(::Type{Swizzled{NewStyle}}, sz::Swizzled{Style,Axes,mask,imask,Arg,dims,Op}) where {NewStyle,Style,Axes,mask,imask,Arg,dims,Op} =
-    Swizzled{NewStyle,Axes,mask,imask,Arg,dims,Op}(sz.arg, sz.dims, sz.op, sz.axes)
+Base.convert(::Type{Swizzled{NewStyle}}, sz::Swizzled{Style,Axes,IMask,Arg,Mask,Op}) where {NewStyle,Style,Axes,IMask,Arg,Mask,Op} =
+    Swizzled{NewStyle,Axes,IMask,Arg,Mask,Op}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask)
 
 function Base.show(io::IO, sz::Swizzled{Style}) where {Style}
     print(io, Swizzled)
@@ -61,7 +64,7 @@ function Base.show(io::IO, sz::Swizzled{Style}) where {Style}
     # "outermost" Swizzled. The styles of nested Broadcasteds represent an intermediate
     # computation that is not relevant for dispatch, confusing, and just extra line noise.
     sz.axes isa Tuple && print(io, '{', Style, '}')
-    print(io, '(', sz.arg, ", ", getdims(sz), ", ", sz.op ')')
+    print(io, '(', sz.arg, ", ", sz.mask, ", ", sz.op, ')')
     nothing
 end
 
@@ -77,27 +80,19 @@ Base.similar(sz::Swizzled{ArrayConflict}, ::Type{Bool}) =
     similar(BitArray, axes(sz))
 
 ## Computing the result's axes. Most types probably won't need to specialize this.
-swizzle_dims(::Type{Swizzled{<:Any,<:Any,<:Any,<:Any,<:Any, dims}}) where {dims} = dims
-swizzle_dims(sz::Swizzled) = swizzle_dims(typeof(sz))
+instantiate_mask(sz::Swizzled) = _instantiate_mask(sz, sz.mask)
+_instantiate_mask(sz::Swizzled, mask::Tuple) = mask
+_instantiate_mask(sz::Swizzled, ::Nothing) = (take(sz.mask, ndims(sz.arg))...,)
 
-swizzle_imask(sz::Swizzled) = swizzle_imask(typeof(sz))
-swizzle_imask(::Type{Swizzled{<:Any,<:Any,<:Any,imask}}) where {imask} = imask
-swizzle_imask(sz::Swizzled{<:Any,<:Any,<:Any,nothing}) = (take(swizzle_dims(sz), length(broadcast_axes(arg(sz))))...,)
+instantiate_imask(sz::Swizzled) = _instantiate_imask(sz, sz.imask, sz.mask)
+_instantiate_imask(sz::Swizzled, imask::Tuple, mask::Nothing) = imask
+_instantiate_imask(sz::Swizzled, imask::Nothing, mask::Tuple) = setindexinto((repeated(pass, max(0, maximum(mask)))...,), 1:length(mask), mask)
+_instantiate_imask(sz::Swizzled, imask::Nothing, mask::Nothing) = _imask(sz, imask, instantiate_mask(sz))
 
-swizzle_mask(sz::Swizzled) = swizzle_mask(typeof(sz))
-swizzle_mask(::Type{Swizzled{<:Any,<:Any,mask}}) where {mask} = mask
-function swizzle_mask(sz::Type{Swizzled{<:Any,<:Any,nothing}})
-  imask = swizzle_imask(sz)
-  return setindexinto((repeated(skip, max(0, maximum(imask)))...,), 1:length(imask), imask)
-end
-
-@inline Base.axes(sz::Swizzled) = _axes(sz, sz.axes)
-_axes(::Swizzled, axes::Tuple) = axes
-@inline function _axes(sz::Swizzled, ::Nothing)
-    b_a = broadcast_axes(sz.arg)
-    mask = swizzle_mask(sz)
-    return getindexinto((repeated(Base.OneTo(1), length(mask))...,), b_a, mask)
-end
+@inline Base.axes(sz::Swizzled) = _axes(sz, sz.axes, sz.imask, sz.mask)
+_axes(::Swizzled, axes::Tuple, imask, mask) = axes
+_axes(::Swizzled, axes::Nothing, imask::Tuple, mask) = getindexinto((repeated(Base.OneTo(1), length(imask))...,), broadcast_axes(sz.arg), imask)
+_axes(::Swizzled, axes::Nothing, imask::Nothing) = _axes(sz, nothing, instantiate_imask(sz))
 
 @inline Base.eachindex(sz::Swizzled) = _eachindex(axes(sz))
 _eachindex(t::Tuple{Any}) = t[1]
@@ -105,7 +100,8 @@ _eachindex(t::Tuple) = CartesianIndices(t)
 
 Base.ndims(::Swizzled{<:Any,<:NTuple{N,Any}}) where {N} = N
 Base.ndims(::Type{<:Swizzled{<:Any,<:NTuple{N,Any}}}) where {N} = N
-#TODO could also compute from mask or imask
+Base.ndims(::Swizzled{<:Any,Nothing,<:NTuple{N,Any}}) where {N} = N
+Base.ndims(::Type{<:Swizzled{<:Any,Nothing,<:NTuple{N,Any}}}) where {N} = N
 
 Base.length(sz::Swizzled) = prod(map(length, axes(sz)))
 
@@ -132,12 +128,12 @@ Custom [`BroadcastStyle`](@ref)s may override this default in cases where it is 
 to compute and verify the resulting `axes` on-demand, leaving the `axis` field
 of the `Swizzled` object empty (populated with [`nothing`](@ref)).
 """
-@inline function instantiate(sz::Swizzled{Style}) where {Style}
-    if sz.axes isa Nothing || sz.mask isa Nothing || sz.imask isa Nothing
-        imask = swizzle_imask(sz)
-        mask = swizzle_mask(sz)
-        axes = axes(sz)
-        return Swizzled{Style}(sz.arg, sz.dims, sz.op, axes, mask, imask)
+@inline function Base.Broadcast.instantiate(sz::Swizzled{Style}) where {Style}
+    if sz.axes isa Nothing || sz.imask isa Nothing || !(sz.mask isa Tuple)
+        mask = instantiate_mask(sz)
+        imask = _instantiate_imask(sz, sz.imask, mask)
+        axes = _axes(sz, sz.axes, sz.imask)
+        return Swizzled{Style}(sz.arg, mask, sz.op, axes, imask)
     else
         check_swizzle(sz)
         return sz
@@ -145,27 +141,29 @@ of the `Swizzled` object empty (populated with [`nothing`](@ref)).
 end
 
 function check_swizzle(sz)
-    imask = swizzle_imask(sz)
-    mask = swizzle_mask(sz)
-    argaxes = axes(sz.arg)
-    axes = axes(sz)
-    @assert imask == (take(swizzle_dims(sz), length(imask))...,)
-    @assert length(imask) == length(argaxes)
-    @assert eltype(imask) isa Union{Int, Skip}
-    @assert eltype(mask) isa Union{Int, Skip}
-    @assert (minimum(imask) isa Int && minimum(imask) >= 1) || minimum(imask) isa Skip
-    @assert (maximum(imask) isa Int && maximum(imask) == length(mask)) || (maximum(imask) isa Skip && length(mask) == 0)
-    @assert all(map(((i, j),) -> m isa Skip || mask[m] == i, enumerate(imask)))
-    @assert all(map(((i, j),) -> m isa Skip || imask[m] == i, enumerate(mask)))
-    @assert all(map(((i, j),) -> (j isa Skip && axes[i] == 1:1) || axes[i] == argaxes[j], enumerate(mask)))
+    @assert sz.mask isa Tuple{Vararg{<:Union{Int, Pass}}}
+    @assert sz.imask isa Tuple{Vararg{<:Union{Int, Pass}}}
+    @assert length(mask) == length(axes(sz.arg))
+    @assert length(imask) == length(sz.axes)
+    @assert max(0, maximum(mask)) == length(imask)
+    @assert max(0, maximum(imask)) == length(mask)
+    #= FIXME
+    @assert all(map(d -> d isa Pass || 1 <= d, mask))
+    @assert any(map(d -> d isa Int && d == maximum(mask)))
+    @assert (minimum(mask) isa Int && minimum(mask) >= 1) || minimum(mask) isa Pass
+    @assert (maximum(mask) isa Int && maximum(mask) == length(imask)) || (maximum(gmask) isa Pass && length(imask) == 0)
+    @assert all(map(((i, j),) -> m isa Pass || imask[m] == i, enumerate(gmask)))
+    @assert all(map(((i, j),) -> m isa Pass || gmask[m] == i, enumerate(imask)))
+    @assert all(map(((i, j),) -> (j isa Pass && axes[i] == 1:1) || axes[i] == argaxes[j], enumerate(imask)))
+    =#
 end
 
-## Flattening swizzles is difficult and people shouldn't flatten broadcasts anyway. Harumph
+## Flattening swizzles is difficult and people shouldn't flatten broadcasts anyway. Harumph.
 
 ### Objects with customized swizzling behavior should define a corresponding BroadcastStyle
 
 """
-  `swizzle_style(style, dims, op=unspecifiedop)`
+  `swizzle_style(style, mask, op=unspecifiedop)`
 Broadcast styles are used to determine behavior of objects under swizzling.  To
 customize the swizzling behavior of a type, one can first define an appropriate
 Broadcast style for the the type, then declare how the broadcast style should
@@ -174,15 +172,17 @@ behave under broadcasting after the swizzle by overriding the
 """
 swizzle_style
 
-swizzle_style(::Broadcast.Style{Tuple}, dims, op) = first(dims) == 1 ? Broadcast.Style{Tuple}() : Broadcast.DefaultArrayStyle(Val(first(dims)))
-swizzle_style(style::A, dims, op) where {N, A <: Broadcast.AbstractArrayStyle{N}} = A(Val(maximum(take(idims, N))))
-swizzle_style(style::Broadcast.AbstractArrayStyle{Any}, dims, op) = style
-swizzle_style(::BroadcastStyle, dims, op) = Broadcast.Unknown()
-swizzle_style(::ArrayConflict, dims, op) = Broadcast.ArrayConflict() #FIXME
+swizzle_style(::Style{Tuple}, mask, op) = first(mask) == 1 ? Style{Tuple}() : DefaultArrayStyle(Val(first(mask)))
+swizzle_style(style::A, mask, op) where {N, A <: Broadcast.AbstractArrayStyle{N}} = A(Val(maximum(take(mask, N))))
+swizzle_style(style::Broadcast.AbstractArrayStyle{Any}, mask, op) = style
+swizzle_style(::BroadcastStyle, mask, op) = Broadcast.Unknown()
+swizzle_style(::ArrayConflict, mask, op) = Broadcast.ArrayConflict() #FIXME
+
+Broadcast.BroadcastStyle(::Swizzled) = swizzle_style(BroadcastStyle(sz.arg), sz.mask, sz.op)
 
 @inline function Base.getindex(sz::Swizzled, I::Union{Integer,CartesianIndex})
     @boundscheck checkbounds(sz, I)
-    inds = eachindex(getindexinto(axes(sz.arg), I, swizzle_imask(sz)))
+    inds = eachindex(getindexinto(axes(sz.arg), I, sz.mask))
     (i, inds) = peel(inds)
     res = @inbounds getindex(sz.arg, i)
     for i in inds
@@ -198,21 +198,21 @@ Base.@propagate_inbounds Base.getindex(sz::Swizzled) = sz[CartesianIndex(())]
     Base.checkbounds_indices(Bool, axes(bc), (I,)) || Base.throw_boundserror(bc, (I,))
 =# #TODO why would anyone need this?
 
-broadcastable(sz::Swizzle) = sz
+Base.Broadcast.broadcastable(sz::Swizzled) = sz
 
 ## Swizzling core
 
 """
-    swizzle(A, dims, op=unspecifiedop)
+    swizzle(A, mask, op=unspecifiedop)
 Create a new obect `B` such that the dimension `i` of `A` is mapped to
-dimension `dims[i]` of `B`, operating on lazy broadcast expressions, arrays,
-tuples, collections, [`Ref`](@ref)s and/or scalars `As`. If `dims[i]` is an
-instance of the singleton type `Skip`, the dimension is reduced over using
-`op`. `dims` may be any (possibly infinite) iterable over elements of type
-`Int` and `Skip`. The integers in `dims` must be unique, and if `dims` is
-not long enough, additional `skip` are added to the end.
+dimension `mask[i]` of `B`, operating on lazy broadcast expressions, arrays,
+tuples, collections, [`Ref`](@ref)s and/or scalars `As`. If `mask[i]` is an
+instance of the singleton type `Pass`, the dimension is reduced over using
+`op`. `mask` may be any (possibly infinite) iterable over elements of type
+`Int` and `Pass`. The integers in `mask` must be unique, and if `mask` is
+not long enough, additional `pass` are added to the end.
 The resulting container type is established by the following rules:
- - If all elements of `dims` are `Skip`, it returns an unwrapped scalar.
+ - If all elements of `mask` are `Pass`, it returns an unwrapped scalar.
  - All other combinations of arguments default to returning an `Array`, but
    custom container types can define their own implementation rules to
    customize the result when they appear as an argument.
@@ -253,12 +253,12 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 1x2-element Array{Int64,1}:
  1 2
 """
-swizzle(A, dims, op=unspecifiedop) = materialize(Swizzled(A, dims, op))
+swizzle(A, mask, op=unspecifiedop) = materialize(Swizzled(A, mask, op))
 
 """
-    swizzle!(A, dims, op=unspecifiedop)
+    swizzle!(A, mask, op=unspecifiedop)
 Like [`swizzle`](@ref), but store the result of
-`swizzle(A, dims, op)` in the `dest` array.
+`swizzle(A, mask, op)` in the `dest` array.
 Note that `dest` is only used to store the result
 `swizzle!` results in `copyto!(dest, Swizzled(...))`.
 # Examples
@@ -280,30 +280,30 @@ julia> A
  -2.0
 ```
 """
-swizzle!(dest, A, dims, op=unspecifiedop) = (materialize!(dest, Swizzled(A, dims, op); dest)
+swizzle!(dest, A, mask, op=unspecifiedop) = (materialize!(dest, Swizzled(A, mask, op)); dest)
 
-@inline materialize(sz::Swizzled) = copy(sz)
+@inline Base.Broadcast.materialize(sz::Swizzled) = copy(sz)
 
-@inline materialize!(dest, sz::Swizzled) = copyto!(dest, sz)
+@inline Base.Broadcast.materialize!(dest, sz::Swizzled) = copyto!(dest, sz)
 
 
 
-copy(sz::Swizzled{Style, Axes, mask, imask}) where {Style, Axes, mask, imask} = copy(Swizzled{Nothing, Axes, mask, imask}(sz.arg, swizzle_dims(sz), sz.op, sz.axes, mask, imask))
+Base.copy(sz::Swizzled{Style}) where {Style} = copy(Swizzled{Nothing}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask))
 
-copyto!(dest, sz::Swizzled{Style, Axes, mask, imask}) where {Style, Axes, mask, imask} = copyto!(dest, Swizzled{Nothing, Axes, mask, imask}(sz.arg, swizzle_dims(sz), sz.op, sz.axes, mask, imask))
+Base.copyto!(dest, sz::Swizzled{Style}) where {Style} = copyto!(dest, Swizzled{Nothing}(sz.arg, sz.mask, sz.op, sz.axes, sz.imask))
 
-copy(sz::Swizzled{Nothing}) = copy(instantiate(preprocess(Broadcasted(identity, (sz,)))))
+Base.copy(sz::Swizzled{Nothing}) = copy(instantiate(preprocess(Broadcasted(identity, (sz,)))))
 
-copyto!(dest, sz::Swizzled{Nothing}) = copyto(dest, instantiate(preprocess(Broadcasted(identity, (sz,)))))
+Base.copyto!(dest, sz::Swizzled{Nothing}) = copyto(dest, instantiate(preprocess(Broadcasted(identity, (sz,)))))
 
-preprocess(dest, sz::Swizzled{Style, Axes, mask, imask}) where {Style, Axes, mask, imask} = extrude(instantiate(Swizzled{Style, Axes, mask, imask}(preprocess(dest, sz.arg), swizzle_dims(sz), sz.op, sz.axes, mask, imask)))
+Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = extrude(instantiate(Swizzled{Style}(preprocess(dest, sz.arg), sz.mask, sz.op, sz.axes, sz.imask)))
 
 struct Swizzler
-    dims
+    mask
     op
 end
 
-broadcasted(style, sz::Swizzler, arg) = Swizzled{style}(sz.dims, sz.op)
+Base.Broadcast.broadcasted(style, sz::Swizzler, arg) = Swizzled{style}(sz.mask, sz.op)
 
 
 
@@ -315,7 +315,7 @@ function Reduce(dims, op)
     m = maximum((0, dims...))
     s = set(dims)
     c = 1
-    Swizzler(flattened((ntuple(d->d in s ? Skip : c++, m), count(m - length(s) + 1))), op)
+    Swizzler(flattened((ntuple(d -> d in s ? Pass : c += 1, m), countfrom(m - length(s) + 1))), op)
 end
 
 
