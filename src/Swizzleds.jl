@@ -180,11 +180,21 @@ swizzle_style(::BroadcastStyle, mask, op) = Broadcast.Unknown()
 swizzle_style(::ArrayConflict, mask, op) = Broadcast.ArrayConflict() #FIXME
 
 Broadcast.BroadcastStyle(::Type{<:Swizzled{Nothing, Axes, imask, Arg, mask, Op}}) where {Style, Axes, imask, Arg, mask, Op} = swizzle_style(BroadcastStyle(Arg), mask, Op)
-Broadcast.BroadcastStyle(::Type{<:Swizzled{Style}}) where {Style} = Style
+Broadcast.BroadcastStyle(::Type{<:Swizzled{Style}}) where {Style} = Style()
 
-@inline function Base.getindex(sz::Swizzled, I::Union{Integer,CartesianIndex})
-    @boundscheck checkbounds(sz, I)
+@inline function Base.getindex(sz::Swizzled, I::Integer)
+    #@boundscheck checkbounds(sz, I) FIXME
     inds = eachindex(getindexinto(axes(sz.arg), I, _mask(sz)))
+    (i, inds) = peel(inds)
+    res = @inbounds getindex(sz.arg, i)
+    for i in inds
+        res = sz.op(res, @inbounds getindex(sz.arg, i))
+    end
+    return res
+end
+@inline function Base.getindex(sz::Swizzled, I::CartesianIndex)
+    #@boundscheck checkbounds(sz, I) FIXME
+    inds = eachindex(getindexinto(axes(sz.arg), Tuple(I), instantiate_mask(sz)))
     (i, inds) = peel(inds)
     res = @inbounds getindex(sz.arg, i)
     for i in inds
@@ -308,6 +318,14 @@ end
 Base.Broadcast.broadcasted(style::BroadcastStyle, szr::Swizzler, arg) = Swizzled(arg, szr.mask, szr.op) #Should use style here duh.
 
 
+function Beam(arg, dims...)
+    Swizzled(arg, flatten((dims, repeated(pass))), unspecifiedop)
+end
+
+function NoSum(dims::Int...)
+    m = maximum((0, dims...))
+    Swizzler(setindexinto((take(repeated(pass), m)...,), 1:length(dims), dims), +)
+end
 
 function Sum(dims::Int...)
     Reduce(dims, +)
