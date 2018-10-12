@@ -1,10 +1,3 @@
-#=
-using .Base.Cartesian
-using .Base: Indices, OneTo, tail, to_shape, isoperator, promote_typejoin,
-             _msk_end, unsafe_bitgetindex, bitcache_chunks, bitcache_size, dumpbitcache, unalias
-import .Base: copy, copyto!
-export broadcast, broadcast!, BroadcastStyle, broadcast_axes, broadcastable, dotview, @__dot__
-=#
 using Base.Iterators: repeated, countfrom, flatten, take, peel
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, preprocess, broadcast_axes, _broadcast_getindex
