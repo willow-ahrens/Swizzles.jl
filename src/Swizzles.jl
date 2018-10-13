@@ -1,9 +1,14 @@
 module Swizzles
 
 export Drop, drop
+export getindexinto, setindexinto
 
 include("base.jl")
 include("util.jl")
+
+using Base.Iterators: repeated, countfrom, flatten, take, peel
+using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
+using Base.Broadcast: materialize, materialize!, instantiate, preprocess, broadcast_axes, _broadcast_getindex
 
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
@@ -35,7 +40,7 @@ end
 mask(::Type{Swizzled{Arg, _mask, _imask, Op}}) where {Arg, _mask, _imask, Op} = _mask
 mask(sz::S) where {S <: Swizzled} = mask(S)
 imask(::Type{Swizzled{Arg, _mask, _imask, Op}}) where {Arg, _mask, _imask, Op} = _imask
-mask(sz::S) where {S <: Swizzled} = imask(S)
+imask(sz::S) where {S <: Swizzled} = imask(S)
 
 function Base.show(io::IO, sz::Swizzled)
     print(io, Swizzled)
@@ -245,4 +250,6 @@ end
 
 function BeamTo(arg, dims::Union{Int, Drop}...)
     Swizzled(arg, flatten((setindexinto((take(repeated(drop), maximum((0, imask...)))...,), 1:length(imask), imask), repeated(drop))), unspecifiedop)
+end
+
 end

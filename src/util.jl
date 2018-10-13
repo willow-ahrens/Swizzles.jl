@@ -21,10 +21,10 @@ julia> getindexinto(-1, B, drop)
  -1
 ```
 """
-getindexinto
+getindexinto(a, b, i::Union{Int, Drop}) = _getindexinto(a, b, i)
 
-getindexinto(a, b, i::Int) = b[i]
-getindexinto(a, b, i::Drop) = a
+_getindexinto(a, b, i::Int) = b[i]
+_getindexinto(a, b, i::Drop) = a
 
 """
     getindexinto(A, B, I)
@@ -50,15 +50,13 @@ julia> getindexinto(A, B, (2, 4, drop, 3, 1))
 getindexinto
 
 getindexinto(a, b, i::Tuple{}) = ()
-function getindexinto(a, b, i::Tuple{Vararg{<:Union{Int, Drop}}})
-    @boundscheck length(a) == length(i)
-    r = ntuple(j ->getindexinto(a[j], b, i[j]), length(i))
+getindexinto(a, b, i::Tuple{Vararg{<:Union{Int, Drop}}}) = ntuple(j -> getindexinto(a[j], b, i[j]), length(i))
+function getindexinto(a, b, i::AbstractVector)
+    r = similar(i)
+    for j in eachindex(i)
+        r[j] == getindexinto(a[j], b, i[j])
+    end
     return r
-end
-
-function getindexinto(a, b, i::AbstractVector{<:Union{Int, Drop}}) #FIXME wrong output
-    @boundscheck length(a) == length(i)
-    map((x, j)->getindexinto(x, b, j), a, i)
 end
 
 """
@@ -89,10 +87,10 @@ julia> setindexinto(A, -1, drop)
   (2, 4, 0, 3, 1)
 ```
 """
-setindexinto
+setindexinto(a, b, i::Union{Int, Drop}) = setindexinto(a, b, i)
 
-setindexinto(a, b, i::Int) = ntuple(j -> j == i ? b : a[j], length(a))
-setindexinto(a, b, i::Drop) = a
+_setindexinto(a, b, i::Int) = ntuple(j -> j == i ? b : a[j], length(a))
+_setindexinto(a, b, i::Drop) = a
 
 """
     setindexinto(A, B, I)
@@ -128,35 +126,18 @@ julia> setindexinto(A, (-1, -2), (drop, 3))
 """
 setindexinto
 
-function setindexinto(a, b, i::Tuple{Vararg{Drop}})
-    @boundscheck length(b) == length(i)
-    return a
-end
-function setindexinto(a, b, i::Tuple{Int})
-    @boundscheck length(b) == 1
-    setindexinto(a, b[1], i[1])
-end
-function setindexinto(a, b, i::Tuple{Int, Drop})
-    @boundscheck length(b) == 2
-    setindexinto(a, b[1], i[1])
-end
-function setindexinto(a, b, i::Tuple{Drop, Int})
-    @boundscheck length(b) == 2
-    setindexinto(a, b[2], i[2])
-end
-function setindexinto(a, b, i::Tuple{Int, Int})
-    @boundscheck length(b) == 2
-    ntuple(j -> j == i[2] ? b[2] : (j == i[1] ? b[1] : a[j]), length(a))
-end
+setindexinto(a, b, i::Tuple{Vararg{Drop}}) = a
+setindexinto(a, b, i::Tuple{Int}) = setindexinto(a, b[1], i[1])
+setindexinto(a, b, i::Tuple{Int, Drop}) = setindexinto(a, b[1], i[1])
+setindexinto(a, b, i::Tuple{Drop, Int}) = setindexinto(a, b[2], i[2])
+setindexinto(a, b, i::Tuple{Int, Int}) = ntuple(j -> j == i[2] ? b[2] : (j == i[1] ? b[1] : a[j]), length(a))
 
 function setindexinto(a, b, i::Tuple{Vararg{<:Union{Int, Drop}}})
-    @boundscheck length(b) == length(i)
     state = Dict(j => x for (j, x) in zip(i, b))
     ntuple(j -> haskey(state, j) ? state[j] : a[j], length(a))
 end
 
 function setindexinto(a, b, i::AbstractVector{<:Union{Int, Drop}}) #FIXME wrong output?
-    @boundscheck length(b) == length(i)
     state = Dict(j => x for (j, x) in zip(i, b))
     map((x, j) -> haskey(state, j) ? state[j] : x, a, 1:length(a))
 end
