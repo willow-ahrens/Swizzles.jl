@@ -82,9 +82,85 @@ end
 @inline Base.getindex(sz::Swizzled, I::Int...) = _getindex(I)
 @inline Base.getindex(sz::Swizzled) = _getindex(())
 
-swizzle(A, mask, op=unspecifiedop) = copy(Swizzled(A, mask, op))
+"""
+    swizzle(A, mask, op=unspecifiedop)
+Create a new obect `B` such that the dimension `i` of `A` is mapped to
+dimension `mask[i]` of `B`, operating on lazy broadcast expressions, arrays,
+tuples, collections, [`Ref`](@ref)s and/or scalars `As`. If `mask[i]` is an
+instance of the singleton type `Drop`, the dimension is reduced over using
+`op`. `mask` may be any (possibly infinite) iterable over elements of type
+`Int` and `Drop`. The integers in `mask` must be unique, and if `mask` is
+not long enough, additional `Drop`s are added to the end.
+The resulting container type is established by the following rules:
+ - If all elements of `mask` are `Drop`, it returns an unwrapped scalar.
+ - All other combinations of arguments default to returning an `Array`, but
+   custom container types can define their own implementation rules to
+   customize the result when they appear as an argument.
+The swizzle operation is represented with a special lazy `Swizzled` type.
+`swizzle` results in `copy(Swizzled(...))`.
+The swizzle operation can use a special `Swizzler` type to take advantage of
+the special broadcast syntax. A statement like:
+   y = Swizzler((1,), +).(x .* (Swizzler((2, 1)).x .+ 1))
+will result in code that is essentially:
+   y = copy(Swizzled(Broadcasted(*, Swizzled(x, (2, 1)), Broadcasted(+, x, 1)), (1,), +))
+If Swizzleds are mixed with Broadcasteds, the result is fused into one big for loop.
+# Examples
+```jldoctest
+julia> A = [1, 2, 3, 4, 5]
+5-element Array{Int64,1}:
+ 1
+ 2
+ 3
+ 4
+ 5
+julia> B = [1 2; 3 4; 5 6; 7 8; 9 10]
+5×2 Array{Int64,2}:
+ 1   2
+ 3   4
+ 5   6
+ 7   8
+ 9  10
+julia> swizzle(B, (1,), +)
+5×2 Array{Int64,2}:
+ 3
+ 7
+ 11
+ 15
+ 19
+julia> swizzle(B, (), +)
+55
+julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
+1x2-element Array{Int64,1}:
+ 1 2
+"""
+swizzle(A, mask, op=unspecifiedop) = copy(Swizzled(A, flatten((mask, repeated(drop))), op))
 
-swizzle!(dest, A, mask, op=unspecifiedop) = copyto!(dest, Swizzled(A, mask, op))
+"""
+    swizzle!(A, mask, op=unspecifiedop)
+Like [`swizzle`](@ref), but store the result of
+`swizzle(A, mask, op)` in the `dest` array.
+Note that `dest` is only used to store the result
+`swizzle!` results in `copyto!(dest, Swizzled(...))`.
+# Examples
+```jldoctest
+julia> A = [1.0; 0.0]; B = [0.0; 0.0];
+julia> broadcast!(+, B, A, (0, -2.0));
+julia> B
+2-element Array{Float64,1}:
+  1.0
+ -2.0
+julia> A
+2-element Array{Float64,1}:
+ 1.0
+ 0.0
+julia> broadcast!(+, A, A, (0, -2.0));
+julia> A
+2-element Array{Float64,1}:
+  1.0
+ -2.0
+```
+"""
+swizzle!(dest, A, mask, op=unspecifiedop) = copyto!(dest, Swizzled(A, flatten((mask, repeated(drop))), op))
 
 Base.Broadcast.broadcastable(sz::Swizzled) = sz
 
