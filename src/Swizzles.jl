@@ -6,10 +6,10 @@ export getindexinto, setindexinto
 include("base.jl")
 include("util.jl")
 
-using Base: checkbounds_indices, throw_boundserror
+using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel
-using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable
+using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, longest_tuple
 
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
@@ -33,7 +33,18 @@ end
 
 function Swizzled(arg, mask, op)
     arg = instantiate(broadcastable(arg))
-    mask = (take(mask, ndims(typeof(arg)))...,)
+    mask = (take(flatten((mask, repeated(drop))), ndims(typeof(arg)))...,)
+    return _Swizzled(arg, mask, op)
+end
+function Swizzled(arg::Tuple, mask, op)
+    mask = (take(flatten((mask, repeated(drop))), 1)...,)
+    return _Swizzled(arg, mask, op)
+end
+function _Swizzled(arg, mask::Tuple{}, op)
+    imask = ()
+    Swizzled{typeof(arg), mask, imask, Core.Typeof(op)}(arg, op)
+end
+function _Swizzled(arg, mask::Tuple, op)
     imask = setindexinto(ntuple(d->drop, max(0, maximum(mask))), 1:length(mask), mask)
     Swizzled{typeof(arg), mask, imask, Core.Typeof(op)}(arg, op)
 end
@@ -75,7 +86,7 @@ Base.IteratorEltype(::Type{<:Swizzled}) = Base.EltypeUnknown()
 
 @inline function _getindex(sz::Swizzled, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(sz), I) || throw_boundserror(sz, I)
-    inds = product(getindexinto(axes(sz.arg), I, mask(sz))...)
+    inds = product(getindexinto(broadcast_axes(sz.arg), I, mask(sz))...)
     (i, inds) = peel(inds)
     res = @inbounds getindex(sz.arg, i...)
     for i in inds
@@ -139,7 +150,7 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 1x2-element Array{Int64,1}:
  1 2
 """
-swizzle(A, mask, op=nooperator) = copy(Swizzled(A, flatten((mask, repeated(drop))), op))
+swizzle(A, mask, op=nooperator) = copy(Swizzled(A, mask, op))
 
 """
     swizzle!(A, mask, op=nooperator)
@@ -166,7 +177,7 @@ julia> A
  -2.0
 ```
 """
-swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, Swizzled(A, flatten((mask, repeated(drop))), op))
+swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, Swizzled(A, mask, op))
 
 Base.Broadcast.broadcastable(sz::Swizzled) = sz
 
@@ -177,6 +188,8 @@ Base.Broadcast.broadcastable(sz::Swizzled) = sz
 Base.copy(sz::Swizzled) = copy(instantiate(Broadcasted(identity, (sz,))))
 
 Base.copyto!(dest, sz::Swizzled) = copyto!(dest, instantiate(Broadcasted(identity, (sz,))))
+
+Base.copyto!(dest::AbstractArray, sz::Swizzled) = copyto!(dest, instantiate(Broadcasted(identity, (sz,))))
 
 #Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(sz.arg, mask(sz), sz.op, sz.axes, imask(sz))) #TODO problem here too.
 #Base.Broadcast.broadcasted(style::BroadcastStyle, szr::Swizzler, arg) = Swizzled(arg, szr.mask, szr.op) #Should use style here duh.
@@ -191,13 +204,16 @@ behave under broadcasting after the swizzle by overriding the
 """
 SwizzleStyle
 
-SwizzleStyle(::Style{Tuple}, mask, op) = first(mask) == 1 ? Style{Tuple}() : DefaultArrayStyle(Val(first(mask)))
-SwizzleStyle(style::A, mask, op) where {N, A <: Broadcast.AbstractArrayStyle{N}} = A(Val(maximum(take(mask, N))))
-SwizzleStyle(style::Broadcast.AbstractArrayStyle{Any}, mask, op) = style
-SwizzleStyle(::BroadcastStyle, mask, op) = Broadcast.Unknown()
-SwizzleStyle(::ArrayConflict, mask, op) = Broadcast.ArrayConflict() #FIXME
+SwizzleStyle(::Style{Tuple}, mask, op) = first(mask) == 1 ? Style{Tuple}() : DefaultArrayStyle(Val(max(0, first(mask))))
+Broadcast.longest_tuple(::Nothing, t::Tuple{<:Swizzled{<:Any, (1,)},Vararg{Any}}) = longest_tuple(longest_tuple(nothing, (t[1].arg,)), tail(t))
+SwizzleStyle(style::A, mask, op) where {A <: AbstractArrayStyle{0}} = A(Val(0))
+SwizzleStyle(style::A, mask, op) where {N, A <: AbstractArrayStyle{N}} = A(Val(max(0, maximum(take(mask, N)))))
+SwizzleStyle(style::AbstractArrayStyle{Any}, mask, op) = style
+SwizzleStyle(::BroadcastStyle, mask, op) = Unknown()
+SwizzleStyle(::ArrayConflict, mask, op) = ArrayConflict() #FIXME
 
 Broadcast.BroadcastStyle(::Type{<:Swizzled{Arg, mask, imask, Op}}) where {Arg, mask, imask, Op} = SwizzleStyle(BroadcastStyle(Arg), mask, Op)
+
 
 struct Swizzle
     mask
@@ -225,8 +241,12 @@ function Min(dims::Int...)
     Reduce(min, dims...)
 end
 
+function Beam(dims::Union{Int, Drop}...)
+    Swizzle(dims, nooperator)
+end
+
 function SwizzleTo(imask::Tuple{Vararg{<:Union{Int, Drop}}}, op)
-    Swizzle(flatten((setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), repeated(drop))), op)
+    Swizzle(setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), op)
 end
 
 function ReduceTo(op, dims::Union{Int, Drop}...)
@@ -245,12 +265,8 @@ function MinTo(dims::Union{Int, Drop}...)
     SwizzleTo(dims, min)
 end
 
-function Beam(arg, dims::Union{Int, Drop}...)
-    Swizzled(arg, flatten((dims, repeated(drop))), nooperator)
-end
-
-function BeamTo(arg, dims::Union{Int, Drop}...)
-    Swizzled(arg, flatten((setindexinto(ntuple(d->drop, maximum((0, dims...))), 1:length(dims), dims), repeated(drop))), nooperator)
+function BeamTo(dims::Union{Int, Drop}...)
+    SwizzleTo(dims, nooperator)
 end
 
 end

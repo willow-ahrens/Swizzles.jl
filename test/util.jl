@@ -30,17 +30,15 @@
     end
 
     As = [[],
-          [-1],
+          [-1.0],
           [-1; -2],
           [-1; -2; -3],
           [-1.0; -2.0]]
     Bs = [[],
-          [11],
           [11.0],
           [11; 12],
           [11.0; 12.0],
-          [11; 12; 13],
-          [11.0; 12.0; 13.0]]
+          [11; 12; 13]]
     Is = [[],
           [1],
           [drop],
@@ -48,13 +46,11 @@
           [drop; 2],
           [2; drop],
           [2; 2; 1],
-          [-2; 2; 1],
-          [0; 2; 4],
-          [drop; 2; 2],
+          [1; 2; 4],
           [1; drop; 3; 3]]
     As = vcat(As, [(A...,) for A in As], [-1, -1.0])
     Bs = vcat(Bs, [(B...,) for B in Bs], [11, -11.0])
-    Is = vcat(Is, [(I...,) for I in Is], [-1, 1, 5, drop])
+    Is = vcat(Is, [(I...,) for I in Is], [-1, 1, drop])
     for (A, B, I, (ref_f, test_f)) in Iterators.product(As, Bs, Is, ((refsetindexinto, setindexinto), (refgetindexinto, getindexinto)))
         try
             ref_f(A, B, I)
