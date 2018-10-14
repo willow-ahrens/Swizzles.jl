@@ -3,15 +3,15 @@ struct Drop end
 const drop = Drop()
 
 Base.isequal(::Drop, ::Drop) = true
-Base.isequal(::Drop, ::Int) = false
-Base.isequal(::Int, ::Drop) = false
-Base.isless(::Drop, ::Int) = true
-Base.isless(::Int, ::Drop) = false
+Base.isequal(::Drop, ::Integer) = false
+Base.isequal(::Integer, ::Drop) = false
+Base.isless(::Drop, ::Integer) = true
+Base.isless(::Integer, ::Drop) = false
 Base.isless(::Drop, ::Drop) = false
 
 """
-    getindexinto(a, B, i::Union{Int, Drop})
-If `i isa Drop`, return `a`. Otherwise, return `B[i]`.
+    getindexinto(a, B, i::Union{Integer, Drop})
+If `i isa Drop`, return `a`. If `i isa Integer`, return `B[i]`.
 # Examples
 ```jldoctest
 julia> B = [2; 4; 0; 3; 1];
@@ -21,16 +21,15 @@ julia> getindexinto(-1, B, drop)
  -1
 ```
 """
-getindexinto(a, b, i::Union{Int, Drop}) = _getindexinto(a, b, i)
+getindexinto(a, B, i::Union{Integer, Drop}) = _scalar_getindexinto(a, B, i)
 
-_getindexinto(a, b, i::Int) = b[i]
-_getindexinto(a, b, i::Drop) = a
+_scalar_getindexinto(a, B, i::Integer) = B[i]
+_scalar_getindexinto(a, B, i::Drop) = a
 
 """
     getindexinto(A, B, I)
-Return a collection `R` similar to `I` such that `R[j] == B[I[j]] when `I[j] isa
-Int` and `R[j] == A[j] when `I[j] isa Drop`.
-`A` must have the same length as `I`.
+Return a collection `R` similar to `I` such that `R[j] == A[j] when `I[j] isa
+Drop` and `R[j] == B[I[j]]` otherwise.
 # Examples
 ```jldoctest
 julia> A = [-1; -2; -3; -4; -5];
@@ -47,22 +46,24 @@ julia> getindexinto(A, B, (2, 4, drop, 3, 1))
   (12, 14, -3, 13, 11)
 ```
 """
-getindexinto
+getindexinto(A, B, I::Union{Tuple, AbstractVector}) = _vector_getindexinto(A, B, I)
 
-getindexinto(a, b, i::Tuple{}) = ()
-getindexinto(a, b, i::Tuple{Vararg{<:Union{Int, Drop}}}) = ntuple(j -> getindexinto(a[j], b, i[j]), length(i))
-function getindexinto(a, b, i::AbstractVector)
-    r = similar(i)
-    for j in eachindex(i)
-        r[j] == getindexinto(a[j], b, i[j])
+_vector_getindexinto(A, B, I::Tuple{}) = ()
+_vector_getindexinto(A, B, I::Tuple) = ntuple(j -> I[j] isa Drop ? A[j] : B[I[j]], length(I))
+function _vector_getindexinto(A, B, I::AbstractVector)
+    R = similar(I, Any)
+    for j in eachindex(I)
+        i = I[j]
+        R[j] = i isa Drop ? A[j] : B[i]
     end
-    return r
+    return map(identity, R)
 end
 
 """
-    setindexinto(A, b, i::Union{Int, Drop})
-Return a collection `R` similar to `A` such that `R[j] == A[j]` whenever `j != i`, and
-`R[i] == b` if `i isa Int`.
+    setindexinto(A, b, i::Union{Integer, Drop})
+If `i isa Drop`, return a collection `R` similar to `A` where `R[j] == A[j]`
+everywhere. If `i isa Integer`, return a collection `R` similar to `A` such
+that `R[i] == b` and `R[j] = A[j]` everywhere else.
 # Examples
 ```jldoctest
 julia> A = [2; 4; 0; 3; 1];
@@ -87,21 +88,25 @@ julia> setindexinto(A, -1, drop)
   (2, 4, 0, 3, 1)
 ```
 """
-setindexinto(a, b, i::Union{Int, Drop}) = setindexinto(a, b, i)
+setindexinto(A::Union{Tuple, AbstractVector}, b, i::Union{Integer, Drop}) = _scalar_setindexinto(A, b, i)
 
-_setindexinto(a, b, i::Int) = ntuple(j -> j == i ? b : a[j], length(a))
-_setindexinto(a, b, i::Drop) = a
+@inline function _scalar_setindexinto(A::Tuple, b, i::Integer)
+    @boundscheck A[i]
+    ntuple(j -> j == i ? b : A[j], length(A))
+end
+@inline _scalar_setindexinto(A::Tuple, b, i::Drop) = A
+@inline _scalar_setindexinto(A::AbstractVector, b, i::Drop) = map(identity, A)
+function _scalar_setindexinto(A::AbstractVector, b, i::Integer)
+    R = similar(A, Any)
+    copyto!(R, A)
+    R[i] = b
+    return map(identity, R)
+end
 
 """
     setindexinto(A, B, I)
-Return a collection `R` similar to `A` equivalent to the `R` that would be produced by
-  ```
-    R = A
-    for (b, i) in zip(B, I)
-      R = setindexinto(R, b, i)
-    end
-  ```
-`B` must have the same length as `I`.
+Return a collection `R` similar to `A` such that `R[I[j]] == B[j]` whenever
+`!(I[j] isa Drop)`, and `R[i] = A[i]` otherwise.
 # Examples
 ```jldoctest
 julia> A = [2; 4; 0; 3; 1];
@@ -124,20 +129,37 @@ julia> setindexinto(A, (-1, -2), (drop, 3))
   (2, 4, -2, 3, 1)
 ```
 """
-setindexinto
+setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B, I)
 
-setindexinto(a, b, i::Tuple{Vararg{Drop}}) = a
-setindexinto(a, b, i::Tuple{Int}) = setindexinto(a, b[1], i[1])
-setindexinto(a, b, i::Tuple{Int, Drop}) = setindexinto(a, b[1], i[1])
-setindexinto(a, b, i::Tuple{Drop, Int}) = setindexinto(a, b[2], i[2])
-setindexinto(a, b, i::Tuple{Int, Int}) = ntuple(j -> j == i[2] ? b[2] : (j == i[1] ? b[1] : a[j]), length(a))
-
-function setindexinto(a, b, i::Tuple{Vararg{<:Union{Int, Drop}}})
-    state = Dict(j => x for (j, x) in zip(i, b))
-    ntuple(j -> haskey(state, j) ? state[j] : a[j], length(a))
+_vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
+_vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
+_vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
+_vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
+function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
+    @boundscheck A[I[1]]
+    ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
 end
-
-function setindexinto(a, b, i::AbstractVector{<:Union{Int, Drop}}) #FIXME wrong output?
-    state = Dict(j => x for (j, x) in zip(i, b))
-    map((x, j) -> haskey(state, j) ? state[j] : x, a, 1:length(a))
+function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Drop})
+    @boundscheck A[I[1]]
+    ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
+end
+function _vector_setindexinto(A::Tuple, B, I::Tuple{Drop, Integer})
+    @boundscheck A[I[2]]
+    ntuple(j -> j == I[2] ? B[2] : A[j], length(A))
+end
+function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Integer})
+    @boundscheck A[max(I[1], I[2])]
+    ntuple(j -> j == I[2] ? B[2] : (j == I[1] ? B[1] : A[j]), length(A))
+end
+_vector_setindexinto(A::Tuple, B, I) = (_vector_setindexinto([A...,], B, I)...,)
+function _vector_setindexinto(A::AbstractVector, B, I)
+    R = similar(A, Any)
+    copyto!(R, A)
+    for j in eachindex(I)
+        i = I[j]
+        if !isa(i, Drop)
+            R[i] = B[j]
+        end
+    end
+    return map(identity, R)
 end

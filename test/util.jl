@@ -1,74 +1,83 @@
 @testset "util" begin
-    @testset "scalar getindexinto" begin
-        @test getindexinto(-1, [2; 4; 0; 3; 1], 3) === 0
-        @test getindexinto(-1, [2; 4; 0; 3; 1], drop) === -1
-        @test getindexinto(-1.0, [2.0; 4.0; 0.0; 3.0; 1.0], 3) === 0.0
-        @test getindexinto(-1.0, [2.0; 4.0; 0.0; 3.0; 1.0], drop) === -1.0
-        @test getindexinto(-1, (2, 4, 0, 3, 1), 3) === 0
-        @test getindexinto(-1, (2, 4, 0, 3, 1), drop) === -1
-        @test getindexinto(-1.0, (2.0, 4.0, 0.0, 3.0, 1.0), 3) === 0.0
-        @test getindexinto(-1.0, (2.0, 4.0, 0.0, 3.0, 1.0), drop) === -1.0
-
-        @test_throws Exception getindexinto(-1, (), 3)
-        @test getindexinto(-1, (), drop) === -1
-        @test_throws Exception getindexinto(-1, [], 3)
-        @test getindexinto(-1, [], drop) === -1
-        @test_throws Exception getindexinto(-1, (2, 4, 0, 3, 1), -1)
-        @test_throws Exception getindexinto(-1, [2; 4; 0; 3; 1], -1)
-        @test_throws Exception getindexinto(-1, (2, 4, 0, 3, 1), (1, 2))
-        @test_throws Exception getindexinto(-1, [2; 4; 0; 3; 1], (1, 2))
+    refgetindexinto(a, B, i::Union{Integer, Drop}) = refgetindexinto((a,), B, (i,))[1]
+    refgetindexinto(A, B, I::Tuple) = (refgetindexinto(A, B, [I...,])...,)
+    function refgetindexinto(A, B, I::AbstractVector)
+        R = similar(I, Any)
+        for j in eachindex(I)
+            if I[j] isa Drop
+                R[j] = A[j]
+            else
+                R[j] = B[I[j]]
+            end
+        end
+        return map(identity, R)
     end
 
-    @testset "tensor getindexinto" begin
-        function refgetindexinto(A, B, I)
-            result = similar(I)
-            for j in eachindex(I)
-                push!(result, getindexinto(A[j], B, I[j]))
-            end
-            return copyto!(similar(I), result)
+    refsetindexinto(A::Tuple, b, i::Union{Integer, Drop}) = refsetindexinto(A, (b,), (i,))
+    refsetindexinto(A::AbstractVector, b, i::Union{Integer, Drop}) = refsetindexinto(A, (b,), (i,))
+    refsetindexinto(A::Tuple, B, I) = (refsetindexinto([A...,], B, I)...,)
+    function refsetindexinto(A::AbstractVector, B, I)
+        R = similar(A, Any)
+        for j in eachindex(A)
+            R[j] = A[j]
         end
-        refgetindexinto(A, B, I::Tuple) = (refgetindexinto(A, B, [I...,])...,)
-
-        As = [[],
-              [-1],
-              [-1.0],
-              [-1; -2],
-              [-1.0; -2.0]]
-        Bs = [[],
-              [11],
-              [11.0],
-              [11; 12],
-              [11.0; 12.0],
-              [11; 12; 13],
-              [11.0; 12.0; 13.0]]
-        Is = [[],
-              [1],
-              [-1],
-              [drop],
-              [1; 2],
-              [drop; 2],
-              [2; drop],
-              [2; 2; 1],
-              [-2; 2; 1],
-              [1; 2; 4],
-              [0; 2; 4],
-              [drop; 2; 2],
-              [drop; 2; 4],
-              [-1; drop; 4],
-              [1; drop; 3; 3]]
-        As = vcat(As, [(A...,) for A in As])
-        Bs = vcat(Bs, [(B...,) for B in Bs])
-        Is = vcat(Is, [(I...,) for I in Is])
-        for (A, B, I) in Iterators.product(As, Bs, Is)
-            #println((A, B, I))
-            try
-                refgetindexinto(A, B, I)
-            catch E
-                #@test_throws typeof(E) getindexinto(A, B, I) #FIXME
-                continue
+        for j in eachindex(I)
+            if !(I[j] isa Drop)
+                R[I[j]] = B[j]
             end
-            @test getindexinto(A, B, I) == refgetindexinto(A, B, I)
-            @test typeof(getindexinto(A, B, I)) == typeof(refgetindexinto(A, B, I))
+        end
+        return map(identity, R)
+    end
+
+    As = [[],
+          [-1],
+          [-1; -2],
+          [-1; -2; -3],
+          [-1.0; -2.0]]
+    Bs = [[],
+          [11],
+          [11.0],
+          [11; 12],
+          [11.0; 12.0],
+          [11; 12; 13],
+          [11.0; 12.0; 13.0]]
+    Is = [[],
+          [1],
+          [drop],
+          [1; 2],
+          [drop; 2],
+          [2; drop],
+          [2; 2; 1],
+          [-2; 2; 1],
+          [0; 2; 4],
+          [drop; 2; 2],
+          [1; drop; 3; 3]]
+    As = vcat(As, [(A...,) for A in As], [-1, -1.0])
+    Bs = vcat(Bs, [(B...,) for B in Bs], [11, -11.0])
+    Is = vcat(Is, [(I...,) for I in Is], [-1, 1, 5, drop])
+    for (A, B, I, (ref_f, test_f)) in Iterators.product(As, Bs, Is, ((refsetindexinto, setindexinto), (refgetindexinto, getindexinto)))
+        try
+            ref_f(A, B, I)
+        catch E
+            if !isa(@test_throws(typeof(E), test_f(A, B, I)), Test.Pass)
+                println("Failed On: $test_f($A, $B, $I)")
+                println("Expected Error:", throw(E))
+                break
+            end
+            continue
+        end
+        try
+            if !isa(@test(test_f(A, B, I) == ref_f(A, B, I)), Test.Pass)
+                println("Failed On: $test_f($A, $B, $I)")
+                break
+            end
+            if !isa(@test(typeof(test_f(A, B, I)) == typeof(ref_f(A, B, I))), Test.Pass)
+                println("Failed On: $test_f($A, $B, $I)")
+                break
+            end
+        catch E
+            throw(E)
+            break
         end
     end
 end
