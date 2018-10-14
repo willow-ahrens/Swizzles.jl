@@ -6,9 +6,10 @@ export getindexinto, setindexinto
 include("base.jl")
 include("util.jl")
 
-using Base.Iterators: repeated, countfrom, flatten, take, peel
+using Base: checkbounds_indices, throw_boundserror
+using Base.Iterators: repeated, countfrom, flatten, product, take, peel
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, ArrayConflict
-using Base.Broadcast: materialize, materialize!, instantiate, preprocess, broadcast_axes, _broadcast_getindex
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable
 
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
@@ -25,15 +26,15 @@ struct Swizzled{Arg, mask, imask, Op}
     arg::Arg
     op::Op
     function Swizzled{Arg, mask, imask, Op}(arg::Arg, op::Op) where {Arg, mask, imask, Op}
-        #TODO assert a bunch.
+        #FIXME check swizzles.
         new(arg, op)
     end
 end
 
 function Swizzled(arg, mask, op)
-    arg = broadcastable(arg)
+    arg = instantiate(broadcastable(arg))
     mask = (take(mask, ndims(typeof(arg)))...,)
-    imask = setindexinto((repeated(drop, max(0, maximum(mask)))...,), 1:length(mask), mask)
+    imask = setindexinto(ntuple(d->drop, max(0, maximum(mask))), 1:length(mask), mask)
     Swizzled{typeof(arg), mask, imask, Core.Typeof(op)}(arg, op)
 end
 
@@ -48,13 +49,13 @@ function Base.show(io::IO, sz::Swizzled)
     nothing
 end
 
-@inline Base.axes(sz::Swizzled) = getindexinto((repeated(Base.OneTo(1), length(imask))...,), broadcast_axes(sz.arg), imask)
+@inline Base.axes(sz::Swizzled) = getindexinto(ntuple(d->Base.OneTo(1), length(imask(sz))), broadcast_axes(sz.arg), imask(sz))
 
 @inline Base.eachindex(sz::Swizzled) = _eachindex(axes(sz))
 _eachindex(t::Tuple{Any}) = t[1]
 _eachindex(t::Tuple) = CartesianIndices(t)
 
-Base.ndims(::Type{S}) where {S <: Swizzled} = length(mask(S))
+Base.ndims(::Type{S}) where {S <: Swizzled} = length(imask(S))
 
 Base.length(sz::Swizzled) = prod(map(length, axes(sz)))
 
@@ -73,22 +74,22 @@ Base.IteratorSize(::Type{<:Swizzled{<:Any,<:NTuple{N}}}) where {N} = Base.HasSha
 Base.IteratorEltype(::Type{<:Swizzled}) = Base.EltypeUnknown()
 
 @inline function _getindex(sz::Swizzled, I::Tuple{Vararg{Int}})
-    @boundscheck checkbounds_indices(axes(sz), I)
-    inds = eachindex(getindexinto(axes(sz.arg), I, _mask(sz)))
+    @boundscheck checkbounds_indices(Bool, axes(sz), I) || throw_boundserror(sz, I)
+    inds = product(getindexinto(axes(sz.arg), I, mask(sz))...)
     (i, inds) = peel(inds)
-    res = @inbounds getindex(sz.arg, i)
+    res = @inbounds getindex(sz.arg, i...)
     for i in inds
-        res = sz.op(res, @inbounds getindex(sz.arg, i))
+        res = sz.op(res, @inbounds getindex(sz.arg, i...))
     end
     return res
 end
-@inline Base.getindex(sz::Swizzled, I::Int) = _getindex(I)
-@inline Base.getindex(sz::Swizzled, I::CartesianIndex) = _getindex(Tuple(I))
-@inline Base.getindex(sz::Swizzled, I::Int...) = _getindex(I)
-@inline Base.getindex(sz::Swizzled) = _getindex(())
+@inline Base.getindex(sz::Swizzled, I::Int) = _getindex(sz, I)
+@inline Base.getindex(sz::Swizzled, I::CartesianIndex) = _getindex(sz, Tuple(I))
+@inline Base.getindex(sz::Swizzled, I::Int...) = _getindex(sz, I)
+@inline Base.getindex(sz::Swizzled) = _getindex(sz, ())
 
 """
-    swizzle(A, mask, op=unspecifiedop)
+    swizzle(A, mask, op=nooperator)
 Create a new obect `B` such that the dimension `i` of `A` is mapped to
 dimension `mask[i]` of `B`, operating on lazy broadcast expressions, arrays,
 tuples, collections, [`Ref`](@ref)s and/or scalars `As`. If `mask[i]` is an
@@ -138,10 +139,10 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 1x2-element Array{Int64,1}:
  1 2
 """
-swizzle(A, mask, op=unspecifiedop) = copy(Swizzled(A, flatten((mask, repeated(drop))), op))
+swizzle(A, mask, op=nooperator) = copy(Swizzled(A, flatten((mask, repeated(drop))), op))
 
 """
-    swizzle!(A, mask, op=unspecifiedop)
+    swizzle!(A, mask, op=nooperator)
 Like [`swizzle`](@ref), but store the result of
 `swizzle(A, mask, op)` in the `dest` array.
 Note that `dest` is only used to store the result
@@ -165,7 +166,7 @@ julia> A
  -2.0
 ```
 """
-swizzle!(dest, A, mask, op=unspecifiedop) = copyto!(dest, Swizzled(A, flatten((mask, repeated(drop))), op))
+swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, Swizzled(A, flatten((mask, repeated(drop))), op))
 
 Base.Broadcast.broadcastable(sz::Swizzled) = sz
 
@@ -177,11 +178,11 @@ Base.copy(sz::Swizzled) = copy(instantiate(Broadcasted(identity, (sz,))))
 
 Base.copyto!(dest, sz::Swizzled) = copyto!(dest, instantiate(Broadcasted(identity, (sz,))))
 
-#Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(sz.arg, _mask(sz), sz.op, sz.axes, _imask(sz))) #TODO problem here too.
+#Base.Broadcast.preprocess(dest, sz::Swizzled{Style}) where {Style} = instantiate(Swizzled{Style}(sz.arg, mask(sz), sz.op, sz.axes, imask(sz))) #TODO problem here too.
 #Base.Broadcast.broadcasted(style::BroadcastStyle, szr::Swizzler, arg) = Swizzled(arg, szr.mask, szr.op) #Should use style here duh.
 
 """
-  `SwizzleStyle(style, mask, op=unspecifiedop)`
+  `SwizzleStyle(style, mask, op=nooperator)`
 Broadcast styles are used to determine behavior of objects under swizzling.  To
 customize the swizzling behavior of a type, one can first define an appropriate
 Broadcast style for the the type, then declare how the broadcast style should
@@ -208,7 +209,7 @@ Base.Broadcast.broadcasted(style::BroadcastStyle, sz::Swizzle, arg) = Swizzled(a
 function Reduce(op, dims::Int...)
     m = maximum((0, dims...))
     s = Set(dims)
-    c = 1
+    c = 0
     Swizzle(flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1))), op)
 end
 
@@ -225,7 +226,7 @@ function Min(dims::Int...)
 end
 
 function SwizzleTo(imask::Tuple{Vararg{<:Union{Int, Drop}}}, op)
-    Swizzle(flatten((setindexinto((take(repeated(drop), maximum((0, imask...)))...,), 1:length(imask), imask), repeated(drop))), op)
+    Swizzle(flatten((setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), repeated(drop))), op)
 end
 
 function ReduceTo(op, dims::Union{Int, Drop}...)
@@ -245,11 +246,11 @@ function MinTo(dims::Union{Int, Drop}...)
 end
 
 function Beam(arg, dims::Union{Int, Drop}...)
-    Swizzled(arg, flatten((dims, repeated(drop))), unspecifiedop)
+    Swizzled(arg, flatten((dims, repeated(drop))), nooperator)
 end
 
 function BeamTo(arg, dims::Union{Int, Drop}...)
-    Swizzled(arg, flatten((setindexinto((take(repeated(drop), maximum((0, imask...)))...,), 1:length(imask), imask), repeated(drop))), unspecifiedop)
+    Swizzled(arg, flatten((setindexinto(ntuple(d->drop, maximum((0, dims...))), 1:length(dims), dims), repeated(drop))), nooperator)
 end
 
 end
