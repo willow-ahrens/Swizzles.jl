@@ -45,13 +45,13 @@
           [1; 2],
           [drop; 2],
           [2; drop],
-          [2; 2; 1],
+          [2; 2; drop],
           [1; 2; 4],
           [1; drop; 3; 3]]
     As = vcat(As, [(A...,) for A in As], [-1, -1.0])
     Bs = vcat(Bs, [(B...,) for B in Bs], [11, -11.0])
     Is = vcat(Is, [(I...,) for I in Is], [-1, 1, drop])
-    for (A, B, I, (ref_f, test_f)) in Iterators.product(As, Bs, Is, ((refsetindexinto, setindexinto), (refgetindexinto, getindexinto)))
+    for (A, B, I, (ref_f, test_f)) in Iterators.product(As, Bs, Is, ((refgetindexinto, getindexinto), (refsetindexinto, setindexinto)))
         try
             ref_f(A, B, I)
         catch E
