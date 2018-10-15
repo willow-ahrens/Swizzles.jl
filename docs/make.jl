@@ -1,8 +1,8 @@
 using Documenter
-using SwizzledDimsArrays
+using Swizzles
 
 makedocs(
-    modules = [SwizzledDimsArrays]
+    modules = [Swizzles]
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.
