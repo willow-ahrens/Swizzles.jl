@@ -151,6 +151,7 @@ julia> swizzle(A, (), +)
 julia> swizzle(parse.(Int, ["1", "2"]), (2,))
 1x2-element Array{Int64,1}:
  1 2
+```
 """
 swizzle(A, mask, op=nooperator) = copy(Swizzled(A, mask, op))
 
@@ -266,6 +267,7 @@ julia> Swizzle((), +).(A)
 julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
 1x2-element Array{Int64,1}:
  1 2
+```
 """
     Swizzle(mask, op=nooperator) = new(mask, op)
 end
@@ -299,6 +301,7 @@ julia> Beam(drop, 3).(A)
  4
 [:, :, 5] =
  5
+```
 """
 function Beam(dims::Union{Int, Drop}...)
     Swizzle(dims, nooperator)
@@ -330,6 +333,7 @@ julia> Reduce(+, 2).(A)
  11
  15
  19
+```
 """
 function Reduce(op, dims::Int...)
     m = maximum((0, dims...))
@@ -365,6 +369,7 @@ julia> Sum(2).(A)
  11
  15
  19
+```
 """
 function Sum(dims::Int...)
     Reduce(+, dims...)
@@ -396,6 +401,7 @@ julia> Max(2).(A)
  6
  8
  10
+```
 """
 function Max(dims::Int...)
     Reduce(max, dims...)
@@ -427,6 +433,7 @@ julia> Min(2).(A)
  5
  7
  9
+```
 """
 function Min(dims::Int...)
     Reduce(min, dims...)
