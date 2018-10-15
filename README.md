@@ -5,7 +5,7 @@
 [![Coveralls](https://coveralls.io/repos/peterahrens/Swizzles.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/peterahrens/Swizzles.jl?branch=master)
 [![Codecov](http://codecov.io/github/peterahrens/Swizzles.jl/coverage.svg?branch=master)](http://codecov.io/github/peterahrens/Swizzles.jl?branch=master)
 
-Swizzles are Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzle operations are lazily evaluated together with broadcast expressions, and provide a familar interface for reducing and permuting.
+Swizzles are Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzles are lazily evaluated together with broadcast expressions, and provide a familar interface for reducing and permuting.
 
 ## Syntax
 
