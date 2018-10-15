@@ -86,21 +86,28 @@
   @test Beam(2,1).(A) == transpose(A)
   @test Beam(2,1,3).(A) == transpose(A)
 
-  @test Reduce(+).(A) == A
+  @test Reduce(+).(A) == 45
   @test Reduce(+, 1).(A) == [12; 15; 18]
   @test Reduce(+, 2).(A) == [6; 15; 24]
   @test Reduce(+, 1, 2).(A) == 45
   @test Reduce(+, 2, 1).(A) == 45
   @test Reduce(+, 2, 1, 3).(A) == 45
 
-  @test Max().(A) == A
+  @test Sum().(A) == 45
+  @test Sum(1).(A) == [12; 15; 18]
+  @test Sum(2).(A) == [6; 15; 24]
+  @test Sum(1, 2).(A) == 45
+  @test Sum(2, 1).(A) == 45
+  @test Sum(2, 1, 3).(A) == 45
+
+  @test Max().(A) == 9
   @test Max(1).(A) == [7; 8; 9]
   @test Max(2).(A) == [3; 6; 9]
   @test Max(1, 2).(A) == 9
   @test Max(2, 1).(A) == 9
   @test Max(2, 1, 3).(A) == 9
 
-  @test Min().(A) == A
+  @test Min().(A) == 1
   @test Min(1).(A) == [1; 2; 3]
   @test Min(2).(A) == [1; 4; 7]
   @test Min(1, 2).(A) == 1
@@ -123,21 +130,28 @@
   @test Beam(2,1).(A.+A) == transpose(A.+A)
   @test Beam(2,1,3).(A.+A) == transpose(A.+A)
 
-  @test Reduce(+).(A.+A) == A.+A
+  @test Reduce(+).(A.+A) == 90
   @test Reduce(+, 1).(A.+A) == [24; 30; 36]
   @test Reduce(+, 2).(A.+A) == [12; 30; 48]
   @test Reduce(+, 1, 2).(A.+A) == 90
   @test Reduce(+, 2, 1).(A.+A) == 90
   @test Reduce(+, 2, 1, 3).(A.+A) == 90
 
-  @test Max().(A.+A) == A.+A
+  @test Sum().(A.+A) == 90
+  @test Sum(1).(A.+A) == [24; 30; 36]
+  @test Sum(2).(A.+A) == [12; 30; 48]
+  @test Sum(1, 2).(A.+A) == 90
+  @test Sum(2, 1).(A.+A) == 90
+  @test Sum(2, 1, 3).(A.+A) == 90
+
+  @test Max().(A.+A) == 18
   @test Max(1).(A.+A) == [14; 16; 18]
   @test Max(2).(A.+A) == [6; 12; 18]
   @test Max(1, 2).(A.+A) == 18
   @test Max(2, 1).(A.+A) == 18
   @test Max(2, 1, 3).(A.+A) == 18
 
-  @test Min().(A.+A) == A.+A
+  @test Min().(A.+A) == 2
   @test Min(1).(A.+A) == [2; 4; 6]
   @test Min(2).(A.+A) == [2; 8; 14]
   @test Min(1, 2).(A.+A) == 2
@@ -167,6 +181,13 @@
   @test ReduceTo(+, 2, 1).(A) == transpose(A)
   @test ReduceTo(+, 2, 1, 3).(A) == transpose(A)
 
+  @test SumTo().(A) == 45
+  @test SumTo(1).(A) == [6; 15; 24]
+  @test SumTo(2).(A) == [12; 15; 18]
+  @test SumTo(1, 2).(A) == A
+  @test SumTo(2, 1).(A) == transpose(A)
+  @test SumTo(2, 1, 3).(A) == transpose(A)
+
   @test MaxTo().(A) == 9
   @test MaxTo(1).(A) == [3; 6; 9]
   @test MaxTo(2).(A) == [7; 8; 9]
@@ -195,6 +216,13 @@
   @test ReduceTo(+, 1, 2).(A.+A) == A.+A
   @test ReduceTo(+, 2, 1).(A.+A) == transpose(A.+A)
   @test ReduceTo(+, 2, 1, 3).(A.+A) == transpose(A.+A)
+
+  @test SumTo().(A.+A) == 90
+  @test SumTo(1).(A.+A) == [12; 30; 48]
+  @test SumTo(2).(A.+A) == [24; 30; 36]
+  @test SumTo(1, 2).(A.+A) == A.+A
+  @test SumTo(2, 1).(A.+A) == transpose(A.+A)
+  @test SumTo(2, 1, 3).(A.+A) == transpose(A.+A)
 
   @test MaxTo().(A.+A) == 18
   @test MaxTo(1).(A.+A) == [6; 12; 18]
