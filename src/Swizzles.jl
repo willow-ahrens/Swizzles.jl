@@ -102,7 +102,7 @@ Base.ndims(::Type{S}) where {S <: Swizzled} = length(imask(S))
 
 Base.length(sz::Swizzled) = prod(map(length, axes(sz)))
 
-function Base.iterate(sz::Swizzled)
+Base.@propagate_inbounds function Base.iterate(sz::Swizzled)
     iter = eachindex(sz)
     iterate(sz, (iter,))
 end
@@ -128,7 +128,7 @@ Base.@propagate_inbounds function _swizzle_getindex(sz::Swizzled, I::Tuple{Varar
         arg_I = getindexinto(broadcast_axes(sz.arg), I, mask(sz))
     end
     if sz.op isa typeof(nooperator)
-        return @inbounds getindex(sz.arg, arg_I...)
+        return @inbounds getindex(sz.arg, map(first, arg_I)...)
     else
         (i, inds) = peel(product(arg_I...))
         res = @inbounds getindex(sz.arg, i...)
