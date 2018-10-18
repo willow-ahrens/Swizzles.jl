@@ -23,3 +23,11 @@ Unwrap() = Unwrap(nothing)
 Base.Broadcast.broadcasted(::BroadcastStyle, ::Unwrap, bc) = Unwrap(bc)
 
 Base.Broadcast.materialize(uw::Unwrap) = uw.val
+
+
+
+using Base.Broadcast: Extruded
+
+#Base.@propagate_inbounds Base.getindex(A::Extruded, I...) = Broadcast._broadcast_getindex(A, CartesianIndex(I))
+
+#Base.@propagate_inbounds Base.getindex(A::Extruded, I) = Broadcast._broadcast_getindex(A, I)
