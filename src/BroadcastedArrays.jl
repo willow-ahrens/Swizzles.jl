@@ -12,6 +12,12 @@ struct BroadcastedArray{T, N, Arg} <: AbstractArray{T, N}
         @assert T <: eltype(arg)
         return new{T, N, typeof(arg)}(arg)
     end
+    @inline function BroadcastedArray{T, 1, Arg}(arg::Arg) where {T, Arg <: Tuple}
+        arg = instantiate(broadcastable(arg))
+        @assert typeof(arg) <: Arg
+        @assert T <: eltype(arg)
+        return new{T, 1, typeof(arg)}(arg)
+    end
 end
 
 @inline function BroadcastedArray(arg)
@@ -19,14 +25,26 @@ end
     return BroadcastedArray{eltype(arg), ndims(typeof(arg)), typeof(arg)}(arg)
 end
 
+@inline function BroadcastedArray(arg::Tuple)
+    return BroadcastedArray{eltype(arg), 1, typeof(arg)}(arg)
+end
+
 @inline function BroadcastedArray{T}(arg) where {T}
     arg = instantiate(broadcastable(arg))
     return BroadcastedArray{T, ndims(typeof(arg)), typeof(arg)}(arg)
 end
 
+@inline function BroadcastedArray{T}(arg::Tuple) where {T}
+    return BroadcastedArray{T, 1, typeof(arg)}(arg)
+end
+
 @inline function BroadcastedArray{T, N}(arg) where {T, N}
     arg = instantiate(broadcastable(arg))
     return BroadcastedArray{T, N, typeof(arg)}(arg)
+end
+
+@inline function BroadcastedArray{T, 1}(arg::Tuple) where {T, N}
+    return BroadcastedArray{T, 1, typeof(arg)}(arg)
 end
 
 function Base.show(io::IO, A::BroadcastedArray{T, N}) where {T, N}
