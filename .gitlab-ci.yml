@@ -3,7 +3,7 @@
 # results of) your [Julia][1] packages. Please refer to the [documentation][2]
 # for more information about package development in Julia.
 #
-# Here, it is assumed that your Julia package is named `Swizzles`. Change it to
+# Here, it is assumed that your Julia package is named `Swizzle`. Change it to
 # whatever name you have given to your package.
 #
 # [1]: http://julialang.org/
@@ -19,10 +19,10 @@
   script:
     # Let's run the tests. Substitute `coverage = false` below, if you do not
     # want coverage results.
-    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzles"); Pkg.test("Swizzles"; coverage = true)'
+    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzle"); Pkg.test("Swizzle"; coverage = true)'
     # Comment out below if you do not want coverage results.
     - julia -e 'using Pkg; Pkg.add("Coverage"); 
-      import Swizzles; cd(joinpath(dirname(pathof(Swizzles)), ".."));
+      import Swizzle; cd(joinpath(dirname(pathof(Swizzle)), ".."));
       using Coverage; cl, tl = get_summary(process_folder());
       println("(", cl/tl*100, "%) covered")'
 
@@ -57,8 +57,8 @@ pages:
   stage: deploy
   script:
     - apt-get update -qq && apt-get install -y git # needed by Documenter
-    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzles");' # rebuild Julia (can be put somewhere else I'm sure
-    - julia -e 'using Pkg; import Swizzles; Pkg.add("Documenter")' # install Documenter
+    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzle");' # rebuild Julia (can be put somewhere else I'm sure
+    - julia -e 'using Pkg; import Swizzle; Pkg.add("Documenter")' # install Documenter
     - julia --color=yes docs/make.jl # make documentation
     - mv docs/build public # move to the directory picked up by Gitlab pages
   artifacts:

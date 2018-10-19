@@ -1,5 +1,5 @@
-using Swizzles
+using Swizzle
 using Test
 
-include("Swizzles.jl")
+include("Swizzle.jl")
 include("util.jl")

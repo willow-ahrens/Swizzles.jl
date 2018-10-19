@@ -1,22 +1,22 @@
-# Swizzles
+# Swizzle
 
 <!---
-[![Travis](https://travis-ci.org/peterahrens/Swizzles.jl.svg?branch=master)](https://travis-ci.org/peterahrens/Swizzles.jl)
+[![Travis](https://travis-ci.org/peterahrens/Swizzle.jl.svg?branch=master)](https://travis-ci.org/peterahrens/Swizzle.jl)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/32r7s2skrgm9ubva/branch/master?svg=true)](https://ci.appveyor.com/project/peterahrens/swizzles-jl/branch/master)
-[![Coveralls](https://coveralls.io/repos/peterahrens/Swizzles.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/peterahrens/Swizzles.jl?branch=master)
-[![Codecov](http://codecov.io/github/peterahrens/Swizzles.jl/coverage.svg?branch=master)](http://codecov.io/github/peterahrens/Swizzles.jl?branch=master)
+[![Coveralls](https://coveralls.io/repos/peterahrens/Swizzle.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/peterahrens/Swizzle.jl?branch=master)
+[![Codecov](http://codecov.io/github/peterahrens/Swizzle.jl/coverage.svg?branch=master)](http://codecov.io/github/peterahrens/Swizzle.jl?branch=master)
 -->
-[![pipeline status](https://gitlab.com/peterahrens/Swizzles.jl/badges/master/pipeline.svg)](https://gitlab.com/peterahrens/Swizzles.jl/commits/master)
-[![coverage report](https://gitlab.com/peterahrens/Swizzles.jl/badges/master/coverage.svg)](https://gitlab.com/peterahrens/Swizzles.jl/commits/master)
+[![pipeline status](https://gitlab.com/peterahrens/Swizzle.jl/badges/master/pipeline.svg)](https://gitlab.com/peterahrens/Swizzle.jl/commits/master)
+[![coverage report](https://gitlab.com/peterahrens/Swizzle.jl/badges/master/coverage.svg)](https://gitlab.com/peterahrens/Swizzle.jl/commits/master)
 
-Swizzles are Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzles are lazily evaluated together with broadcast expressions, and provide a familar interface for reducing and permuting.
+Swizzle are Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzle are lazily evaluated together with broadcast expressions, and provide a familar interface for reducing and permuting.
 
 ## Syntax
 
 Let's start with a few examples!
 
 ```julia-repl
-julia> using Swizzles, LinearAlgebra
+julia> using Swizzle, LinearAlgebra
 
 julia> A = rand(5, 7); B = rand(7, 8);
 

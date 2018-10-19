@@ -1,5 +1,5 @@
 using BenchmarkTools
-using Swizzles
+using Swizzle
 
 suite["matmatmul"] = BenchmarkGroup()
 
