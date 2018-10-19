@@ -1,7 +1,3 @@
-export swizzle, swizzle!
-export Swizzler, Reduce, Sum, Max, Min, Beam
-export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
-
 ### An operator which does not expect to be called.
 
 """
@@ -23,43 +19,45 @@ end
 
 
 @inline function SwizzledArray(sz::SwizzledArray)
-    if eltype(mask(sz)) isa Int
-        return SwizzledArray{eltype(sz.arg)}(sz)
-    end
     T = eltype(sz.arg)
+    if eltype(mask(sz)) isa Int
+        return SwizzledArray{T}(sz)
+    end
     T! = Union{T, Base._return_type(sz.op, (T, T))}
-    if T! isa T
-        return T!
+    if T! <: T
+        return SwizzledArray{T!}(sz)
     end
     T = T!
     T! = Union{T, Base._return_type(sz.op, (T, T))}
-    if T! isa T
-        return T!
+    if T! <: T
+        return SwizzledArray{T!}(sz)
     end
-    return SwizzledArray{T}(sz)
+    return SwizzledArray{Any}(sz)
 end
 
-@inline SwizzledArray{T}(sz::SwizzledArray{S, N, Arg, mask, imask, Op}) where {T, S, N, Arg, mask, imask, Op} = SwizzledArray{T, N, Arg, mask, imask, Op}(arg, op)
+@inline SwizzledArray{T}(sz::SwizzledArray{S, N, Arg, mask, imask, Op}) where {T, S, N, Arg, mask, imask, Op} = SwizzledArray{T, N, Arg, mask, imask, Op}(sz.arg, sz.op)
 
 @inline SwizzledArray(arg, mask, op) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask), op))
 
-@inline SwizzledArray{T}(arg::Arg, mask, op) = _SwizzledArray(T, arg, Val(mask), op)
+@inline SwizzledArray{T}(arg, mask, op) where {T} = _SwizzledArray(T, arg, Val(mask), op)
 
-@inline function _SwizzledArray(::Type{T}, arg::Arg, ::Val{mask}, op::Op) where {T, N, mask, Op, Arg <: AbstractArray{T, N}}
+@inline function _SwizzledArray(::Type{T}, arg::AbstractArray{S, N}, ::Val{mask}, op) where {T, S, N, mask}
     if @generated
         mask! = (take(flatten((mask, repeated(drop))), N)...,)
-        imask = setindexinto(ntuple(d->drop, maximum((0, mask!...))), 1:length(mask!), mask!)
-        return :(return SwizzledArray{T, N, Arg, $mask!, $imask, Op}(arg, op))
+        M = maximum((0, mask!...))
+        imask = setindexinto(ntuple(d->drop, M), 1:length(mask!), mask!)
+        return :(return SwizzledArray{T, $M, typeof(arg), $mask!, $imask, typeof(op)}(arg, op))
     else
         mask! = (take(flatten((mask, repeated(drop))), N)...,)
-        imask = setindexinto(ntuple(d->drop, maximum((0, mask!...))), 1:length(mask!), mask!)
-        return SwizzledArray{T, N, typeof(arg), Val(mask!), imask, typeof(op)}(arg, op)
+        M = maximum((0, mask!...))
+        imask = setindexinto(ntuple(d->drop, M), 1:length(mask!), mask!)
+        return SwizzledArray{T, M, typeof(arg), mask!, imask, typeof(op)}(arg, op)
     end
 end
 
-mask(::Type{SwizzledArray{Arg, _mask, _imask, Op}}) where {Arg, _mask, _imask, Op} = _mask
+mask(::Type{SwizzledArray{T, N, Arg, _mask, _imask, Op}}) where {T, N, Arg, _mask, _imask, Op} = _mask
 mask(sz::S) where {S <: SwizzledArray} = mask(S)
-imask(::Type{SwizzledArray{Arg, _mask, _imask, Op}}) where {Arg, _mask, _imask, Op} = _imask
+imask(::Type{SwizzledArray{T, N, Arg, _mask, _imask, Op}}) where {T, N, Arg, _mask, _imask, Op} = _imask
 imask(sz::S) where {S <: SwizzledArray} = imask(S)
 
 struct Swizzler{mask, Op} <: WrappedArrayConstructor
@@ -103,7 +101,7 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 mask(::Type{Swizzler{_mask, Op}}) where {_mask, Op} = _mask
 mask(sz::S) where {S <: Swizzler} = mask(S)
 
-@inline (sz::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
+@inline wrap(sz::Swizzler, arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
 
 
 
@@ -115,12 +113,25 @@ end
 
 @inline function Base.axes(sz::SwizzledArray)
     if @generated
-        args = getindexinto(ntuple(d->:(Base.OneTo(1)), length(imask(sz))), ntuple(d->:(bc_axes[$d]), length(mask(sz))), imask(sz))
+        args = getindexinto(ntuple(d->:(Base.OneTo(1)), length(imask(sz))), ntuple(d->:(arg_axes[$d]), length(mask(sz))), imask(sz))
         return quote
+            arg_axes = axes(sz.arg)
             return ($(args...),)
         end
     else
         getindexinto(ntuple(d->Base.OneTo(1), length(imask(sz))), axes(sz.arg), imask(sz))
+    end
+end
+
+@inline function Base.size(sz::SwizzledArray)
+    if @generated
+        args = getindexinto(ntuple(d->:(1), length(imask(sz))), ntuple(d->:(arg_size[$d]), length(mask(sz))), imask(sz))
+        return quote
+            arg_size = size(sz.arg)
+            return ($(args...),)
+        end
+    else
+        getindexinto(ntuple(d->1, length(imask(sz))), size(sz.arg), imask(sz))
     end
 end
 
@@ -129,13 +140,13 @@ end
 Base.@propagate_inbounds function _swizzle_getindex(sz::SwizzledArray, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(sz), I) || throw_boundserror(sz, I)
     if @generated
-        args = getindexinto(ntuple(d->:(bc_axes[$d]), length(mask(sz))), ntuple(d->:(I[$d]), length(imask(sz))), mask(sz))
+        args = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(sz))), ntuple(d->:(I[$d]), length(imask(sz))), mask(sz))
         quote
-            bc_axes = broadcast_axes(sz.arg)
+            arg_axes = axes(sz.arg)
             arg_I = ($(args...),)
         end
     else
-        arg_I = getindexinto(broadcast_axes(sz.arg), I, mask(sz))
+        arg_I = getindexinto(axes(sz.arg), I, mask(sz))
     end
     if sz.op isa typeof(nooperator)
         return @inbounds getindex(sz.arg, map(first, arg_I)...)
@@ -249,11 +260,11 @@ julia> B
 """
 swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op))
 
-@inline Base.copy(sz::SwizzledArray) = copy(instantiate(Broadcasted(identity, (sz,))))
-
-@inline Base.copyto!(dest, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(identity, (sz,))))
-
-@inline Base.copyto!(dest::AbstractArray, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(identity, (sz,))))
+@inline Base.copy(sz::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (sz,))))
+@inline Base.copyto!(dest, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (sz,))))
+@inline Base.copyto!(dest::AbstractArray, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (sz,))))
+@inline Base.Broadcast.materialize(A::SwizzledArray) = copy(A)
+@inline Base.Broadcast.materialize!(dest, A::SwizzledArray) = copyto!(dest, A)
 
 #function Base.Broadcast.preprocess(dest, sz::SwizzledArray{Arg, mask, imask, Op}) where {Arg, mask, imask, Op}
 #    arg = preprocess(dest, sz.arg)
