@@ -12,17 +12,6 @@ end
 
 
 
-using Base.Broadcast: BroadcastStyle
-
-struct Unwrap
-  val
-end
-
-Unwrap() = Unwrap(nothing)
-
-Base.Broadcast.broadcasted(::BroadcastStyle, ::Unwrap, bc) = Unwrap(bc)
-
-Base.Broadcast.materialize(uw::Unwrap) = uw.val
 
 
 

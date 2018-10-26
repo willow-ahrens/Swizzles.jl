@@ -107,7 +107,7 @@ Broadcast.longest_tuple(::Nothing, t::Tuple{<:BroadcastedArray{T, N, Arg},Vararg
 
 abstract type WrappedArrayConstructor end
 
-@inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = wrap(C, (map(arrayify, args)...))
+@inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = C(map(arrayify, args)...)
 
 """
 operating on lazy broadcast expressions, arrays,

@@ -1,9 +1,11 @@
-authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
 name = "Swizzle"
 uuid = "6997b572-c796-11e8-2991-b59c2857380c"
+authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+Rewrite = "329df15e-4b1e-11e8-0b4f-55ede0b53481"
+SpecialSets = "c6b63f46-9023-11e8-3b28-1f7d8c94880d"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

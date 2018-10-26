@@ -101,7 +101,7 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 mask(::Type{Swizzler{_mask, Op}}) where {_mask, Op} = _mask
 mask(sz::S) where {S <: Swizzler} = mask(S)
 
-@inline wrap(sz::Swizzler, arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
+@inline (sz::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
 
 
 
