@@ -20,15 +20,15 @@ end
 
 @inline function SwizzledArray(sz::SwizzledArray)
     T = eltype(sz.arg)
-    if eltype(mask(sz)) isa Int
+    if eltype(mask(sz)) <: Int
         return SwizzledArray{T}(sz)
     end
-    T! = Union{T, Base._return_type(sz.op, (T, T))}
+    T! = Union{T, return_type(sz.op, (T, T))}
     if T! <: T
         return SwizzledArray{T!}(sz)
     end
     T = T!
-    T! = Union{T, Base._return_type(sz.op, (T, T))}
+    T! = Union{T, return_type(sz.op, (T, T))}
     if T! <: T
         return SwizzledArray{T!}(sz)
     end
@@ -46,11 +46,13 @@ end
         mask! = (take(flatten((mask, repeated(drop))), N)...,)
         M = maximum((0, mask!...))
         imask = setindexinto(ntuple(d->drop, M), 1:length(mask!), mask!)
+        #return :(return SwizzledArray{T, $M, typeof(arg), $mask!, $imask, Core.Typeof(op)}(arg, op))
         return :(return SwizzledArray{T, $M, typeof(arg), $mask!, $imask, typeof(op)}(arg, op))
     else
         mask! = (take(flatten((mask, repeated(drop))), N)...,)
         M = maximum((0, mask!...))
         imask = setindexinto(ntuple(d->drop, M), 1:length(mask!), mask!)
+        #return SwizzledArray{T, M, typeof(arg), mask!, imask, Core.Typeof(op)}(arg, op)
         return SwizzledArray{T, M, typeof(arg), mask!, imask, typeof(op)}(arg, op)
     end
 end

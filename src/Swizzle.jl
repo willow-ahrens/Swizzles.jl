@@ -11,6 +11,7 @@ export unwrap
 
 include("base.jl")
 include("util.jl")
+include("properties.jl")
 include("BroadcastedArrays.jl")
 include("SwizzledArrays.jl")
 

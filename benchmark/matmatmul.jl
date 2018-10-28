@@ -3,7 +3,7 @@ using Swizzle
 
 suite["matmatmul"] = BenchmarkGroup()
 
-for (N, M, K) in zip(2 .^ (2:2:4), 2 .^ (2:2:4), 2 .^ (2:2:4))
+for (N, M, K) in zip(2 .^ (2:2:6), 2 .^ (2:2:6), 2 .^ (2:2:6))
     mymatmul = suite["matmatmul"][(N=N, M=M, K=K)] = BenchmarkGroup()
     A = rand(N, K)
     B = rand(K, M)
