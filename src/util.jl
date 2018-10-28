@@ -172,6 +172,8 @@ struct Unwrap
   value
 end
 
-Base.Broadcast.broadcasted(::BroadcastStyle, ::Type{Unwrap}, bc) = Unwrap(bc)
+Unwrap() = Unwrap(nothing)
+
+Base.Broadcast.broadcasted(::BroadcastStyle, ::Unwrap, bc) = Unwrap(bc)
 
 Base.Broadcast.materialize(uw::Unwrap) = uw.value
