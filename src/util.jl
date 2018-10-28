@@ -163,3 +163,15 @@ function _vector_setindexinto(A::AbstractVector, B, I)
     end
     return map(identity, R)
 end
+
+
+
+using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
+
+struct Unwrap
+  value
+end
+
+Base.Broadcast.broadcasted(::BroadcastStyle, ::Type{Unwrap}, bc) = Unwrap(bc)
+
+Base.Broadcast.materialize(uw::Unwrap) = uw.value

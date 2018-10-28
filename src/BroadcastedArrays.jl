@@ -109,6 +109,7 @@ abstract type WrappedArrayConstructor end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = C(map(arrayify, args)...)
 
+
 """
 operating on lazy broadcast expressions, arrays,
 tuples, collections, [`Ref`](@ref)s and/or scalars `As`
