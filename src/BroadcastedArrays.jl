@@ -1,7 +1,7 @@
 using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, longest_tuple, preprocess, _broadcast_getindex
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex
 
 struct BroadcastedArray{T, N, Arg} <: AbstractArray{T, N}
     arg::Arg
@@ -93,25 +93,14 @@ Base.@propagate_inbounds Base.getindex(A::BroadcastedArray) = _broadcast_getinde
 @inline Base.copyto!(dest, A::BroadcastedArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (A,))))
 @inline Base.Broadcast.materialize!(dest, A::BroadcastedArray) = copyto!(dest, A)
 
+function Base.Broadcast.preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
+    arg = preprocess(dest, A.arg)
+    BroadcastedArray{T, N, typeof(arg)}(arg)
+end
 
-#=
-#TODO looks something like this.
-@inline Base.BroadcastStyle(::Style{Tuple}, A::BroadcastedArray) = BroadcastStyle(A.arg)
-Broadcast.longest_tuple(::Nothing, t::Tuple{<:BroadcastedArray{T, N, Arg},Vararg{Any}}) where {T, N, Arg <: Broadcasted{Style{Tuple}}} = longest_tuple(longest_tuple(nothing, (t[1].arg,)), tail(t))
-@inline Base.BroadcastStyle(::DefaultArrayStyle{N}, A::BroadcastedArray{T, N}) where {T, N} = DefaultArrayStyle(Val(N))
-@inline Base.BroadcastStyle(::AbstractArrayStyle{N}, A::BroadcastedArray) where {N} = AbstractArrayStyle(Val(N))
-@inline Base.BroadcastStyle(::BroadcastStyle, A::BroadcastedArray{T, N}) where {T, N} = AbstractArrayStyle(Val(N))
-@inline Base.BroadcastStyle(::ArrayConflict, A::BroadcastedArray) = ArrayConflict()
-=#
-
+@inline Broadcast.BroadcastStyle(A::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
 abstract type WrappedArrayConstructor end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = C(map(arrayify, args)...)
-
-
-"""
-operating on lazy broadcast expressions, arrays,
-tuples, collections, [`Ref`](@ref)s and/or scalars `As`
-"""
 

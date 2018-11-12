@@ -262,12 +262,11 @@ swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op
 @inline Base.Broadcast.materialize(A::SwizzledArray) = copy(A)
 @inline Base.Broadcast.materialize!(dest, A::SwizzledArray) = copyto!(dest, A)
 
-#function Base.Broadcast.preprocess(dest, sz::SwizzledArray{Arg, mask, Op}) where {Arg, mask, Op}
+#function Base.Broadcast.preprocess(dest, sz::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
 #    arg = preprocess(dest, sz.arg)
-#    SwizzledArray{typeof(arg), mask, Op}(arg, sz.op)
+#    SwizzledArray{T, N, typeof(arg), mask, Op}(arg, sz.op)
 #end
 
-#=
 """
     `SwizzleStyle(style, ::Type{<:SwizzledArray})`
 
@@ -277,10 +276,9 @@ define an appropriate Broadcast style for the the type, then declare how the
 broadcast style should behave under broadcasting after the swizzle by
 overriding the `SwizzleStyle` method.
 """
-SwizzleStyle #FIXME only define on ur stuff
+SwizzleStyle
 
 SwizzleStyle(::Style{Tuple}, Sz) = first(mask(Sz)) == 1 ? Style{Tuple}() : DefaultArrayStyle(Val(max(0, first(mask(Sz)))))
-Broadcast.longest_tuple(::Nothing, t::Tuple{<:SwizzledArray{<:Any, (1,)},Vararg{Any}}) = longest_tuple(longest_tuple(nothing, (t[1].arg,)), tail(t))
 SwizzleStyle(style::A, Sz) where {A <: AbstractArrayStyle{0}} = A(Val(0))
 function SwizzleStyle(style::A, ::Type{Sz}) where {N, A <: AbstractArrayStyle{N}, Sz}
     if @generated
@@ -291,14 +289,6 @@ function SwizzleStyle(style::A, ::Type{Sz}) where {N, A <: AbstractArrayStyle{N}
 end
 SwizzleStyle(style::AbstractArrayStyle{Any}, Sz) = style
 SwizzleStyle(::BroadcastStyle, Sz) = Unknown()
-SwizzleStyle(::ArrayConflict, Sz) = ArrayConflict() #FIXME
+SwizzleStyle(::ArrayConflict, Sz) = ArrayConflict()
 
-@inline Broadcast.BroadcastStyle(Sz::Type{SwizzledArray{Arg, mask, Op}}) where {Arg, mask, Op} = SwizzleStyle(BroadcastStyle(Arg), Sz)
-pain and suffering
-=#
-
-#=
-function _SwizzleStyle(style, sz)
-    
-end
-=#
+@inline Broadcast.BroadcastStyle(Sz::Type{SwizzledArray{T, N, Arg}}) where {T, N, Arg} = SwizzleStyle(BroadcastStyle(Arg), Sz)
