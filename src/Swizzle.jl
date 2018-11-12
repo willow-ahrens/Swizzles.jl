@@ -11,9 +11,9 @@ export Unwrap
 
 include("base.jl")
 include("util.jl")
-include("properties.jl")
 include("BroadcastedArrays.jl")
 include("SwizzledArrays.jl")
+include("properties.jl")
 
 export metatransform
 include("meta.jl")

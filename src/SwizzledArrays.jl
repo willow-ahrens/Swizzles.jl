@@ -16,8 +16,6 @@ struct SwizzledArray{T, N, Arg, mask, imask, Op} <: AbstractArray{T, N}
     end
 end
 
-
-
 @inline function SwizzledArray(sz::SwizzledArray)
     T = eltype(sz.arg)
     if eltype(mask(sz)) <: Int

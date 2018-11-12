@@ -9,6 +9,20 @@ Base.isless(::Drop, ::Integer) = true
 Base.isless(::Integer, ::Drop) = false
 Base.isless(::Drop, ::Drop) = false
 
+struct Keep end
+
+const keep = Keep()
+
+Base.isequal(::Keep, ::Keep) = true
+Base.isequal(::Keep, ::Integer) = false
+Base.isequal(::Integer, ::Keep) = false
+Base.isless(::Keep, ::Integer) = false
+Base.isless(::Integer, ::Keep) = true
+Base.isless(::Keep, ::Keep) = false
+
+Base.isless(::Drop, ::Keep) = true
+Base.isless(::Keep, ::Drop) = false
+
 """
     getindexinto(a, B, i::Union{Integer, Drop})
 If `i isa Drop`, return `a`. If `i isa Integer`, return `B[i]`.
