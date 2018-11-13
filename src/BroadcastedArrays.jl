@@ -53,8 +53,8 @@ function Base.show(io::IO, A::BroadcastedArray{T, N}) where {T, N}
     nothing
 end
 
-arrayify(arg::AbstractArray) = arg
-arrayify(arg) = BroadcastedArray(arg)
+@inline arrayify(arg::AbstractArray) = arg
+@inline arrayify(arg) = BroadcastedArray(arg)
 
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
