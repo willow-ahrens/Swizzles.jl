@@ -1,7 +1,7 @@
 using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
 
 struct BroadcastedArray{T, N, Arg} <: AbstractArray{T, N}
     arg::Arg
@@ -23,6 +23,11 @@ end
 @inline function BroadcastedArray(arg)
     arg = instantiate(broadcastable(arg))
     return BroadcastedArray{eltype(arg), ndims(typeof(arg)), typeof(arg)}(arg)
+end
+
+@inline function BroadcastedArray(arg::Broadcasted)
+    arg = instantiate(arg)
+    return BroadcastedArray{combine_eltypes(arg.f, arg.args), ndims(typeof(arg)), typeof(arg)}(arg)
 end
 
 @inline function BroadcastedArray(arg::Tuple)
@@ -53,8 +58,8 @@ function Base.show(io::IO, A::BroadcastedArray{T, N}) where {T, N}
     nothing
 end
 
-@inline arrayify(arg::AbstractArray) = arg
-@inline arrayify(arg) = BroadcastedArray(arg)
+arrayify(arg::AbstractArray) = arg
+arrayify(arg) = BroadcastedArray(arg)
 
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.

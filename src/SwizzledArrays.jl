@@ -21,12 +21,12 @@ end
     if eltype(mask(sz)) <: Int
         return SwizzledArray{T}(sz)
     end
-    T! = Union{T, return_type(sz.op, (T, T))}
+    T! = Union{T, get_return_type(sz.op, T, T)}
     if T! <: T
         return SwizzledArray{T!}(sz)
     end
     T = T!
-    T! = Union{T, return_type(sz.op, (T, T))}
+    T! = Union{T, get_return_type(sz.op, T, T)}
     if T! <: T
         return SwizzledArray{T!}(sz)
     end
