@@ -1,6 +1,8 @@
 using Swizzle
+using Pkg
 using Test
 
-include("WrappedArrays.jl")
+Pkg.test("WrappedArrays")
+
 include("Swizzle.jl")
 include("util.jl")

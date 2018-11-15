@@ -1,4 +1,10 @@
-using Base.Broadcast: broadcast_axes
+module WrappedArrays
+
+using Base.Broadcast: broadcast_axes, BroadcastStyle
+
+export WrappedArray
+
+export parenttype, storagetype, storage
 
 abstract type WrappedArray{T, N, P} <: AbstractArray{T, N} end
 
@@ -43,3 +49,4 @@ function Base.Broadcast.preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
 end
 =#
 
+end
