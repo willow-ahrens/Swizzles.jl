@@ -16,24 +16,24 @@ struct SwizzledArray{T, N, Arg, mask, Op} <: WrappedArray{T, N, Arg}
     end
 end
 
-@inline function SwizzledArray(sz::SwizzledArray)
-    T = eltype(sz.arg)
-    if eltype(mask(sz)) <: Int
-        return SwizzledArray{T}(sz)
+@inline function SwizzledArray(arr::SwizzledArray)
+    T = eltype(arr.arg)
+    if eltype(mask(arr)) <: Int
+        return SwizzledArray{T}(arr)
     end
-    T! = Union{T, get_return_type(sz.op, T, T)}
+    T! = Union{T, get_return_type(arr.op, T, T)}
     if T! <: T
-        return SwizzledArray{T!}(sz)
+        return SwizzledArray{T!}(arr)
     end
     T = T!
-    T! = Union{T, get_return_type(sz.op, T, T)}
+    T! = Union{T, get_return_type(arr.op, T, T)}
     if T! <: T
-        return SwizzledArray{T!}(sz)
+        return SwizzledArray{T!}(arr)
     end
-    return SwizzledArray{Any}(sz)
+    return SwizzledArray{Any}(arr)
 end
 
-@inline SwizzledArray{T}(sz::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(sz.arg, sz.op)
+@inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
 @inline SwizzledArray(arg, mask, op) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask), op))
 
@@ -54,7 +54,7 @@ end
 end
 
 mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
-mask(sz::S) where {S <: SwizzledArray} = mask(S)
+mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
 struct Swizzler{mask, Op} <: WrappedArrayConstructor
     op::Op
@@ -95,70 +95,70 @@ julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
 @inline Swizzler(mask, op::Op) where {Op} = Swizzler{mask, Op}(op)
 
 mask(::Type{Swizzler{_mask, Op}}) where {_mask, Op} = _mask
-mask(sz::S) where {S <: Swizzler} = mask(S)
+mask(szr::Szr) where {Szr <: Swizzler} = mask(Szr)
 
-@inline (sz::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
+@inline (szr::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(szr)), szr.op))
 
-function Base.show(io::IO, sz::SwizzledArray)
+function Base.show(io::IO, arr::SwizzledArray)
     print(io, SwizzledArray)
-    print(io, '(', sz.arg, ", ", mask(sz), ", ", sz.op, ')')
+    print(io, '(', arr.arg, ", ", mask(arr), ", ", arr.op, ')')
     nothing
 end
 
-Base.parent(sz::SwizzledArray) = sz.arg
+Base.parent(arr::SwizzledArray) = arr.arg
 
-@inline function Base.axes(sz::SwizzledArray)
+@inline function Base.axes(arr::SwizzledArray)
     if @generated
-        args = setindexinto(ntuple(d->:(Base.OneTo(1)), ndims(sz)), ntuple(d->:(arg_axes[$d]), length(mask(sz))), mask(sz))
+        args = setindexinto(ntuple(d->:(Base.OneTo(1)), ndims(arr)), ntuple(d->:(arg_axes[$d]), length(mask(arr))), mask(arr))
         return quote
-            arg_axes = axes(sz.arg)
+            arg_axes = axes(arr.arg)
             return ($(args...),)
         end
     else
-        setindexinto(ntuple(d->Base.OneTo(1), ndims(sz)), axes(sz.arg), mask(sz))
+        setindexinto(ntuple(d->Base.OneTo(1), ndims(arr)), axes(arr.arg), mask(arr))
     end
 end
 
-@inline function Base.size(sz::SwizzledArray)
+@inline function Base.size(arr::SwizzledArray)
     if @generated
-        args = setindexinto(ntuple(d->:(1), ndims(sz)), ntuple(d->:(arg_size[$d]), length(mask(sz))), mask(sz))
+        args = setindexinto(ntuple(d->:(1), ndims(arr)), ntuple(d->:(arg_size[$d]), length(mask(arr))), mask(arr))
         return quote
-            arg_size = size(sz.arg)
+            arg_size = size(arr.arg)
             return ($(args...),)
         end
     else
-        setindexinto(ntuple(d->1, ndims(sz)), size(sz.arg), mask(sz))
+        setindexinto(ntuple(d->1, ndims(arr)), size(arr.arg), mask(arr))
     end
 end
 
 
 
-Base.@propagate_inbounds function _swizzle_getindex(sz::SwizzledArray, I::Tuple{Vararg{Int}})
-    @boundscheck checkbounds_indices(Bool, axes(sz), I) || throw_boundserror(sz, I)
+Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
+    @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
     if @generated
-        args = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(sz))), ntuple(d->:(I[$d]), ndims(sz)), mask(sz))
+        args = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
         quote
-            arg_axes = axes(sz.arg)
+            arg_axes = axes(arr.arg)
             arg_I = ($(args...),)
         end
     else
-        arg_I = getindexinto(axes(sz.arg), I, mask(sz))
+        arg_I = getindexinto(axes(arr.arg), I, mask(arr))
     end
-    #if sz.op isa typeof(nooperator)
-    #    return @inbounds getindex(sz.arg, map(first, arg_I)...)
+    #if arr.op isa typeof(nooperator)
+    #    return @inbounds getindex(arr.arg, map(first, arg_I)...)
     #end
     (i, inds) = peel(product(arg_I...))
-    res = @inbounds getindex(sz.arg, i...)
+    res = @inbounds getindex(arr.arg, i...)
     for i in inds
-        res = sz.op(res, @inbounds getindex(sz.arg, i...))
+        res = arr.op(res, @inbounds getindex(arr.arg, i...))
     end
     return res
 end
 
-Base.@propagate_inbounds Base.getindex(sz::SwizzledArray, I::Int) = _swizzle_getindex(sz, (I,))
-Base.@propagate_inbounds Base.getindex(sz::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(sz, Tuple(I))
-Base.@propagate_inbounds Base.getindex(sz::SwizzledArray, I::Int...) = _swizzle_getindex(sz, I)
-Base.@propagate_inbounds Base.getindex(sz::SwizzledArray) = _swizzle_getindex(sz, ())
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_getindex(arr, (I,))
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
 
 """
     `swizzle(A, mask, op=nooperator)`
@@ -255,15 +255,15 @@ julia> B
 """
 swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(arrayify(A), mask, op))
 
-@inline Base.copy(sz::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (sz,))))
-@inline Base.copyto!(dest, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (sz,))))
-@inline Base.copyto!(dest::AbstractArray, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (sz,))))
+@inline Base.copy(arr::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
+@inline Base.copyto!(dest, arr::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
+@inline Base.copyto!(dest::AbstractArray, arr::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
 @inline Base.Broadcast.materialize(A::SwizzledArray) = copy(A)
 @inline Base.Broadcast.materialize!(dest, A::SwizzledArray) = copyto!(dest, A)
 
-#function Base.Broadcast.preprocess(dest, sz::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
-#    arg = preprocess(dest, sz.arg)
-#    SwizzledArray{T, N, typeof(arg), mask, Op}(arg, sz.op)
+#function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
+#    arg = preprocess(dest, arr.arg)
+#    SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 #end
 
 """
@@ -277,17 +277,58 @@ overriding the `SwizzleStyle` method.
 """
 SwizzleStyle
 
-SwizzleStyle(::Style{Tuple}, Sz) = first(mask(Sz)) == 1 ? Style{Tuple}() : DefaultArrayStyle(Val(max(0, first(mask(Sz)))))
-SwizzleStyle(style::A, Sz) where {A <: AbstractArrayStyle{0}} = A(Val(0))
-function SwizzleStyle(style::A, ::Type{Sz}) where {N, A <: AbstractArrayStyle{N}, Sz}
+function SwizzleStyle(::S, ::Type{A}) where {N, S <: AbstractArrayStyle{N}, A <:SwizzledArray} #TODO orthogonalize
     if @generated
-        return :(return A(Val($(max(0, maximum(take(mask(Sz), N)))))))
+        return :(return S(Val($(max(0, maximum(take(mask(A), N)))))))
     else
-        return A(Val(max(0, maximum(take(mask(Sz), N)))))
+        return S(Val(max(0, maximum(take(mask(A), N)))))
     end
 end
-SwizzleStyle(style::AbstractArrayStyle{Any}, Sz) = style
-SwizzleStyle(::BroadcastStyle, Sz) = Unknown()
-SwizzleStyle(::ArrayConflict, Sz) = ArrayConflict()
+SwizzleStyle(::BroadcastStyle, arr) = DefaultArrayStyle{ndims(arr)}()
+SwizzleStyle(::ArrayConflict, arr) = ArrayConflict()
 
-@inline Broadcast.BroadcastStyle(Sz::Type{<:SwizzledArray{T, N, Arg}}) where {T, N, Arg} = SwizzleStyle(BroadcastStyle(Arg), Sz)
+@inline function Broadcast.BroadcastStyle(::Type{A}) where {T, N, Arg, A <: SwizzledArray{T, N, Arg}}
+    if @generated
+        if mask(A) == ((1:ndims(Arg))...,)
+            return quote
+                Base.@_inline_meta()
+                return BroadcastStyle(Arg)
+            end
+        else
+            return quote
+                Base.@_inline_meta()
+                return (SwizzleStyle(BroadcastStyle(Arg), A))
+            end
+        end
+    else
+        if mask(A) == ((1:ndims(Arg))...,)
+            return BroadcastStyle(Arg)
+        else
+            return (SwizzleStyle(BroadcastStyle(Arg), A))
+        end
+    end
+end
+
+#=
+@inline function Broadcast.broadcastable(arr::SwizzledArray{T, N, Arg}) where {T, N, Arg, A <: }
+    if @generated
+        if mask(arr) == ((1:length(ndims(Arg)))...)
+            return quote
+                Base.@_inline_meta()
+                return arr.arg
+            end
+        else
+            return quote
+                Base.@_inline_meta()
+                return arr
+            end
+        end
+    else
+        if mask(arr) == ((1:length(ndims(Arg)))...)
+            return arr.arg
+        else
+            return arr
+        end
+    end
+end
+=#
