@@ -67,7 +67,6 @@
   R = [0 0 0]
   @test swizzle!(R, [11; 12; 13], (2,)) == [11 12 13]
   R = [0]
-  @test swizzle!(R, [11; 12; 13], (), max) == [13]
   @test swizzle((11, 12, 13), (), max) == 13
 
   @test Swizzler((), +).(A) == 45

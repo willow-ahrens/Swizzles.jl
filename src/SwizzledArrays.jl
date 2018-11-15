@@ -99,13 +99,13 @@ mask(sz::S) where {S <: Swizzler} = mask(S)
 
 @inline (sz::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(sz)), sz.op))
 
-
-
 function Base.show(io::IO, sz::SwizzledArray)
     print(io, SwizzledArray)
     print(io, '(', sz.arg, ", ", mask(sz), ", ", sz.op, ')')
     nothing
 end
+
+Base.parent(sz::SwizzledArray) = sz.arg
 
 @inline function Base.axes(sz::SwizzledArray)
     if @generated
@@ -144,16 +144,15 @@ Base.@propagate_inbounds function _swizzle_getindex(sz::SwizzledArray, I::Tuple{
     else
         arg_I = getindexinto(axes(sz.arg), I, mask(sz))
     end
-    if sz.op isa typeof(nooperator)
-        return @inbounds getindex(sz.arg, map(first, arg_I)...)
-    else
-        (i, inds) = peel(product(arg_I...))
-        res = @inbounds getindex(sz.arg, i...)
-        for i in inds
-            res = sz.op(res, @inbounds getindex(sz.arg, i...))
-        end
-        return res
+    #if sz.op isa typeof(nooperator)
+    #    return @inbounds getindex(sz.arg, map(first, arg_I)...)
+    #end
+    (i, inds) = peel(product(arg_I...))
+    res = @inbounds getindex(sz.arg, i...)
+    for i in inds
+        res = sz.op(res, @inbounds getindex(sz.arg, i...))
     end
+    return res
 end
 
 Base.@propagate_inbounds Base.getindex(sz::SwizzledArray, I::Int) = _swizzle_getindex(sz, (I,))
@@ -212,7 +211,7 @@ julia> swizzle(parse.(Int, ["1", "2"]), (2,))
  1 2
 ```
 """
-swizzle(A, mask, op=nooperator) = copy(SwizzledArray(A, mask, op))
+swizzle(A, mask, op=nooperator) = copy(SwizzledArray(arrayify(A), mask, op))
 
 """
     `swizzle!(dest, A, mask, op=nooperator)`
@@ -254,7 +253,7 @@ julia> B
  19
 ```
 """
-swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op))
+swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(arrayify(A), mask, op))
 
 @inline Base.copy(sz::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (sz,))))
 @inline Base.copyto!(dest, sz::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (sz,))))
