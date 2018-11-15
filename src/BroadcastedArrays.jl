@@ -3,7 +3,7 @@ using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeU
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
 
-struct BroadcastedArray{T, N, Arg} <: AbstractArray{T, N}
+struct BroadcastedArray{T, N, Arg} <: WrappedArray{T, N, Arg}
     arg::Arg
     @inline function BroadcastedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         arg = instantiate(broadcastable(arg))

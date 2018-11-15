@@ -7,7 +7,7 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Arg, mask, Op} <: AbstractArray{T, N}
+struct SwizzledArray{T, N, Arg, mask, Op} <: WrappedArray{T, N, Arg}
     arg::Arg
     op::Op
     function SwizzledArray{T, N, Arg, mask, Op}(arg::Arg, op::Op) where {T, N, Arg, mask, Op}
@@ -290,4 +290,4 @@ SwizzleStyle(style::AbstractArrayStyle{Any}, Sz) = style
 SwizzleStyle(::BroadcastStyle, Sz) = Unknown()
 SwizzleStyle(::ArrayConflict, Sz) = ArrayConflict()
 
-@inline Broadcast.BroadcastStyle(Sz::Type{SwizzledArray{T, N, Arg}}) where {T, N, Arg} = SwizzleStyle(BroadcastStyle(Arg), Sz)
+@inline Broadcast.BroadcastStyle(Sz::Type{<:SwizzledArray{T, N, Arg}}) where {T, N, Arg} = SwizzleStyle(BroadcastStyle(Arg), Sz)
