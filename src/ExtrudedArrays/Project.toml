@@ -1,0 +1,7 @@
+name = "ExtrudedArrays"
+uuid = "951dd108-e9cc-11e8-0d46-afaf0e053574"
+authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+WrappedArrays = "a6ce76e2-e8fe-11e8-3e70-1ffb81fd1158"

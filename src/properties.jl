@@ -9,3 +9,4 @@ using SpecialSets
 @inline get_return_type(::typeof(min), a, b) = Union{a, b}
 @inline get_return_type(::typeof(+), a::Type{<:Number}) = a
 @inline get_return_type(::typeof(-), a::Type{<:Number}) = a
+
