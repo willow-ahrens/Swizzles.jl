@@ -1,6 +1,5 @@
 module Swizzle
 
-using WrappedArrays
 
 export Drop, drop
 export getindexinto, setindexinto #maybe dont export...
@@ -13,6 +12,7 @@ export Unwrap
 
 include("base.jl")
 include("util.jl")
+include("WrappedArrays.jl")
 include("BroadcastedArrays.jl")
 include("SwizzledArrays.jl")
 include("properties.jl")

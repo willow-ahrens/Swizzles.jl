@@ -1,4 +1,4 @@
-### An operator which does not expect to be called.
+using Swizzle.WrappedArrays
 
 """
     `nooperator(a, b)`

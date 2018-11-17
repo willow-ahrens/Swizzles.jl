@@ -1,5 +1,5 @@
-using Swizzle
 using Base.Broadcast: broadcastable
+using Swizzle.WrappedArrays
 
 struct SimpleWrappedArray{T, N, P} <: WrappedArray{T, N, P}
     arg::P
@@ -16,17 +16,14 @@ Base.axes(arr::SimpleWrappedArray{<:Any, <:Any, <:Tuple}) = (Base.OneTo(length(a
 
 myidentity(x) = x
 
-@testset begin
+@testset "WrappedArray Tests" begin
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
 
         x = myidentity.(arg)
         y = myidentity.(SimpleWrappedArray(arg))
-        println(Unwrap().(myidentity.(SimpleWrappedArray(arg))))
-        println(Base.Broadcast.instantiate(Unwrap().(myidentity.(SimpleWrappedArray(arg)))))
         @test x == y
         @test typeof(x) == typeof(y)
 
-#=
         x = arg .+ arg
         y = SimpleWrappedArray(arg) .+ arg
         @test x == y
@@ -36,6 +33,5 @@ myidentity(x) = x
         y = SimpleWrappedArray(arg) .+ SimpleWrappedArray(arg)
         @test x == y
         @test typeof(x) == typeof(y)
-=#
     end
 end

@@ -2,6 +2,7 @@ using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+using Swizzle.WrappedArrays
 
 struct BroadcastedArray{T, N, Arg} <: WrappedArray{T, N, Arg}
     arg::Arg
