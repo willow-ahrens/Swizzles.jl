@@ -16,7 +16,7 @@ Base.axes(arr::SimpleWrappedArray{<:Any, <:Any, <:Tuple}) = (Base.OneTo(length(a
 
 myidentity(x) = x
 
-@testset "WrappedArray Tests" begin
+@testset "WrappedArrays" begin
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
 
         x = myidentity.(arg)

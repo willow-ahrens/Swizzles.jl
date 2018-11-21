@@ -1,10 +1,10 @@
 module ExtrudedArrays
-
+    using StaticArrays
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
 
     export ExtrudedArray
-    export keepify, kept
+    export keepify, keeps
 
     struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrapperArray{T, N, Arg}
         arg::Arg
@@ -17,28 +17,28 @@ module ExtrudedArrays
 
     function ExtrudedArray(arg)
         arr = arrayify(arg)
-        keeps = ntuple(keeps[n] || length(axes(arg, n)) == 1, N)
-        return ExtrudedArray{eltype(arr), ndims(arr), typeof(arr), keeps}(arr)
+        return ExtrudedArray{eltype(arr), ndims(arr), typeof(arr), keeps(arr)}(arr)
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
 
-    keepify(x) = ExtrudedArray(x)
-    keepify(b::Broadcasted) = Broadcasted(b.f, map(keepify, b.args))
+    keeps(x) = newindexer(x)[1]
+    keeps(ext::Extruded) = ext.keeps
+    keeps(::Type) = throw(MethodError())
+    keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
+    keeps(::Type{ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
+    function keeps(bc::Broadcasted)
+        args = map(keeps, bc.args)
+        N = maximum(map(length, args))
+        return ntuple(n -> any(arg -> length(arg) >= n && arg[n], args), N)
+    end
+    function keeps(::Broadcasted{<:Any, <:Any, <:Any, Args<:Tuple}) where {Args}
+        args = map(keeps, Args.parameters)
+        N = maximum(map(length, args))
+        return ntuple(n -> any(arg -> length(arg) >= n && arg[n], args), N)
+    end
 
-    kept(x) = newindexer(x)[1]
-    kept(ext::Extruded) = ext.keeps
-    kept(::Type) = throw(MethodError())
-    kept(::ExtrudedArray{<:Any, <:Any, <:Any, keeps}) where {keeps} = keeps
-    kept(::Type{ExtrudedArray{<:Any, <:Any, <:Any, keeps}}) where {keeps} = keeps
-    function kept(bc::Broadcasted)
-        args = map(kept, bc.args)
-        N = maximum(map(length, args))
-        return ntuple(n -> any(arg -> length(arg) >= n && arg[n], args), N)
-    end
-    function kept(::Broadcasted{<:Any, <:Any, <:Any, Args<:Tuple}) where {Args}
-        args = map(kept, Args.parameters)
-        N = maximum(map(length, args))
-        return ntuple(n -> any(arg -> length(arg) >= n && arg[n], args), N)
-    end
+    lift_keeps(x) = ExtrudedArray(x)
+    lift_keeps(x::StaticArray) = ExtrudedArray(x)
+    lift_keeps(b::Broadcasted) = Broadcasted(b.f, map(lift_keeps, b.args))
 end
