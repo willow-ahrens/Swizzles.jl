@@ -4,7 +4,7 @@ module ExtrudedArrays
     using Base.Broadcast: newindexer
 
     export ExtrudedArray
-    export keepify, keeps
+    export keeps, lift_keeps
 
     struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrapperArray{T, N, Arg}
         arg::Arg
@@ -27,6 +27,7 @@ module ExtrudedArrays
     keeps(::Type) = throw(MethodError())
     keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
     keeps(::Type{ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
+
     function keeps(bc::Broadcasted)
         args = map(keeps, bc.args)
         N = maximum(map(length, args))
