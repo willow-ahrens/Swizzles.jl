@@ -1,8 +1,13 @@
+module BroadcastedArrays
+
 using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
 using Swizzle.WrappedArrays
+
+export BroadcastedArray, WrappedArrayConstructor
+export arrayify
 
 struct BroadcastedArray{T, N, Arg} <: WrappedArray{T, N, Arg}
     arg::Arg
@@ -85,7 +90,7 @@ Base.length(A::BroadcastedArray) = prod(map(length, axes(A)))
 Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::Int) = _broadcast_getindex(A.arg, I)
 Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::CartesianIndex) = _broadcast_getindex(A.arg, I)
 Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::Int...) = _broadcast_getindex(A.arg, CartesianIndex(I))
-Base.@propagate_inbounds Base.getindex(A::BroadcastedArray) = _broadcast_getindex(A.arg)
+Base.@propagate_inbounds Base.getindex(A::BroadcastedArray) = getindex(A.arg)
 
 @inline myidentity(x) = x
 
@@ -110,3 +115,4 @@ abstract type WrappedArrayConstructor end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = C(map(arrayify, args)...)
 
+end

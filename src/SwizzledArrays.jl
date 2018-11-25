@@ -1,4 +1,11 @@
 using Swizzle.WrappedArrays
+using Swizzle.BroadcastedArrays
+using Base: checkbounds_indices, throw_boundserror, tail
+using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
+using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+
+@inline myidentity(x) = x
 
 """
     `nooperator(a, b)`
