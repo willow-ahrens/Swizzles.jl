@@ -1,5 +1,6 @@
 module ExtrudedArrays
     using StaticArrays
+    using Base: RefValue
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
     using Swizzle.WrappedArrays
@@ -35,6 +36,8 @@ module ExtrudedArrays
     keeps(Arr::Type{<:BroadcastedArray}) = keeps(parenttype(Arr))
     keeps(::Type{<:Tuple}) = (true,)
     keeps(::Type{<:Tuple{<:Any}}) = (false,)
+    keeps(::Type{<:Number}) = ()
+    keeps(::Type{<:RefValue}) = ()
 
     function keeps(bc::Broadcasted)
         args = map(keeps, bc.args)
@@ -50,6 +53,8 @@ module ExtrudedArrays
     lift_keeps(x) = ExtrudedArray(x)
     lift_keeps(x::StaticArray) = x
     lift_keeps(x::Tuple) = x
+    lift_keeps(x::Number) = x
+    lift_keeps(x::RefValue) = x
     lift_keeps(x::BroadcastedArray{<:Any, <:Any, <:Tuple}) = x
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
 end
