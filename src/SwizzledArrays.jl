@@ -1,5 +1,6 @@
 using Swizzle.WrappedArrays
 using Swizzle.BroadcastedArrays
+using Swizzle.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -14,7 +15,7 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Arg, mask, Op} <: WrappedArray{T, N, Arg}
+struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: WrappedArray{T, N, Arg}
     arg::Arg
     op::Op
     function SwizzledArray{T, N, Arg, mask, Op}(arg::Arg, op::Op) where {T, N, Arg, mask, Op}
@@ -42,9 +43,9 @@ end
 
 @inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
-@inline SwizzledArray(arg, mask, op) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask), op))
+@inline SwizzledArray(arg, mask, op) = SwizzledArray(_SwizzledArray(Any, arrayify(arg), Val(mask), op))
 
-@inline SwizzledArray{T}(arg, mask, op) where {T} = _SwizzledArray(T, arg, Val(mask), op)
+@inline SwizzledArray{T}(arg, mask, op) where {T} = _SwizzledArray(T, arrayify(arg), Val(mask), op)
 
 @inline function _SwizzledArray(::Type{T}, arg::AbstractArray{S, N}, ::Val{mask}, op) where {T, S, N, mask}
     if @generated
@@ -114,18 +115,6 @@ end
 
 Base.parent(arr::SwizzledArray) = arr.arg
 
-@inline function Base.axes(arr::SwizzledArray)
-    if @generated
-        args = setindexinto(ntuple(d->:(Base.OneTo(1)), ndims(arr)), ntuple(d->:(arg_axes[$d]), length(mask(arr))), mask(arr))
-        return quote
-            arg_axes = axes(arr.arg)
-            return ($(args...),)
-        end
-    else
-        setindexinto(ntuple(d->Base.OneTo(1), ndims(arr)), axes(arr.arg), mask(arr))
-    end
-end
-
 @inline function Base.size(arr::SwizzledArray)
     if @generated
         args = setindexinto(ntuple(d->:(1), ndims(arr)), ntuple(d->:(arg_size[$d]), length(mask(arr))), mask(arr))
@@ -135,6 +124,18 @@ end
         end
     else
         setindexinto(ntuple(d->1, ndims(arr)), size(arr.arg), mask(arr))
+    end
+end
+
+@inline function Base.axes(arr::SwizzledArray)
+    if @generated
+        args = setindexinto(ntuple(d->:(Base.OneTo(1)), ndims(arr)), ntuple(d->:(arg_axes[$d]), length(mask(arr))), mask(arr))
+        return quote
+            arg_axes = axes(arr.arg)
+            return ($(args...),)
+        end
+    else
+        setindexinto(ntuple(d->Base.OneTo(1), ndims(arr)), axes(arr.arg), mask(arr))
     end
 end
 
@@ -218,7 +219,7 @@ julia> swizzle(parse.(Int, ["1", "2"]), (2,))
  1 2
 ```
 """
-swizzle(A, mask, op=nooperator) = copy(SwizzledArray(arrayify(A), mask, op))
+swizzle(A, mask, op=nooperator) = copy(SwizzledArray(A, mask, op))
 
 """
     `swizzle!(dest, A, mask, op=nooperator)`
@@ -260,7 +261,7 @@ julia> B
  19
 ```
 """
-swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(arrayify(A), mask, op))
+swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op))
 
 @inline Base.copy(arr::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
 @inline Base.copyto!(dest, arr::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
@@ -339,3 +340,24 @@ end
     end
 end
 =#
+
+@inline function Swizzle.ExtrudedArrays.keeps(arr::SwizzledArray)
+    if @generated
+        args = setindexinto(ntuple(d->:(false), ndims(arr)), ntuple(d->:(arg_keeps[$d]), length(mask(arr))), mask(arr))
+        return quote
+            arg_keeps = keeps(arr.arg)
+            return ($(args...),)
+        end
+    else
+        setindexinto(ntuple(d->false, ndims(arr)), keeps(arr.arg), mask(arr))
+    end
+end
+
+function Swizzle.ExtrudedArrays.keeps(::Type{Arr}) where {Arr <: SwizzledArray}
+    setindexinto(ntuple(d->false, ndims(Arr)), keeps(parenttype(Arr)), mask(Arr))
+end
+
+function Swizzle.ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
+    arg = arrayify(lift_keeps(arr.arg))
+    return SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
+end

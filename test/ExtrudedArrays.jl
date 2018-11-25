@@ -77,4 +77,18 @@ myidentity(x) = x
     @test keeps(typeof(lift_keeps(bc))) == (false,)
     @test keeps(bc) == (false,)
     @test keeps(typeof(bc)) == (false,)
+
+    bc  = SwizzledArray(Broadcasted(+, ((1, 2, 3), [1, 2, 3]')), (2, 1), +)
+    bc′ = SwizzledArray(Broadcasted(+, ((1, 2, 3), ExtrudedArray([1, 2, 3]'))), (2, 1), +)
+    @test typeof(lift_keeps(bc)) == typeof(bc′)
+    @test keeps(typeof(lift_keeps(bc))) == (true, true)
+    @test keeps(bc) == (true, true)
+    @test_throws MethodError keeps(typeof(bc))
+
+    bc  = SwizzledArray(Broadcasted(+, ((1,), [1, 2, 3]')), (2, 1), +)
+    bc′ = SwizzledArray(Broadcasted(+, ((1,), ExtrudedArray([1, 2, 3]'))), (2, 1), +)
+    @test typeof(lift_keeps(bc)) == typeof(bc′)
+    @test keeps(typeof(lift_keeps(bc))) == (true, false)
+    @test keeps(bc) == (true, false)
+    @test_throws MethodError keeps(typeof(bc))
 end

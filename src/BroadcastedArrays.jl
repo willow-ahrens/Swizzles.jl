@@ -69,6 +69,7 @@ arrayify(arg) = BroadcastedArray(arg)
 
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
+Base.parent(arr::BroadcastedArray) = arr.arg
 
 @inline Base.axes(A::BroadcastedArray) = broadcast_axes(A.arg)
 

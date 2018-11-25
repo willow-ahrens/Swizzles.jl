@@ -55,6 +55,6 @@ module ExtrudedArrays
     lift_keeps(x::Tuple) = x
     lift_keeps(x::Number) = x
     lift_keeps(x::RefValue) = x
-    lift_keeps(x::BroadcastedArray{<:Any, <:Any, <:Tuple}) = x
+    lift_keeps(x::BroadcastedArray) = lift_keeps(parent(x))
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
 end
