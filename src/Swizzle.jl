@@ -19,7 +19,7 @@ include("properties.jl")
 
 export metatransform
 include("meta.jl")
-include("recognize.jl")
+#include("recognize.jl")
 
 """
     `Beam(mask...)`
