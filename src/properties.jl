@@ -1,5 +1,3 @@
-using SpecialSets
-
 @inline get_return_type(f, args...) = Core.Compiler.return_type(f, args)
 @inline get_return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline get_return_type(::typeof(-), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
