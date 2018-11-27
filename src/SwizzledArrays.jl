@@ -143,22 +143,25 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
     if @generated
         arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
-        thunk = Expr(:block,
-            (
-                Expr(:for,
-                    Expr(:block, reverse(:($(Symbol("i_$d")) = $(d == n ? :(last(arg_I_peeled[$d]))  :
-                                                                 d < n  ? :(arg_I[$d])               :
-                                                                          :(first(arg_I_peeled[$d])))) for d = 1:ndims(parenttype(arr)))...),
-                    :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:ndims(parenttype(arr)))...))))
-                )
-            for n = 1:ndims(parenttype(arr)))...
-        )
+        thunk = Expr(:block)
+        for n = 1:ndims(parenttype(arr))
+            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:ndims(parenttype(arr)))...))))
+            for d = 1:ndims(parenttype(arr))
+                if d == n
+                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I_rest[$d]), nest)
+                elseif d < n
+                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
+                else
+                    nest = Expr(:block, :($(Symbol("i_$d")) = arg_I_first[$d]), nest)
+                end
+            end
+            push!(thunk.args, nest)
+        end
         quote
-            @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
             arg_axes = axes(arr.arg)
             arg_I = ($(arg_I...),)
-            arg_I_peeled = map(peel, arg_I)
-            res = @inbounds getindex(arr.arg, $((:(first(arg_I_peeled[$d])) for d = 1:ndims(parenttype(arr)))...))
+            (arg_I_first, arg_I_rest) = zip(map(peel, arg_I)...)
+            res = @inbounds getindex(arr.arg, arg_I_first...)
             $thunk
             res
         end
