@@ -2,7 +2,7 @@ using Swizzle.WrappedArrays
 using Swizzle.BroadcastedArrays
 using Swizzle.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail
-using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
+using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
 
@@ -139,28 +139,40 @@ end
     end
 end
 
-
-
 Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
     if @generated
-        args = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
+        arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
+        thunk = Expr(:block,
+            (
+                Expr(:for,
+                    Expr(:block, reverse(:($(Symbol("i_$d")) = $(d == n ? :(last(arg_I_peeled[$d]))  :
+                                                                 d < n  ? :(arg_I[$d])               :
+                                                                          :(first(arg_I_peeled[$d])))) for d = 1:ndims(parenttype(arr)))...),
+                    :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:ndims(parenttype(arr)))...))))
+                )
+            for n = 1:ndims(parenttype(arr)))...
+        )
         quote
+            @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
             arg_axes = axes(arr.arg)
-            arg_I = ($(args...),)
+            arg_I = ($(arg_I...),)
+            arg_I_peeled = map(peel, arg_I)
+            res = @inbounds getindex(arr.arg, $((:(first(arg_I_peeled[$d])) for d = 1:ndims(parenttype(arr)))...))
+            $thunk
+            res
         end
     else
-        arg_I = getindexinto(axes(arr.arg), I, mask(arr))
+        (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
+        res = @inbounds getindex(arr.arg, i...)
+        for i in inds
+            res = arr.op(res, @inbounds getindex(arr.arg, i...))
+        end
+        return res
     end
     #if arr.op isa typeof(nooperator)
     #    return @inbounds getindex(arr.arg, map(first, arg_I)...)
     #end
-    (i, inds) = peel(product(arg_I...))
-    res = @inbounds getindex(arr.arg, i...)
-    for i in inds
-        res = arr.op(res, @inbounds getindex(arr.arg, i...))
-    end
-    return res
 end
 
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_getindex(arr, (I,))
