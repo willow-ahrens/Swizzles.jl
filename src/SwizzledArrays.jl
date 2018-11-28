@@ -64,7 +64,7 @@ end
 mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
 mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
-struct Swizzler{mask, Op} <: WrappedArrayConstructor
+struct Swizzler{mask, Op} <: Arrayifier
     op::Op
 end
 
@@ -114,6 +114,10 @@ function Base.show(io::IO, arr::SwizzledArray)
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
+function WrappedArrays.map_parent(f, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
+    arg = f(arr.arg)
+    SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
+end
 
 @inline function Base.size(arr::SwizzledArray)
     if @generated

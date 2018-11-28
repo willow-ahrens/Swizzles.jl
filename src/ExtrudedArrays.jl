@@ -24,6 +24,10 @@ module ExtrudedArrays
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
+    function WrappedArrays.map_parent(f, arr::ExtrudedArray{T, N, <:Any, keeps}) where {T, N, keeps}
+        arg = f(arr.arg)
+        ExtrudedArray{T, N, typeof(arg), keeps}(arg)
+    end
 
     #keeps is a complicated function. It returns a tuple where each element of the tuple specifies whether the corresponding dimension is intended to have size 1. The complicated aspect of keeps is that while it should work on BroadcastedArray, it must also work on the type wrapped by BroadcastedArray. This way, lift_keeps only needs to use BroadcastedArrays when it's creating an ExtrudedArray.
     keeps(x) = newindexer(x)[1]
@@ -33,7 +37,7 @@ module ExtrudedArrays
     keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
     keeps(::Type{<:ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
     keeps(Arr::Type{<:StaticArray{<:Any, <:Any, N}}) where {N} = ntuple(n -> length(axes(Arr)[n]) == 1, N)
-    keeps(Arr::Type{<:BroadcastedArray}) = keeps(parenttype(Arr))
+    keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
     keeps(::Type{<:Tuple}) = (true,)
     keeps(::Type{<:Tuple{<:Any}}) = (false,)
     keeps(::Type{<:Number}) = ()
@@ -55,6 +59,6 @@ module ExtrudedArrays
     lift_keeps(x::Tuple) = x
     lift_keeps(x::Number) = x
     lift_keeps(x::RefValue) = x
-    lift_keeps(x::BroadcastedArray) = lift_keeps(parent(x))
+    lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
 end

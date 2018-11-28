@@ -3,13 +3,13 @@ module BroadcastedArrays
 using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 using Swizzle.WrappedArrays
 
-export BroadcastedArray, WrappedArrayConstructor
+export BroadcastedArray, Arrayifier
 export arrayify
 
-struct BroadcastedArray{T, N, Arg} <: WrappedArray{T, N, Arg}
+struct BroadcastedArray{T, N, Arg} <: AbstractArray{T, N}
     arg::Arg
     @inline function BroadcastedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         arg = instantiate(broadcastable(arg))
@@ -69,7 +69,9 @@ arrayify(arg) = BroadcastedArray(arg)
 
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
-Base.parent(arr::BroadcastedArray) = arr.arg
+Base.parent(arr::BroadcastedArray) = arr
+WrappedArrays.parenttype(Arr::Type{<:BroadcastedArray}) = Arr
+WrappedArrays.map_parent(f, arr::BroadcastedArray) = f(arr)
 
 @inline Base.axes(A::BroadcastedArray) = broadcast_axes(A.arg)
 
@@ -105,15 +107,19 @@ Base.@propagate_inbounds Base.getindex(A::BroadcastedArray) = getindex(A.arg)
 @inline Base.copyto!(dest, A::BroadcastedArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (A,))))
 @inline Base.Broadcast.materialize!(dest, A::BroadcastedArray) = copyto!(dest, A)
 
-function Base.Broadcast.preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
+_preprocess(dest, A) = A
+function _preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
     arg = preprocess(dest, A.arg)
-    BroadcastedArray{T, N, typeof(arg)}(arg)
+    x = BroadcastedArray{T, N, typeof(arg)}(arg)
 end
+
+#Fixme this might want to be invoke instead of a reimplementation. We're trying to avoid an infinite loop here with the recursive call
+@inline Base.Broadcast.preprocess(dest, A::Union{WrappedArray, BroadcastedArray}) = extrude(broadcast_unalias(dest, map_storage(x -> _preprocess(dest, x), A)))
 
 @inline Broadcast.BroadcastStyle(A::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
-abstract type WrappedArrayConstructor end
+abstract type Arrayifier end
 
-@inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::WrappedArrayConstructor, args...) = C(map(arrayify, args)...)
+@inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::Arrayifier, args...) = C(map(arrayify, args)...)
 
 end
