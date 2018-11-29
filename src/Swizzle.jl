@@ -2,7 +2,7 @@ module Swizzle
 
 export Drop, drop
 export getindexinto, setindexinto #maybe dont export...
-export BroadcastedArray, WrappedArrayConstructor, wrap
+export BroadcastedArray, WrapperArrayConstructor, wrap
 export SwizzledArray
 export swizzle, swizzle!
 export Swizzler, Reduce, Sum, Max, Min, Beam
@@ -11,7 +11,7 @@ export Unwrap
 
 include("base.jl")
 include("util.jl")
-include("WrappedArrays.jl")
+include("WrapperArrays.jl")
 include("BroadcastedArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")

@@ -3,13 +3,13 @@ module ExtrudedArrays
     using Base: RefValue
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
-    using Swizzle.WrappedArrays
+    using Swizzle.WrapperArrays
     using Swizzle.BroadcastedArrays
 
     export ExtrudedArray
     export keeps, lift_keeps
 
-    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrappedArray{T, N, Arg}
+    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrapperArray{T, N, Arg}
         arg::Arg
         function ExtrudedArray{T, N, Arg, keeps}(arg::Arg) where {T, N, keeps, Arg}
             @assert keeps isa Tuple{Vararg{Bool, N}}
@@ -24,7 +24,7 @@ module ExtrudedArrays
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
-    function WrappedArrays.map_parent(f, arr::ExtrudedArray{T, N, <:Any, keeps}) where {T, N, keeps}
+    function WrapperArrays.map_parent(f, arr::ExtrudedArray{T, N, <:Any, keeps}) where {T, N, keeps}
         arg = f(arr.arg)
         ExtrudedArray{T, N, typeof(arg), keeps}(arg)
     end

@@ -3,5 +3,5 @@ using Test
 
 include("Swizzle.jl")
 include("util.jl")
-include("WrappedArrays.jl")
+include("WrapperArrays.jl")
 include("ExtrudedArrays.jl")

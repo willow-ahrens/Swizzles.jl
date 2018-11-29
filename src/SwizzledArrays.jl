@@ -1,4 +1,4 @@
-using Swizzle.WrappedArrays
+using Swizzle.WrapperArrays
 using Swizzle.BroadcastedArrays
 using Swizzle.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail
@@ -15,7 +15,7 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: WrappedArray{T, N, Arg}
+struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: WrapperArray{T, N, Arg}
     arg::Arg
     op::Op
     function SwizzledArray{T, N, Arg, mask, Op}(arg::Arg, op::Op) where {T, N, Arg, mask, Op}
@@ -114,7 +114,7 @@ function Base.show(io::IO, arr::SwizzledArray)
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
-function WrappedArrays.map_parent(f, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
+function WrapperArrays.map_parent(f, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
     arg = f(arr.arg)
     SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 end

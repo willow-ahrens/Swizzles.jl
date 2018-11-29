@@ -4,7 +4,7 @@ using Base: checkbounds_indices, throw_boundserror, tail
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
-using Swizzle.WrappedArrays
+using Swizzle.WrapperArrays
 
 export BroadcastedArray, Arrayifier
 export arrayify
@@ -70,8 +70,8 @@ arrayify(arg) = BroadcastedArray(arg)
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
 Base.parent(arr::BroadcastedArray) = arr
-WrappedArrays.parenttype(Arr::Type{<:BroadcastedArray}) = Arr
-WrappedArrays.map_parent(f, arr::BroadcastedArray) = f(arr)
+WrapperArrays.parenttype(Arr::Type{<:BroadcastedArray}) = Arr
+WrapperArrays.map_parent(f, arr::BroadcastedArray) = f(arr)
 
 @inline Base.axes(A::BroadcastedArray) = broadcast_axes(A.arg)
 
@@ -114,7 +114,7 @@ function _preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
 end
 
 #Fixme this might want to be invoke instead of a reimplementation. We're trying to avoid an infinite loop here with the recursive call
-@inline Base.Broadcast.preprocess(dest, A::Union{WrappedArray, BroadcastedArray}) = extrude(broadcast_unalias(dest, map_storage(x -> _preprocess(dest, x), A)))
+@inline Base.Broadcast.preprocess(dest, A::Union{WrapperArray, BroadcastedArray}) = extrude(broadcast_unalias(dest, map_storage(x -> _preprocess(dest, x), A)))
 
 @inline Broadcast.BroadcastStyle(A::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
