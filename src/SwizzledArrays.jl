@@ -144,40 +144,46 @@ end
 
 Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
-    if @generated
-        arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
-        thunk = Expr(:block)
-        for n = 1:length(mask(arr))
-            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
-            for d = 1:length(mask(arr))
-                if d == n
-                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
-                elseif d < n
-                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
-                else
-                    nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
-                end
-            end
-            push!(thunk.args, nest)
-        end
-        quote
-            arg_axes = axes(arr.arg)
-            arg_I = ($(arg_I...),)
-            res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1] for d in length(mask(arr))))...))
-            $thunk
-            res
+    if mask(arr) isa Tuple{Vararg{Int}}
+        if @generated
+            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
+            :(return @inbounds getindex(arr.arg, $(arg_I...)))
+        else
+           return @inbounds getindex(arr.arg, getindexinto(axes(arr.arg), I, mask(arr))...)
         end
     else
-        (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
-        res = @inbounds getindex(arr.arg, i...)
-        for i in inds
-            res = arr.op(res, @inbounds getindex(arr.arg, i...))
+        if @generated
+            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
+            thunk = Expr(:block)
+            for n = 1:length(mask(arr))
+                nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
+                for d = 1:length(mask(arr))
+                    if d == n
+                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
+                    elseif d < n
+                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
+                    else
+                        nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
+                    end
+                end
+                push!(thunk.args, nest)
+            end
+            quote
+                arg_axes = axes(arr.arg)
+                arg_I = ($(arg_I...),)
+                res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
+                $thunk
+                return res
+            end
+        else
+            (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
+            res = @inbounds getindex(arr.arg, i...)
+            for i in inds
+                res = arr.op(res, @inbounds getindex(arr.arg, i...))
+            end
+            return res
         end
-        return res
     end
-    #if arr.op isa typeof(nooperator)
-    #    return @inbounds getindex(arr.arg, map(first, arg_I)...)
-    #end
 end
 
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_getindex(arr, (I,))
