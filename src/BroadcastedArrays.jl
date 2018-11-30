@@ -58,9 +58,9 @@ end
     return BroadcastedArray{T, 1, typeof(arg)}(arg)
 end
 
-function Base.show(io::IO, A::BroadcastedArray{T, N}) where {T, N}
+function Base.show(io::IO, arr::BroadcastedArray{T, N}) where {T, N}
     print(io, BroadcastedArray{T, N}) #Showing the arg type (although maybe useful since it's allowed to differ), will likely be redundant.
-    print(io, '(', A.arg, ')')
+    print(io, '(', arr.arg, ')')
     nothing
 end
 
@@ -70,56 +70,58 @@ arrayify(arg) = BroadcastedArray(arg)
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
 Base.parent(arr::BroadcastedArray) = arr
-WrapperArrays.parenttype(Arr::Type{<:BroadcastedArray}) = Arr
-WrapperArrays.map_parent(f, arr::BroadcastedArray) = f(arr)
 
-@inline Base.axes(A::BroadcastedArray) = broadcast_axes(A.arg)
+@inline Base.axes(arr::BroadcastedArray) = broadcast_axes(arr.arg)
 
-@inline Base.size(A::BroadcastedArray) = map(length, axes(A.arg))
+@inline Base.size(arr::BroadcastedArray) = map(length, axes(arr.arg))
 
-@inline Base.eltype(A::BroadcastedArray{T}) where {T} = T
+@inline Base.eltype(arr::BroadcastedArray{T}) where {T} = T
 
-@inline Base.eachindex(A::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = eachindex(A.arg)
-@inline Base.eachindex(A::BroadcastedArray) = _eachindex(axes(A))
+@inline Base.eachindex(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = eachindex(arr.arg)
+@inline Base.eachindex(arr::BroadcastedArray) = _eachindex(axes(arr))
 _eachindex(t::Tuple{Any}) = t[1]
 _eachindex(t::Tuple) = CartesianIndices(t)
 
 Base.ndims(::Type{<:BroadcastedArray{T, N}}) where {T, N} = N
 Base.ndims(::BroadcastedArray{T, N}) where {T, N} = N
 
-Base.length(A::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = length(A.arg)
-Base.length(A::BroadcastedArray) = prod(map(length, axes(A)))
+Base.length(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = length(arr.arg)
+Base.length(arr::BroadcastedArray) = prod(map(length, axes(arr)))
 
-Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::Int) = _broadcast_getindex(A.arg, I)
-Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::CartesianIndex) = _broadcast_getindex(A.arg, I)
-Base.@propagate_inbounds Base.getindex(A::BroadcastedArray, I::Int...) = _broadcast_getindex(A.arg, CartesianIndex(I))
-Base.@propagate_inbounds Base.getindex(A::BroadcastedArray) = getindex(A.arg)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg)
 
 @inline myidentity(x) = x
 
-@inline Base.copy(A::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = copy(A.arg)
-@inline Base.copy(A::BroadcastedArray{T, N, <:Broadcasted}) where {T, N} = copy(A.arg)
-@inline Base.copy(A::BroadcastedArray) = copy(instantiate(Broadcasted(myidentity, (A,))))
-@inline Base.Broadcast.materialize(A::BroadcastedArray) = copy(A)
+@inline Base.copy(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = copy(arr.arg)
+@inline Base.copy(arr::BroadcastedArray{T, N, <:Broadcasted}) where {T, N} = copy(arr.arg)
+@inline Base.copy(arr::BroadcastedArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
+@inline Base.Broadcast.materialize(arr::BroadcastedArray) = copy(arr)
 
-@inline Base.copyto!(dest, A::BroadcastedArray{T, N, <: AbstractArray}) where {T, N} = copyto!(dest, A.arg)
-@inline Base.copyto!(dest, A::BroadcastedArray{T, N, <: Broadcasted}) where {T, N} = copyto!(dest, A.arg)
-@inline Base.copyto!(dest, A::BroadcastedArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (A,))))
-@inline Base.Broadcast.materialize!(dest, A::BroadcastedArray) = copyto!(dest, A)
+@inline Base.copyto!(dest, arr::BroadcastedArray{T, N, <: AbstractArray}) where {T, N} = copyto!(dest, arr.arg)
+@inline Base.copyto!(dest, arr::BroadcastedArray{T, N, <: Broadcasted}) where {T, N} = copyto!(dest, arr.arg)
+@inline Base.copyto!(dest, arr::BroadcastedArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
+@inline Base.Broadcast.materialize!(dest, arr::BroadcastedArray) = copyto!(dest, arr)
 
-_preprocess(dest, A) = A
-function _preprocess(dest, A::BroadcastedArray{T, N}) where {T, N}
-    arg = preprocess(dest, A.arg)
+@inline Base.Broadcast.preprocess(dest, arr::AbstractArray) = extrude(broadcast_unalias(dest, preprocess_storage(dest, arr)))
+function preprocess_storage(dest, arr)
+    if iswrapper(arr)
+        adopt(preprocess_storage(dest, parent(arr)), arr)
+    else
+        arr
+    end
+end
+function preprocess_storage(dest, arr::BroadcastedArray{T, N}) where {T, N}
+    arg = preprocess(dest, arr.arg)
     x = BroadcastedArray{T, N, typeof(arg)}(arg)
 end
 
-#Fixme this might want to be invoke instead of a reimplementation. We're trying to avoid an infinite loop here with the recursive call
-@inline Base.Broadcast.preprocess(dest, A::Union{WrapperArray, BroadcastedArray}) = extrude(broadcast_unalias(dest, map_storage(x -> _preprocess(dest, x), A)))
-
-@inline Broadcast.BroadcastStyle(A::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
+@inline Broadcast.BroadcastStyle(::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
 abstract type Arrayifier end
 
-@inline Base.Broadcast.broadcasted(style::BroadcastStyle, C::Arrayifier, args...) = C(map(arrayify, args)...)
+@inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
 
 end

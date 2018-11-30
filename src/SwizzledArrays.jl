@@ -114,8 +114,7 @@ function Base.show(io::IO, arr::SwizzledArray)
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
-function WrapperArrays.map_parent(f, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
-    arg = f(arr.arg)
+function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
     SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 end
 
@@ -148,9 +147,9 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
     if @generated
         arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
         thunk = Expr(:block)
-        for n = 1:ndims(parenttype(arr))
-            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:ndims(parenttype(arr)))...))))
-            for d = 1:ndims(parenttype(arr))
+        for n = 1:length(mask(arr))
+            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
+            for d = 1:length(mask(arr))
                 if d == n
                     nest = Expr(:for, :($(Symbol("i_$d")) = arg_I_rest[$d]), nest)
                 elseif d < n
@@ -372,8 +371,8 @@ end
     end
 end
 
-function Swizzle.ExtrudedArrays.keeps(::Type{Arr}) where {Arr <: SwizzledArray}
-    setindexinto(ntuple(d->false, ndims(Arr)), keeps(parenttype(Arr)), mask(Arr))
+function Swizzle.ExtrudedArrays.keeps(::Type{Arr}) where {Arg, Arr <: SwizzledArray{<:Any, <:Any, <:Arg}}
+    setindexinto(ntuple(d->false, ndims(Arr)), keeps(Arg), mask(Arr))
 end
 
 function Swizzle.ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}

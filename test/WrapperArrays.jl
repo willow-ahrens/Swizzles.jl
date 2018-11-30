@@ -11,7 +11,7 @@ function SimpleWrapperArray(arg)
 end
 SimpleWrapperArray(arg::Tuple) = SimpleWrapperArray{eltype(arg), 1, typeof(arg)}(arg)
 Base.parent(arr::SimpleWrapperArray) = arr.arg
-WrapperArrays.map_parent(f, arr::SimpleWrapperArray) = SimpleWrapperArray(f(parent(arr)))
+WrapperArrays.adopt(arg, arr::SimpleWrapperArray) = SimpleWrapperArray(arg)
 Base.size(arr::SimpleWrapperArray{<:Any, <:Any, <:Tuple}) = length(arr.arg)
 Base.axes(arr::SimpleWrapperArray{<:Any, <:Any, <:Tuple}) = (Base.OneTo(length(arr.arg)),)
 

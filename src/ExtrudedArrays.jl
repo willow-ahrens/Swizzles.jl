@@ -24,10 +24,7 @@ module ExtrudedArrays
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
-    function WrapperArrays.map_parent(f, arr::ExtrudedArray{T, N, <:Any, keeps}) where {T, N, keeps}
-        arg = f(arr.arg)
-        ExtrudedArray{T, N, typeof(arg), keeps}(arg)
-    end
+    WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray(arg)
 
     #keeps is a complicated function. It returns a tuple where each element of the tuple specifies whether the corresponding dimension is intended to have size 1. The complicated aspect of keeps is that while it should work on BroadcastedArray, it must also work on the type wrapped by BroadcastedArray. This way, lift_keeps only needs to use BroadcastedArrays when it's creating an ExtrudedArray.
     keeps(x) = newindexer(x)[1]
