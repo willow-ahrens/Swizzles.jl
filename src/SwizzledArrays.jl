@@ -151,11 +151,11 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
             nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
             for d = 1:length(mask(arr))
                 if d == n
-                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I_rest[$d]), nest)
+                    nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
                 elseif d < n
                     nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
                 else
-                    nest = Expr(:block, :($(Symbol("i_$d")) = arg_I_first[$d]), nest)
+                    nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
                 end
             end
             push!(thunk.args, nest)
@@ -163,8 +163,7 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
         quote
             arg_axes = axes(arr.arg)
             arg_I = ($(arg_I...),)
-            (arg_I_first, arg_I_rest) = zip(map(peel, arg_I)...)
-            res = @inbounds getindex(arr.arg, arg_I_first...)
+            res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1] for d in length(mask(arr))))...))
             $thunk
             res
         end
