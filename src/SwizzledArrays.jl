@@ -1,7 +1,7 @@
 using Swizzle.WrapperArrays
 using Swizzle.BroadcastedArrays
 using Swizzle.ExtrudedArrays
-using Base: checkbounds_indices, throw_boundserror, tail, dataids
+using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
@@ -120,6 +120,8 @@ function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, <:Any, mask, Op}) whe
 end
 
 Base.dataids(arr::SwizzledArray) = (dataids(arr.arg), dataids(arr.op))
+Base.unaliascopy(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(unaliascopy(arr.arg), unaliascopy(arr.op))
+Base.unalias(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(unalias(dest, arr.arg), unalias(dest, arr.op))
 
 @inline function Base.size(arr::SwizzledArray)
     if @generated

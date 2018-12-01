@@ -1,7 +1,7 @@
 module WrapperArrays
 
 using Base.Broadcast: broadcast_axes, BroadcastStyle
-using Base: dataids
+using Base: dataids, unaliascopy, unalias
 
 import LinearAlgebra
 
@@ -116,13 +116,16 @@ See also: [`parent`](@ref), [`adopt`](@ref)
 """
 abstract type WrapperArray{T, N, Arg} <: AbstractArray{T, N} end
 
-Base.parent(arr::WrapperArray) = throw(MethodError(adopt, (arr, wrapper)))
+Base.parent(arr::WrapperArray) = throw(MethodError(parent, (arr)))
 
 iswrapper(arr::WrapperArray) = true
 
 IndexStyle(arr::WrapperArray) = IndexStyle(parent(arr))
 
 Base.dataids(arr::WrapperArray) = dataids(parent(arr))
+Base.unaliascopy(arr::A) where {A <:WrapperArray} = adopt(unaliascopy(parent(arr)), arr)::A
+Base.unalias(dest, arr::A) where {A <:WrapperArray} = adopt(unalias(dest, arr.arg), arr)::A
+
 
 Base.eltype(::Type{<:WrapperArray{T}}) where {T} = T
 Base.eltype(::WrapperArray{T}) where {T} = T
