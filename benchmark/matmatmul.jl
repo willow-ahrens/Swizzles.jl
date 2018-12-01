@@ -13,8 +13,8 @@ for (N, M, K) in zip(2 .^ (2:2:6), 2 .^ (2:2:6), 2 .^ (2:2:6))
             B = $B
             C = zeros(size(A, 1), size(B, 2))
             for j = axes(B, 1)
-                for k = axes(B, 1)
-                    for i = axes(A, 1)
+	        for i = axes(A, 1)
+	            for k = axes(B, 1)
                         C[i, j] += A[i, k] * B[k, j]
                     end
                 end

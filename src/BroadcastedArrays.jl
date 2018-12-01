@@ -1,6 +1,6 @@
 module BroadcastedArrays
 
-using Base: checkbounds_indices, throw_boundserror, tail
+using Base: checkbounds_indices, throw_boundserror, tail, dataids
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
@@ -70,6 +70,8 @@ arrayify(arg) = BroadcastedArray(arg)
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
 Base.parent(arr::BroadcastedArray) = arr
+
+Base.dataids(arr::BroadcastedArray) = dataids(arr.arg)
 
 @inline Base.axes(arr::BroadcastedArray) = broadcast_axes(arr.arg)
 

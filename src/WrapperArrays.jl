@@ -1,6 +1,7 @@
 module WrapperArrays
 
 using Base.Broadcast: broadcast_axes, BroadcastStyle
+using Base: dataids
 
 import LinearAlgebra
 
@@ -18,6 +19,15 @@ export WrapperArray
         methods for easy construction of wrapper arrays.
     Ideally, numbers 1 and 2 should live in Adapt.jl, (note that `adapt` can be
     implemented with adopt).
+
+    Wrappers need to define
+        parent
+        adopt
+        iswrapper?
+        dataids?
+        unaliascopy?
+        alias?
+
 =#
 
 """
@@ -109,6 +119,10 @@ abstract type WrapperArray{T, N, Arg} <: AbstractArray{T, N} end
 Base.parent(arr::WrapperArray) = throw(MethodError(adopt, (arr, wrapper)))
 
 iswrapper(arr::WrapperArray) = true
+
+IndexStyle(arr::WrapperArray) = IndexStyle(parent(arr))
+
+Base.dataids(arr::WrapperArray) = dataids(parent(arr))
 
 Base.eltype(::Type{<:WrapperArray{T}}) where {T} = T
 Base.eltype(::WrapperArray{T}) where {T} = T

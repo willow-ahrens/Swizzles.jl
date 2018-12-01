@@ -1,10 +1,11 @@
 using Swizzle.WrapperArrays
 using Swizzle.BroadcastedArrays
 using Swizzle.ExtrudedArrays
-using Base: checkbounds_indices, throw_boundserror, tail
+using Base: checkbounds_indices, throw_boundserror, tail, dataids
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+
 
 @inline myidentity(x) = x
 
@@ -117,6 +118,8 @@ Base.parent(arr::SwizzledArray) = arr.arg
 function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
     SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 end
+
+Base.dataids(arr::SwizzledArray) = (dataids(arr.arg), dataids(arr.op))
 
 @inline function Base.size(arr::SwizzledArray)
     if @generated
