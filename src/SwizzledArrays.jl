@@ -218,7 +218,7 @@ The swizzle operation is represented with a special lazy `SwizzledArray` type.
 ```
 will result in code that is essentially:
 ```
-   y = copy(SwizzledArray(BroadcastedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
+   y = copy(SwizzledArray(ArrayifiedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one big operation.
 
