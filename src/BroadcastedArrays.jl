@@ -126,10 +126,55 @@ function preprocess_storage(dest, arr::ArrayifiedArray{T, N}) where {T, N}
     x = ArrayifiedArray{T, N, typeof(arg)}(arg)
 end
 
-@inline Broadcast.BroadcastStyle(::Type{ArrayifiedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
+@inline Base.Broadcast.BroadcastStyle(::Type{ArrayifiedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
 abstract type Arrayifier end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
+
+#Now we start BroadcastedArrays
+
+"""
+    BroadcastedArray <: AbstractArray
+
+An AbstractArray that is mostly implemented using Broadcast.
+
+See also: [`parent`](@ref)
+"""
+abstract type BroadcastedArray{T, N} <: AbstractArray{T, N} end
+
+Base.copyto!(dst::BroadcastedArray, src) = _copyto!(dst, arrayify(src))
+Base.copyto!(dst, src::BroadcastedArray) = _copyto!(arrayify(dst), src)
+Base.copyto!(dst::BroadcastedArray, src::BroadcastedArray) = _copyto!(dst, src)
+function _copyto!(dst, src)
+    if axes(dst) != axes(src)
+        assign!(reshape(dst, :), reshape(src, :))
+    else
+        assign!(dst, src)
+    end
+end
+
+Base.copy!(dst::BroadcastedArray, src) = _copy!(dst, arrayify(src))
+Base.copy!(dst, src::BroadcastedArray) = _copy!(arrayify(dst), src)
+Base.copy!(dst::BroadcastedArray, src::BroadcastedArray) = _copy!(dst, src)
+function _copy!(dst, src)
+    if axes(dst) != axes(src)
+        throw(ArgumentError("axes of $dst and $src do not match."))
+    else
+        assign!(dst, src)
+    end
+end
+
+#=
+struct NullArray{N} <: AbstractArray{<:Any, N}
+    axes::NTuple{N}
+end
+
+Base.axes(arr::NullArray) = arr.axes
+Base.setindex!(arr, val, inds...) = val
+
+Base.foreach(f, a::BroadcastedArray) = assign!(NullArray(axes(a)), a)
+
+=#
 
 end
