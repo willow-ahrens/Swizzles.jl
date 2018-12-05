@@ -16,7 +16,7 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: WrapperArray{T, N, Arg}
+struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: MetaArray{T, N}
     arg::Arg
     op::Op
     function SwizzledArray{T, N, Arg, mask, Op}(arg::Arg, op::Op) where {T, N, Arg, mask, Op}
@@ -115,6 +115,7 @@ function Base.show(io::IO, arr::SwizzledArray)
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
+WrapperArrays.iswrapper(arr::SwizzledArray) = true
 function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
     SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 end
@@ -149,14 +150,7 @@ end
 
 Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
-    if mask(arr) isa Tuple{Vararg{Int}}
-        if @generated
-            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
-            :(return @inbounds getindex(arr.arg, $(arg_I...)))
-        else
-           return @inbounds getindex(arr.arg, getindexinto(axes(arr.arg), I, mask(arr))...)
-        end
-    else
+    if any(ntuple(n -> keeps(arr.arg)[n] && mask(arr)[n] isa Drop, ndims(arr))) #swizzle might reduce
         if @generated
             arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
             thunk = Expr(:block)
@@ -188,6 +182,13 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
             end
             return res
         end
+    else #swizzle will not reduce
+        if @generated
+            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
+            :(return @inbounds getindex(arr.arg, $(arg_I...)))
+        else
+           return @inbounds getindex(arr.arg, getindexinto(axes(arr.arg), I, mask(arr))...)
+        end
     end
 end
 
@@ -195,6 +196,72 @@ Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_ge
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
+
+
+function BroadcastedArrays.assign!(dst::AbstractArray, MetaArray(op2, arg, Swizzle(stuff, Op)) generic broadcast
+function BroadcastedArrays.assign!(dst::AbstractArray, MetaArray(op, AliasArray(dst)) in-place map
+function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) foreach
+
+
+function BroadcastedArrays.assign!(dst::AbstractArray, src::SwizzledArray)
+function BroadcastedArrays.assign!(dst::AbstractArray, src::MetaArray(Op, AliasArray(dst), Swizzle(stuff, Op)) this means no copy needed
+function BroadcastedArrays.assign!(dst::AbstractArray, src::MetaArray(Op, arg, Swizzle(stuff, Op)) copy needed but still fast track
+function BroadcastedArrays.assign!(dst::AbstractArray, src::SwizzledArray)
+    if op has zero, zero dst and calle
+        assign!(dst, op.(AliasArray(dst), src), aliased)
+    otherwise peel
+    dst = 0
+
+    if axes(dst) != axes(src)
+        throw(DimensionMismatch("destination axes $axdest are not compatible with source axes $axsrc"))
+    end
+    arg = preprocess(dst, src.arg)
+    if any(ntuple(n -> keeps(arg)[n] && (mask(src)[n] isa Drop), ndims(arg))) #swizzle will reduce
+        if has_identity()
+        update!(dst, that, SwizzledArray{eltype{src}}(view(arg, setindexinto(ntuple(n -> mask(src), ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[1] : Colon(), ndims(arg))...), mask(src), op(src)))
+        for n = 1:length(mask(arr))
+            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
+        end
+        quote
+            arg_axes = axes(arr.arg)
+            arg_I = ($(arg_I...),)
+            res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
+            $thunk
+            return res
+        end
+
+
+
+
+
+
+
+        (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
+        res = @inbounds getindex(arr.arg, i...)
+        for i in inds
+            res = arr.op(res, @inbounds getindex(arr.arg, i...))
+        end
+        return res
+        update!(dst, that, SwizzledArray{eltype{src}}(view(arg, ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[1] : Colon(), ndims(arg))...), mask(src), op(src)))
+        update!(dst, src.op, SwizzledArray{eltype{src}}(view(arg, ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[2:end] : Colon(), ndims(arg))...), mask(src), op(src)))
+        return dst
+    else #swizzle will not reduce
+        @simd for I in eachindex(dst)
+            @inbounds dst[I] = arg[I]
+        end
+        return dst
+    end
+end
+
+function BroadcastedArrays.assign!(dst::AbstractArray, src::BroadcastedArray{Broadcasted{Style,Op,Tuple{<:Any, SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}, style::MatchAssign) where {Style, Op}
+    if axes(dst) != axes(src)
+        throw(DimensionMismatch("destination axes $axdest are not compatible with source axes $axsrc"))
+    end
+    arg = preprocess(dst, src.arg)
+    copyto!(dst, arg.args[1])
+    assign!(dst, BroadcastedArray(Broadcasted{})
+    return dst
+end
 
 """
     `swizzle(A, mask, op=nooperator)`
@@ -218,7 +285,7 @@ The swizzle operation is represented with a special lazy `SwizzledArray` type.
 ```
 will result in code that is essentially:
 ```
-   y = copy(SwizzledArray(ArrayifiedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
+   y = copy(SwizzledArray(BroadcastedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one big operation.
 
@@ -290,12 +357,6 @@ julia> B
 ```
 """
 swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op))
-
-@inline Base.copy(arr::SwizzledArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
-@inline Base.copyto!(dest, arr::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
-@inline Base.copyto!(dest::AbstractArray, arr::SwizzledArray) = copyto!(dest, instantiate(Broadcasted(myidentity, (arr,))))
-@inline Base.Broadcast.materialize(A::SwizzledArray) = copy(A)
-@inline Base.Broadcast.materialize!(dest, A::SwizzledArray) = copyto!(dest, A)
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
 #    arg = preprocess(dest, arr.arg)
