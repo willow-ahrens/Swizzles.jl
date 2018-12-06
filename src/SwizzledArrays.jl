@@ -198,7 +198,7 @@ Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
 
 function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
-    #pain
+    #pain involving identities and peeled iteration.
 end
 function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:Union{MatchDestinationStyle{S}, nothing}, <:Any, Op, <:Tuple{<:MatchArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
     #unalias, copy first arg to dst, in-place swizzle

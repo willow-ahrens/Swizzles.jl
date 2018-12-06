@@ -99,6 +99,8 @@ Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg
 
 @inline myidentity(x) = x
 
+#FIXME next 10 lines are suspect if BroadcastedArray becomes MetaArray
+
 @inline Base.copy(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = copy(arr.arg)
 @inline Base.copy(arr::BroadcastedArray{T, N, <:Broadcasted}) where {T, N} = copy(arr.arg)
 @inline Base.copy(arr::BroadcastedArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
@@ -127,5 +129,7 @@ end
 abstract type Arrayifier end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
+
+Base.copyto!(dst, src::BroadcastedArray) = copyto!(dst, src.arg)
 
 end
