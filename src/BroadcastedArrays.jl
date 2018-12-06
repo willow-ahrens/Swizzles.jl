@@ -8,7 +8,7 @@ using Swizzle.WrapperArrays
 
 export BroadcastedArray, Arrayifier, arrayify
 
-struct BroadcastedArray{T, N, Arg} <: MetaArray{T, N}
+struct BroadcastedArray{T, N, Arg} <: GeneratedArray{T, N}
     arg::Arg
     @inline function BroadcastedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         arg = instantiate(broadcastable(arg))

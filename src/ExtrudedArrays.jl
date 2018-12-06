@@ -9,7 +9,7 @@ module ExtrudedArrays
     export ExtrudedArray
     export keeps, lift_keeps
 
-    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrapperArray{T, N, Arg}
+    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: ShallowArray{T, N, Arg}
         arg::Arg
         function ExtrudedArray{T, N, Arg, keeps}(arg::Arg) where {T, N, keeps, Arg}
             @assert keeps isa Tuple{Vararg{Bool, N}}

@@ -1,7 +1,7 @@
 using Base.Broadcast: broadcastable
 using Swizzle.WrapperArrays
 
-struct SimpleWrapperArray{T, N, P} <: WrapperArray{T, N, P}
+struct SimpleWrapperArray{T, N, P} <: ShallowArray{T, N, P}
     arg::P
 end
 

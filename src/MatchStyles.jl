@@ -1,6 +1,6 @@
 module MatchStyles
 
-struct MatchedArray{T, N, Arg} <: WrapperArray{T, N, Arg}
+struct MatchedArray{T, N, Arg} <: ShallowArray{T, N, Arg}
     arg::Arg
 end
 Base.parent(arr::MatchedArray) = arr.arg
