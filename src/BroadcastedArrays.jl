@@ -25,7 +25,6 @@ struct BroadcastedArray{T, N, Arg} <: MetaArray{T, N}
     end
 end
 
-
 @inline function BroadcastedArray(arg)
     arg = instantiate(broadcastable(arg))
     return BroadcastedArray{eltype(arg), ndims(typeof(arg)), typeof(arg)}(arg)

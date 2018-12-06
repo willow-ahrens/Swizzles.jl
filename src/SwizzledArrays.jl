@@ -197,70 +197,14 @@ Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = 
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
 
-
-function BroadcastedArrays.assign!(dst::AbstractArray, MetaArray(op2, arg, Swizzle(stuff, Op)) generic broadcast
-function BroadcastedArrays.assign!(dst::AbstractArray, MetaArray(op, AliasArray(dst)) in-place map
-function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) foreach
-
-
-function BroadcastedArrays.assign!(dst::AbstractArray, src::SwizzledArray)
-function BroadcastedArrays.assign!(dst::AbstractArray, src::MetaArray(Op, AliasArray(dst), Swizzle(stuff, Op)) this means no copy needed
-function BroadcastedArrays.assign!(dst::AbstractArray, src::MetaArray(Op, arg, Swizzle(stuff, Op)) copy needed but still fast track
-function BroadcastedArrays.assign!(dst::AbstractArray, src::SwizzledArray)
-    if op has zero, zero dst and calle
-        assign!(dst, op.(AliasArray(dst), src), aliased)
-    otherwise peel
-    dst = 0
-
-    if axes(dst) != axes(src)
-        throw(DimensionMismatch("destination axes $axdest are not compatible with source axes $axsrc"))
-    end
-    arg = preprocess(dst, src.arg)
-    if any(ntuple(n -> keeps(arg)[n] && (mask(src)[n] isa Drop), ndims(arg))) #swizzle will reduce
-        if has_identity()
-        update!(dst, that, SwizzledArray{eltype{src}}(view(arg, setindexinto(ntuple(n -> mask(src), ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[1] : Colon(), ndims(arg))...), mask(src), op(src)))
-        for n = 1:length(mask(arr))
-            nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
-        end
-        quote
-            arg_axes = axes(arr.arg)
-            arg_I = ($(arg_I...),)
-            res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
-            $thunk
-            return res
-        end
-
-
-
-
-
-
-
-        (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
-        res = @inbounds getindex(arr.arg, i...)
-        for i in inds
-            res = arr.op(res, @inbounds getindex(arr.arg, i...))
-        end
-        return res
-        update!(dst, that, SwizzledArray{eltype{src}}(view(arg, ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[1] : Colon(), ndims(arg))...), mask(src), op(src)))
-        update!(dst, src.op, SwizzledArray{eltype{src}}(view(arg, ntuple(n -> mask(src)[n] isa Drop ? axes(arg, n)[2:end] : Colon(), ndims(arg))...), mask(src), op(src)))
-        return dst
-    else #swizzle will not reduce
-        @simd for I in eachindex(dst)
-            @inbounds dst[I] = arg[I]
-        end
-        return dst
-    end
+function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
+    #pain
 end
-
-function BroadcastedArrays.assign!(dst::AbstractArray, src::BroadcastedArray{Broadcasted{Style,Op,Tuple{<:Any, SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}, style::MatchAssign) where {Style, Op}
-    if axes(dst) != axes(src)
-        throw(DimensionMismatch("destination axes $axdest are not compatible with source axes $axsrc"))
-    end
-    arg = preprocess(dst, src.arg)
-    copyto!(dst, arg.args[1])
-    assign!(dst, BroadcastedArray(Broadcasted{})
-    return dst
+function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:Union{MatchDestinationStyle{S}, nothing}, <:Any, Op, <:Tuple{<:MatchArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
+    #unalias, copy first arg to dst, in-place swizzle
+end
+function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:Union{MatchDestinationStyle{S}, nothing}, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
+    #unalias, in-place swizzle
 end
 
 """
@@ -394,14 +338,14 @@ SwizzleStyle(::ArrayConflict, arr) = ArrayConflict()
         else
             return quote
                 Base.@_inline_meta()
-                return (SwizzleStyle(BroadcastStyle(Arg), A))
+                return (MarkDestinationStyle(SwizzleStyle(BroadcastStyle(Arg), A)))
             end
         end
     else
         if mask(A) == ((1:ndims(Arg))...,)
             return BroadcastStyle(Arg)
         else
-            return (SwizzleStyle(BroadcastStyle(Arg), A))
+            return (MarkDestinationStyle(SwizzleStyle(BroadcastStyle(Arg), A)))
         end
     end
 end
