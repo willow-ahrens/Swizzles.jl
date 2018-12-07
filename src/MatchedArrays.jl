@@ -60,6 +60,10 @@ Base.Broadcast.BroadcastStyle(::MarkDestinationStyle{S}, ::MarkDestinationStyle{
 struct MatchDestinationStyle{S<:BroadcastStyle} <: BroadcastStyle end
 MatchDestinationStyle(style::S) where {S <: BroadcastStyle} = MatchDestinationStyle{S}()
 
+function Base.copy(src::Broadcasted{<:MarkDestinationStyle{S}}) where {S}
+    copy(convert(Broadcasted{S}, src))
+end
+
 function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MarkDestinationStyle{S}}) where {S}
     copyto!(dst, Broadcasted{MatchDestinationStyle{S}}(src.f, map(arg->mark_destination(dst, arg), src.args), src.axes))
 end
