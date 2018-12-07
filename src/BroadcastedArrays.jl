@@ -132,4 +132,7 @@ abstract type Arrayifier end
 
 Base.copyto!(dst, src::BroadcastedArray) = copyto!(dst, src.arg)
 
+keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
+lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
+
 end

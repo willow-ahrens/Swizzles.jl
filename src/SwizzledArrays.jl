@@ -1,11 +1,11 @@
 using Swizzle.WrapperArrays
 using Swizzle.BroadcastedArrays
+using Swizzle.GeneratedArrays
 using Swizzle.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
-
 
 @inline myidentity(x) = x
 
@@ -16,7 +16,7 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: MetaArray{T, N}
+struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: GeneratedArray{T, N}
     arg::Arg
     op::Op
     function SwizzledArray{T, N, Arg, mask, Op}(arg::Arg, op::Op) where {T, N, Arg, mask, Op}
@@ -197,14 +197,26 @@ Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = 
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
 
+#=
 function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
     #pain involving identities and peeled iteration.
 end
-function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:Union{MatchDestinationStyle{S}, nothing}, <:Any, Op, <:Tuple{<:MatchArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
-    #unalias, copy first arg to dst, in-place swizzle
+=#
+
+function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, Op, <:Tuple{<:MatchArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {Op}
+    src = preprocess(dst, src)
+    arg = src.args[2].arg
+    for i in eachindex(arg)
+        i′ = setindexinto(axes(dst), i, mask(arr)))
+        @inbounds dst[i′] = src.args[2].op(dst[i′], src.args[2].arg[i])
+    end
+    return dst
 end
-function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:Union{MatchDestinationStyle{S}, nothing}, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
-    #unalias, in-place swizzle
+
+function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{S, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
+    src = preprocess(dst, src)
+    copyto!(dst, src.args[1])
+    copyto!(dst, Broadcasted{MatchDestinationStyle{S}}(MatchArray(dst), src.args[2]))
 end
 
 """

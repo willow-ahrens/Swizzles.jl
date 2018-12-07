@@ -1,13 +1,8 @@
 module WrapperArrays
 
-using Base.Broadcast: broadcast_axes, BroadcastStyle
-using Base: dataids, unaliascopy, unalias
-
 import LinearAlgebra
 
 export iswrapper, adopt, storage
-
-export ShallowArray
 
 #=
     This file defines
@@ -104,6 +99,5 @@ iswrapper(::PermutedDimsArray) = true
 function adopt(arg::Arg, arr::PermutedDimsArray{<:Any,N,perm,iperm}) where {T,N,perm,iperm,Arg<:AbstractArray{T, N}}
     return PermutedDimsArray{T,N,perm,iperm,Arg}(arg)
 end
-
 
 end

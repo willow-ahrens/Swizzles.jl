@@ -58,8 +58,13 @@ function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MatchDestinationSty
     copyto!(dst, Broadcasted{S}(bc.f, map(unmatch, bc.args), bc.axes))
 end
 
-function BroadcastedArrays.assign!(dst::AbstractArray, MetaArray(op, AliasArray(dst)) in-place map
-function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) foreach
-
+#in-place update pattern
+function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, F, <:Tuple{<:MatchArray}}) where {F}
+    @boundscheck axes(dst) == axes(src) || throw(DimensionMismatchError("FIXME"))
+    arg = src.args[1]
+    @simd for I in eachindex(arg)
+        @inbounds arg[I] = src.f(arg[I])
+    end
+end
 
 end

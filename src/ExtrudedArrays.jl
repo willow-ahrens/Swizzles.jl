@@ -4,6 +4,7 @@ module ExtrudedArrays
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
     using Swizzle.WrapperArrays
+    using Swizzle.ShallowArrays
     using Swizzle.BroadcastedArrays
 
     export ExtrudedArray
@@ -39,7 +40,6 @@ module ExtrudedArrays
     keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
     keeps(::Type{<:ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
     keeps(Arr::Type{<:StaticArray{<:Any, <:Any, N}}) where {N} = ntuple(n -> length(axes(Arr)[n]) == 1, N)
-    keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
     keeps(::Type{<:Tuple}) = (true,)
     keeps(::Type{<:Tuple{<:Any}}) = (false,)
     keeps(::Type{<:Number}) = ()
@@ -61,6 +61,5 @@ module ExtrudedArrays
     lift_keeps(x::Tuple) = x
     lift_keeps(x::Number) = x
     lift_keeps(x::RefValue) = x
-    lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
 end

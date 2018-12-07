@@ -1,10 +1,19 @@
 module DeclarativeArrays
+
+using Swizzle.WrapperArrays
+
+using Base.Broadcast: broadcast_axes, BroadcastStyle
+using Base: dataids, unaliascopy, unalias
+
+export ShallowArray
+
 """
     ShallowArray
 
-A convenience type for constructing simple wrapper arrays. Provides default
-implementations of `AbstractArray` methods. Subtypes of `ShallowArray` must
-define [`parent`](@ref) and [`adopt`](@ref)
+A convenience type for constructing simple wrapper arrays that behave almost
+exactly like their parent. Provides default implementations of `AbstractArray`
+methods. Subtypes of `ShallowArray` must define [`parent`](@ref) and
+[`adopt`](@ref)
 
 See also: [`parent`](@ref), [`adopt`](@ref)
 """
@@ -19,7 +28,6 @@ IndexStyle(arr::ShallowArray) = IndexStyle(parent(arr))
 Base.dataids(arr::ShallowArray) = dataids(parent(arr))
 Base.unaliascopy(arr::A) where {A <:ShallowArray} = adopt(unaliascopy(parent(arr)), arr)::A
 Base.unalias(dest, arr::A) where {A <:ShallowArray} = adopt(unalias(dest, arr.arg), arr)::A
-
 
 Base.eltype(::Type{<:ShallowArray{T}}) where {T} = T
 Base.eltype(::ShallowArray{T}) where {T} = T

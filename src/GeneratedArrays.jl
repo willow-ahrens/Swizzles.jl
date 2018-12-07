@@ -5,9 +5,13 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 """
     GeneratedArray <: AbstractArray
 
-An AbstractArray that is mostly implemented using copyto!(::Any, ::Broadcasted).
+A convenience type for defining array types that are mostly implemented using
+copyto!(::Any, ::Broadcasted). Consult the [Interfaces chapter](@ref
+man-interfaces-broadcasting) on broadcasting for more info about broadcast. Many
+Base functions are implemented for GeneratedArrays in terms of `copyto!`
+including `map`, `getindex`, and `foreach`.
 
-See also: [`parent`](@ref)
+See also: [`copyto!`](@ref)
 """
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
@@ -45,6 +49,7 @@ Base.axes(arr::NullArray) = arr.axes
 Base.setindex!(arr, val, inds...) = val
 
 Base.foreach(f, a::GeneratedArray) = assign!(NullArray(axes(a)), a)
+function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 
 =#
 
