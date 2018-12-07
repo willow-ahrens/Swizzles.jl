@@ -10,10 +10,15 @@ export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Unwrap
 
 include("util.jl")
+
 include("WrapperArrays.jl")
+include("GeneratedArrays.jl")
 include("BroadcastedArrays.jl")
+include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
+include("MatchedArrays.jl")
 include("SwizzledArrays.jl")
+
 include("properties.jl")
 
 """

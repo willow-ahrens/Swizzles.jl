@@ -2,16 +2,21 @@ module GeneratedArrays
 
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
+using Base.Broadcast: Broadcasted
+using Base.Broadcast: broadcast_axes, instantiate
+
+export GeneratedArray
+
 """
     GeneratedArray <: AbstractArray
 
 A convenience type for defining array types that are mostly implemented using
-copyto!(::Any, ::Broadcasted). Consult the [Interfaces chapter](@ref
-man-interfaces-broadcasting) on broadcasting for more info about broadcast. Many
-Base functions are implemented for GeneratedArrays in terms of `copyto!`
-including `map`, `getindex`, and `foreach`.
+copyto!(::Any, ::Broadcasted) and copy(::Broadcasted). Consult the [Interfaces
+chapter](@ref man-interfaces-broadcasting) on broadcasting for more info about
+broadcast. Many Base functions are implemented for GeneratedArrays in terms of
+`copyto!` including `map`, `getindex`, and `foreach`.
 
-See also: [`copyto!`](@ref)
+See also: [`copy`](@ref), [`copyto!`](@ref)
 """
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 

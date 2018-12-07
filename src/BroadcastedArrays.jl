@@ -5,6 +5,7 @@ using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeU
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 using Swizzle.WrapperArrays
+using Swizzle.GeneratedArrays
 
 export BroadcastedArray, Arrayifier, arrayify
 
@@ -131,8 +132,5 @@ abstract type Arrayifier end
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
 
 Base.copyto!(dst, src::BroadcastedArray) = copyto!(dst, src.arg)
-
-keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
-lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
 
 end

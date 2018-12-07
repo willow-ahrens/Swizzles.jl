@@ -1,4 +1,4 @@
-module DeclarativeArrays
+module ShallowArrays
 
 using Swizzle.WrapperArrays
 

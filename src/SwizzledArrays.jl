@@ -2,6 +2,7 @@ using Swizzle.WrapperArrays
 using Swizzle.BroadcastedArrays
 using Swizzle.GeneratedArrays
 using Swizzle.ExtrudedArrays
+using Swizzle.MatchedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -150,7 +151,7 @@ end
 
 Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
-    if any(ntuple(n -> keeps(arr.arg)[n] && mask(arr)[n] isa Drop, ndims(arr))) #swizzle might reduce
+    if any(ntuple(n -> keeps(arr.arg)[n] && mask(arr)[n] isa Drop, ndims(arr.arg))) #swizzle might reduce
         if @generated
             arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
             thunk = Expr(:block)
@@ -204,20 +205,20 @@ function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
 end
 =#
 
-function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, Op, <:Tuple{<:MatchArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {Op}
+function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, Op, <:Tuple{<:MatchedArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {Op}
     src = preprocess(dst, src)
     arg = src.args[2].arg
     for i in eachindex(arg)
-        i′ = setindexinto(axes(dst), i, mask(arr)))
+        i′ = setindexinto(axes(dst), i, mask(arr))
         @inbounds dst[i′] = src.args[2].op(dst[i′], src.args[2].arg[i])
     end
     return dst
 end
 
-function Base.copyto!(dst::AbstractArray, src::Base.Broadcasted{S, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
+function Base.copyto!(dst::AbstractArray, src::Broadcasted{S, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {S, Op}
     src = preprocess(dst, src)
     copyto!(dst, src.args[1])
-    copyto!(dst, Broadcasted{MatchDestinationStyle{S}}(MatchArray(dst), src.args[2]))
+    copyto!(dst, Broadcasted{MatchDestinationStyle{S}}(MatchedArray(dst), src.args[2]))
 end
 
 """
