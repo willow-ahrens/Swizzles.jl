@@ -9,7 +9,6 @@ export Swizzler, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Unwrap
 
-include("base.jl")
 include("util.jl")
 include("WrapperArrays.jl")
 include("BroadcastedArrays.jl")
