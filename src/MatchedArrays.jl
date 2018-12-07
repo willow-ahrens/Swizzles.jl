@@ -8,6 +8,7 @@ using Base.Broadcast: Broadcasted, BroadcastStyle, AbstractArrayStyle
 using Base.Broadcast: result_style
 
 export MatchedArray, MatchDestinationStyle, MarkDestinationStyle
+export unmatch
 
 struct MatchedArray{T, N, Arg} <: ShallowArray{T, N, Arg}
     arg::Arg
@@ -61,6 +62,7 @@ struct MatchDestinationStyle{S<:BroadcastStyle} <: BroadcastStyle end
 MatchDestinationStyle(style::S) where {S <: BroadcastStyle} = MatchDestinationStyle{S}()
 
 function Base.copy(src::Broadcasted{<:MarkDestinationStyle{S}}) where {S}
+    println(convert(Broadcasted{S}, src))
     copy(convert(Broadcasted{S}, src))
 end
 

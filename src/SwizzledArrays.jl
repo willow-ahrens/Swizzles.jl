@@ -206,7 +206,7 @@ end
 =#
 
 function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, Op, <:Tuple{<:MatchedArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {Op}
-    src = preprocess(dst, src)
+    src = preprocess(dst, unmatch(src))
     arg = src.args[2].arg
     for i in eachindex(arg)
         i′ = setindexinto(axes(dst), i, mask(arr))
