@@ -9,17 +9,12 @@ export Swizzler, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Unwrap
 
-include("base.jl")
 include("util.jl")
 include("WrapperArrays.jl")
 include("BroadcastedArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
 include("properties.jl")
-
-export metatransform
-include("meta.jl")
-#include("recognize.jl")
 
 """
     `Beam(mask...)`
