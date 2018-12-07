@@ -175,6 +175,7 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
                 return res
             end
         else
+            #reduce(@view(arr.arg[getindexinto(axes(arr.arg), I, mask(arr))...)...], arr.op))
             (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
             res = @inbounds getindex(arr.arg, i...)
             for i in inds
