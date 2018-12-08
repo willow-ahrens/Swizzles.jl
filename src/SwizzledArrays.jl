@@ -185,11 +185,11 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
             return res
         end
     else #swizzle will not reduce
+        #TODO should we use a function "default" instead of "first(axes(arr))"?
         if @generated
-            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
-            :(return @inbounds getindex(arr.arg, $(arg_I...)))
+            arg_I = getindexinto(ntuple(d->:(first(arg_axes[$d])), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
         else
-           return @inbounds getindex(arr.arg, getindexinto(axes(arr.arg), I, mask(arr))...)
+           return @inbounds getindex(arr.arg, getindexinto(map(first, axes(arr.arg)), I, mask(arr))...)
         end
     end
 end
@@ -230,20 +230,20 @@ dimension `mask[i]` of `B`. If `mask[i]` is an instance of the singleton type
 infinite) iterable over elements of type `Int` and `Drop`. The integers in
 `mask` must be unique, and if `mask` is not long enough, additional `Drop`s are
 added to the end.
-The resulting container type from `copy(B)` is established by the following rules:
+The resulting container type from `materialize(B)` is established by the following rules:
  - If all elements of `mask` are `Drop`, it returns an unwrapped scalar.
  - All other combinations of arguments default to returning an `Array`, but
    custom container types can define their own implementation rules to
    customize the result when they appear as an argument.
 The swizzle operation is represented with a special lazy `SwizzledArray` type.
-`swizzle` results in `copy(SwizzledArray(...))`.  The swizzle operation can use the
+`swizzle` results in `materialize(SwizzledArray(...))`.  The swizzle operation can use the
 `Swizzler` type to take advantage of special broadcast syntax. A statement like:
 ```
    y = Swizzler((1,), +).(x .* (Swizzler((2, 1)).x .+ 1))
 ```
 will result in code that is essentially:
 ```
-   y = copy(SwizzledArray(BroadcastedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
+   y = materialize(SwizzledArray(BroadcastedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one big operation.
 
@@ -272,13 +272,13 @@ julia> swizzle(parse.(Int, ["1", "2"]), (2,))
  1 2
 ```
 """
-swizzle(A, mask, op=nooperator) = copy(SwizzledArray(A, mask, op))
+swizzle(A, mask, op=nooperator) = materialize(SwizzledArray(A, mask, op))
 
 """
     `swizzle!(dest, A, mask, op=nooperator)`
 
 Like [`swizzle`](@ref), but store the result of `swizzle(A, mask, op)` in the
-`dest` array.  Results in `copyto!(dest, SwizzledArray(...))`.
+`dest` type.  Results in `materialize!(dest, SwizzledArray(...))`.
 
 See also: [`swizzle`](@ref), [`Swizzler`](@ref).
 
@@ -314,7 +314,7 @@ julia> B
  19
 ```
 """
-swizzle!(dest, A, mask, op=nooperator) = copyto!(dest, SwizzledArray(A, mask, op))
+swizzle!(dest, A, mask, op=nooperator) = materialize!(dest, SwizzledArray(A, mask, op))
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
 #    arg = preprocess(dest, arr.arg)

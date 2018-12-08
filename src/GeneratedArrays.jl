@@ -3,7 +3,7 @@ module GeneratedArrays
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
 using Base.Broadcast: Broadcasted
-using Base.Broadcast: broadcast_axes, instantiate
+using Base.Broadcast: broadcast_axes, instantiate, broadcasted
 
 export GeneratedArray
 
@@ -14,14 +14,16 @@ A convenience type for defining array types that are mostly implemented using
 copyto!(::Any, ::Broadcasted) and copy(::Broadcasted). Consult the [Interfaces
 chapter](@ref man-interfaces-broadcasting) on broadcasting for more info about
 broadcast. Many Base functions are implemented for GeneratedArrays in terms of
-`copyto!` including `map`, `getindex`, and `foreach`.
+`copyto!` including `map`, `getindex`, and `foreach`. Note that
+`copy(::GeneratedArray)` is not implemented in terms of `Broadcast`, as `copy`
+is intended to be a shallow copy function on arrays.
 
 See also: [`copy`](@ref), [`copyto!`](@ref)
 """
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-@inline Base.Broadcast.materialize(A::GeneratedArray) = copy(A)
-@inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = copyto!(dst, A)
+@inline Base.Broadcast.materialize(A::GeneratedArray) = copy(instantiate(broadcasted(identity, A)))
+@inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = copyto!(dst, instantiate(broadcasted(identity, A)))
 
 #Beware infinite recursion!
 
@@ -36,9 +38,9 @@ Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{Abst
 totallynotidentity(x) = x
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != broadcast_axes(src)
-        copyto!(reshape(dst, broadcast_axes(src)), instantiate(Broadcasted(totallynotidentity, (src,))))
+        copyto!(reshape(dst, broadcast_axes(src)), instantiate(broadcasted(totallynotidentity, src)))
     else
-        copyto!(dst, instantiate(Broadcasted(totallynotidentity, (src,))))
+        copyto!(dst, instantiate(broadcasted(totallynotidentity, src)))
     end
 end
 
