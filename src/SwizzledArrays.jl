@@ -194,6 +194,32 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
     end
 end
 
+@generated function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
+            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
+            thunk = Expr(:block)
+            for n = 1:length(mask(arr))
+                nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
+                for d = 1:length(mask(arr))
+                    if d == n
+                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
+                    elseif d < n
+                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
+                    else
+                        nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
+                    end
+                end
+                push!(thunk.args, nest)
+            end
+            quote
+                @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
+                arg_axes = axes(arr.arg)
+                arg_I = ($(arg_I...),)
+                res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
+                $thunk
+                return res
+            end
+end
+
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_getindex(arr, (I,))
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
 Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
