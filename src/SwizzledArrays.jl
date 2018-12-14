@@ -149,7 +149,11 @@ end
     end
 end
 
-Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Integer) = _swizzle_getindex(arr, Tuple(CartesianIndices(arr)[I])) #needed?
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
+Base.@propagate_inbounds Base.getindex(arr::SwizzledArray{<:Any, N}, I::Vararg{Integer, N}) where {N} = _swizzle_getindex(arr, I)
+
+Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray{<:Any, N}, I::NTuple{N, Integer}) where {N}
     @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
     if any(ntuple(n -> keeps(arr.arg)[n] && mask(arr)[n] isa Drop, ndims(arr.arg))) #swizzle might reduce
         if @generated
@@ -194,6 +198,7 @@ Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray, I::Tuple
     end
 end
 
+#=
 @generated function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
             arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
             thunk = Expr(:block)
@@ -219,11 +224,8 @@ end
                 return res
             end
 end
+=#
 
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int) = _swizzle_getindex(arr, (I,))
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Int...) = _swizzle_getindex(arr, I)
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray) = _swizzle_getindex(arr, ())
 
 #=
 function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
