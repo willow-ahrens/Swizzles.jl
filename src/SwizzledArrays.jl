@@ -116,6 +116,7 @@ function Base.show(io::IO, arr::SwizzledArray)
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
+Base.parent(::Type{<:SwizzledArray{<:Any, <:Any, Arg}}) where {Arg} = Arg
 WrapperArrays.iswrapper(arr::SwizzledArray) = true
 function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, <:Any, mask, Op}) where {T, N, mask, Op}
     SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
@@ -149,89 +150,64 @@ end
     end
 end
 
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::Integer) = _swizzle_getindex(arr, Tuple(CartesianIndices(arr)[I])) #needed?
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray, I::CartesianIndex) = _swizzle_getindex(arr, Tuple(I))
-Base.@propagate_inbounds Base.getindex(arr::SwizzledArray{<:Any, N}, I::Vararg{Integer, N}) where {N} = _swizzle_getindex(arr, I)
+Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::SwizzledArray) = copyto!(dst, view(src, ntuple(_->Colon(), ndims(src))...))
 
-Base.@propagate_inbounds function _swizzle_getindex(arr::SwizzledArray{<:Any, N}, I::NTuple{N, Integer}) where {N}
-    @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
-    if any(ntuple(n -> keeps(arr.arg)[n] && mask(arr)[n] isa Drop, ndims(arr.arg))) #swizzle might reduce
-        if @generated
-            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
-            thunk = Expr(:block)
-            for n = 1:length(mask(arr))
-                nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
-                for d = 1:length(mask(arr))
-                    if d == n
-                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
-                    elseif d < n
-                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
-                    else
-                        nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
-                    end
-                end
-                push!(thunk.args, nest)
-            end
-            quote
-                arg_axes = axes(arr.arg)
-                arg_I = ($(arg_I...),)
-                res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
-                $thunk
-                return res
-            end
-        else
-            #reduce(@view(arr.arg[getindexinto(axes(arr.arg), I, mask(arr))...)...], arr.op))
+#=
             (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
             res = @inbounds getindex(arr.arg, i...)
             for i in inds
                 res = arr.op(res, @inbounds getindex(arr.arg, i...))
             end
             return res
-        end
-    else #swizzle will not reduce
-        #TODO should we use a function "default" instead of "first(axes(arr))"?
-        if @generated
-            arg_I = getindexinto(ntuple(d->:(first(arg_axes[$d])), length(mask(arr))), ntuple(d->:(I[$d]), ndims(arr)), mask(arr))
+=#
+@generated function Base.copyto!(dst::AbstractArray, src::SubArray{T, <:Any, Arr, I}) where {T, N, Arr <: SwizzledArray{T, N}, I<:NTuple{N}}
+    QuoteNode(:(println($(quote
+        Base.@_propagate_inbounds_meta
+        @boundscheck checkbounds_indices(Bool, axes(arr), inds) || throw_boundserror(arr, inds) #TODO Do we need this or will the view check it?
+        arr = parent(src)
+        arg = parent(arr)
+        if has_identity(arr.op, eltype(arr), eltype(arr.arg))
+            dst .= (get_identity(arr.op, eltype(arr), eltype(arr.arg)))
+            dst .= (arr.op).(dst, arr) #TODO could be more direct, avoid some method cruft as long as we're generating this puppy
         else
-           return @inbounds getindex(arr.arg, getindexinto(map(first, axes(arr.arg)), I, mask(arr))...)
-        end
-    end
-end
-
-#=
-@generated function _swizzle_getindex(arr::SwizzledArray, I::Tuple{Vararg{Int}})
-            arg_I = getindexinto(ntuple(d->:(arg_axes[$d]), length(mask(arr))), ntuple(d->:((I[$d],)), ndims(arr)), mask(arr))
-            thunk = Expr(:block)
-            for n = 1:length(mask(arr))
-                nest = :(res = arr.op(res, @inbounds getindex(arr.arg, $((Symbol("i_$d") for d = 1:length(mask(arr)))...))))
-                for d = 1:length(mask(arr))
-                    if d == n
-                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d][2:end]), nest)
-                    elseif d < n
-                        nest = Expr(:for, :($(Symbol("i_$d")) = arg_I[$d]), nest)
+            arg_axes = axes(arg)
+            arg_firstindices = ntuple(n->firstindex(arg_axes[n]), ndims(Arr))
+            arg_restindices = ntuple(n->arg_axes[n][(firstindices[n] + 1):end], ndims(Arr))
+            $(begin
+                i′ = [Symbol("i′_$d") for d = 1:length(mask(arr))]
+                i = setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], i′, mask(arr))[findall(isa(Union{#PAIN#AbstractArray}, I.parameters))]
+                thunk = Expr(:block)
+                for n = cat(0, findall(isa(Drop), mask(Arr)))
+                    if n > 0
+                        nest = :(dst[$(i...)] = arr.op(res, @inbounds getindex(arg, $(i′...))))
                     else
-                        nest = Expr(:block, :($(Symbol("i_$d")) = arg_I[$d][1]), nest)
+                        nest = :(dst[$(i...)] = @inbounds getindex(arg, $(i′...)))
                     end
+                    for d = 1:length(mask(arr))
+                        if mask(Arr)[d] isa Drop
+                            if d == n
+                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
+                            elseif d < n
+                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
+                            else
+                                nest = Expr(:block, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
+                            end
+                        else
+                            nest = Expr(:block, :($(Symbol("i′_$d")) = $(inds[mask(arr)[d]])), nest)
+                        end
+                    end
+                    if n > 0
+                        nest = Expr(:if, :(keeps(arg)[$n]), nest)
+                    end
+                    push!(thunk.args, nest)
                 end
-                push!(thunk.args, nest)
-            end
-            quote
-                @boundscheck checkbounds_indices(Bool, axes(arr), I) || throw_boundserror(arr, I)
-                arg_axes = axes(arr.arg)
-                arg_I = ($(arg_I...),)
-                res = @inbounds getindex(arr.arg, $((:(arg_I[$d][1]) for d = 1:length(mask(arr)))...))
-                $thunk
-                return res
-            end
+                thunk
+            end)
+        end
+        return res::eltype(arr)
+    end))))
 end
-=#
 
-
-#=
-function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
-    #pain involving identities and peeled iteration.
-end
-=#
 
 function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:MatchDestinationStyle{<:AbstractArrayStyle}, <:Any, Op, <:Tuple{<:MatchedArray, <:SwizzledArray{<:Any, <:Any, <:Any, <:Any, Op}}}) where {Op}
     src = preprocess(dst, unmatch(src))

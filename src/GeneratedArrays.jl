@@ -44,7 +44,10 @@ function _copyto!(dst::AbstractArray, src)
     end
 end
 
+
+
 #=
+#begin Base overrides
 
 #do overrides for wierd copyto!s, map, foreach, etc...
 
@@ -59,5 +62,9 @@ Base.foreach(f, a::GeneratedArray) = assign!(NullArray(axes(a)), a)
 function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 
 =#
+
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray{<:Any, N}, I::Vararg{Integer, N}) where {N} = copyto!(Array{eltype(arr), 0}(undef), view(arr, I...))[]
 
 end
