@@ -26,16 +26,12 @@
                           Pkg.test(; coverage = true);'
     - julia --project -e 'using Pkg; Pkg.add("Coverage"); 
       import Swizzle; using Coverage;
-       cl, tl = get_summary(process_folder());
+      cl, tl = get_summary(process_folder());
       println("(", cl/tl*100, "%) covered")'
   coverage: '/\(\d+.\d+\%\) covered/'
 
 # Name a test and select an appropriate image.
 # images comes from Docker hub
-test:0.7:
-  image: julia:0.7
-  <<: *test_definition
-  
 test:1.0:
   image: julia:1.0
   <<: *test_definition
@@ -57,7 +53,7 @@ test:1.0:
 
 # Example documentation deployment
 pages:
-  image: julia:0.7
+  image: julia:1.0
   stage: deploy
   script:
     - apt-get update -qq && apt-get install -y git # needed by Documenter
