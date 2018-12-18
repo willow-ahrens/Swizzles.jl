@@ -44,8 +44,6 @@ function _copyto!(dst::AbstractArray, src)
     end
 end
 
-
-
 #=
 #begin Base overrides
 
@@ -63,6 +61,7 @@ function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 
 =#
 
+#The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray{<:Any, N}, I::Vararg{Integer, N}) where {N} = copyto!(Array{eltype(arr), 0}(undef), view(arr, I...))[]
