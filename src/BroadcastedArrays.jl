@@ -100,16 +100,11 @@ Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg
 
 @inline myidentity(x) = x
 
-#FIXME next 10 lines are suspect if BroadcastedArray becomes MetaArray
-
-@inline Base.copy(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = copy(arr.arg)
-@inline Base.copy(arr::BroadcastedArray{T, N, <:Broadcasted}) where {T, N} = copy(arr.arg)
-@inline Base.copy(arr::BroadcastedArray) = copy(instantiate(Broadcasted(myidentity, (arr,))))
+#it may be that instead of specializing copy, we should just specialize similar
+@inline Base.copy(dst, arr::BroadcastedArray) = copy(arr.arg)
 @inline Base.Broadcast.materialize(arr::BroadcastedArray) = copy(arr)
 
-@inline Base.copyto!(dst, arr::BroadcastedArray{T, N, <: AbstractArray}) where {T, N} = copyto!(dst, arr.arg)
-@inline Base.copyto!(dst, arr::BroadcastedArray{T, N, <: Broadcasted}) where {T, N} = copyto!(dst, arr.arg)
-@inline Base.copyto!(dst, arr::BroadcastedArray) = copyto!(dst, instantiate(Broadcasted(myidentity, (arr,))))
+@inline Base.copyto!(dst, arr::BroadcastedArray) = copyto!(dst, arr.arg)
 @inline Base.Broadcast.materialize!(dst, arr::BroadcastedArray) = copyto!(dst, arr)
 
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
@@ -130,7 +125,5 @@ end
 abstract type Arrayifier end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
-
-Base.copyto!(dst, src::BroadcastedArray) = copyto!(dst, src.arg)
 
 end

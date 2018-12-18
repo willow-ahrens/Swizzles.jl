@@ -152,8 +152,6 @@ end
     end
 end
 
-Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::SwizzledArray) = copyto!(dst, view(src, ntuple(_->Colon(), ndims(src))...))
-
 #=
     (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
     res = @inbounds getindex(arr.arg, i...)
@@ -164,30 +162,32 @@ Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::SwizzledArray) = 
 =#
 
 function Base.convert(::Type{SwizzledArray}, src::SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}) where {T, N}
+    arr = parent(src)
+    arg = parent(arr)
     return SwizzledArray{eltype(src)}(
-        SubArray(parent(parent(src)),
+        SubArray(arg,
             getindexinto(
-                map(Base.Slice, axes(parent(parent(src)))),
+                map(Base.Slice, axes(arg)),
                 parentindices(src),
-                Val(mask(parent(src))))),
-        _convert_remask(parentindices(src), mask(parent(src)))
-        parent(src).op)
+                mask(arr))),
+        _convert_remask(parentindices(src), mask(arr)...),
+        operator(arr))
 end
 
-@inline function _convert_remask(indices, d, mask...) =
+@inline function _convert_remask(indices, d, mask...)
     if d isa Drop
         (drop, _convert_remask(indices, mask...)...)
-    elseif Base.index_ndims(indices(src)[d]) isa Tuple{}
+    elseif Base.index_ndims(indices[d]) isa Tuple{}
         _convert_remask(indices, mask...)
     else
-        (length(Base.index_ndims(indices(src)[1:d])), _convert_remask(indices, mask...)...)
+        (length(Base.index_ndims(indices[1:d])), _convert_remask(indices, mask...)...)
     end
 end
 @inline _convert_remask(indices) = ()
 
 function Base.copyto!(dst::AbstractArray, src::SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of dropping view indices). Therefore, we convert to a 
+    #complexity of dropping view indices). Therefore, we convert to a
     #accumulating the swizzle. Therefore, we should allocate a suitable
     #destination and then accumulate.
     return Base.copyto!(dst, convert(SwizzledArray, src))
@@ -200,38 +200,39 @@ end
     copyto!(dst, copy(src))
 end
 @generated function Base.copyto!(dst::AbstractArray{T}, src::SwizzledArray{<:T}) where {T}
-    QuoteNode(:(println($(quote
+    thunk = quote
         Base.@_propagate_inbounds_meta
         arg = src.arg
-        if has_identity(src.op, eltype(src), eltype(arg)) && false #need fancy backwards indexing
-            dst .= (get_identity(src.op, eltype(src), eltype(src.arg)))
-            dst .= (src.op).(dst, src) #TODO could be more direct, avoid some method cruft as long as we're generating this puppy
+        if has_identity(operator(src), eltype(src), eltype(arg))
+            dst .= (get_identity(operator(src), eltype(src), eltype(src.arg)))
+            dst .= operator(src).(dst, src)
         else
+            arg = BroadcastedArrays.preprocess(dst, src.arg)
             arg_axes = axes(arg)
-            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:ndims(arr))...))
-            arg_restindices = ($((:(view(arg_axes[$n], 2:end)) for n = 1:ndims(arr))...))
+            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((src))))...),)
+            arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(src)))...),)
             arg_keeps = keeps(arg)
             $(begin
                 i′ = [Symbol("i′_$d") for d = 1:length(mask(src))]
                 i = setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], i′, mask(src))
                 thunk = Expr(:block)
-                for n = cat(0, findall(isa(Drop), mask(Arr)))
+                for n = vcat(0, findall(d -> d isa Drop, mask(src)))
                     if n > 0
-                        nest = :(dst[$(i...)] = src.op(res, @inbounds getindex(arg, $(i′...))))
+                        nest = :(dst[$(i...)] = src.op(dst[$(i...)], @inbounds getindex(arg, $(i′...))))
                     else
                         nest = :(dst[$(i...)] = @inbounds getindex(arg, $(i′...)))
                     end
                     for d = 1:length(mask(src))
-                        if mask(Arr)[d] isa Drop
+                        if mask(src)[d] isa Drop
                             if d == n
-                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
+                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
                             elseif d < n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
                             else
-                                nest = Expr(:block, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
+                                nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
                             end
                         else
-                            nest = Expr(:block, :($(Symbol("i′_$d")) = $(inds[mask(src)[d]])), nest)
+                            nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
                         end
                     end
                     if n > 0
@@ -241,17 +242,20 @@ end
                 end
                 thunk
             end)
+            return dst
         end
-    end))))
+    end
+    #:(println($(QuoteNode(thunk))); $thunk)
+    thunk
 end
 
-function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{<:Any, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:T, <:Any, <:Any, <:Any, Op}}}) where {T, Op}
-    src = preprocess(dst, src)
+function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:T, <:Any, <:Any, <:Any, Op}}}) where {T, Op}
     copyto!(dst, src.args[1])
-    arg = src.args[2].arg
+    arr = src.args[2]
+    arg = BroadcastedArrays.preprocess(dst, arr.arg)
     for i in eachindex(arg)
-        i′ = setindexinto(axes(dst), i, mask(arr))
-        @inbounds dst[i′] = src.args[2].op(dst[i′], src.args[2].arg[i])
+        i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
+        @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
     end
     return dst
 end
