@@ -25,6 +25,8 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 @inline Base.Broadcast.materialize(A::GeneratedArray) = copy(instantiate(broadcasted(identity, A)))
 @inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = copyto!(dst, instantiate(broadcasted(identity, A)))
 
+Base.copy(src::GeneratedArray) = identity.(src)
+
 #Beware infinite recursion!
 
 Base.copyto!(dst, src::GeneratedArray) = copyto!(dst, Array(src))

@@ -101,7 +101,7 @@ Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg
 @inline myidentity(x) = x
 
 #it may be that instead of specializing copy, we should just specialize similar
-@inline Base.copy(dst, arr::BroadcastedArray) = copy(arr.arg)
+@inline Base.copy(arr::BroadcastedArray) = copy(arr.arg)
 @inline Base.Broadcast.materialize(arr::BroadcastedArray) = copy(arr)
 
 @inline Base.copyto!(dst, arr::BroadcastedArray) = copyto!(dst, arr.arg)

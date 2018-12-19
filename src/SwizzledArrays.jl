@@ -152,15 +152,6 @@ end
     end
 end
 
-#=
-    (i, inds) = peel(product(getindexinto(axes(arr.arg), I, mask(arr))...))
-    res = @inbounds getindex(arr.arg, i...)
-    for i in inds
-        res = arr.op(res, @inbounds getindex(arr.arg, i...))
-    end
-    return res
-=#
-
 function Base.convert(::Type{SwizzledArray}, src::SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}) where {T, N}
     arr = parent(src)
     arg = parent(arr)
@@ -193,14 +184,14 @@ function Base.copyto!(dst::AbstractArray, src::SubArray{T, <:Any, <:SwizzledArra
     return Base.copyto!(dst, convert(SwizzledArray, src))
 end
 
-@generated function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
+function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
     #This method gets called when the destination eltype is unsuitable for
     #accumulating the swizzle. Therefore, we should allocate a suitable
     #destination and then accumulate.
     copyto!(dst, copy(src))
 end
-@generated function Base.copyto!(dst::AbstractArray{T}, src::SwizzledArray{<:T}) where {T}
-    thunk = quote
+@generated function Base.copyto!(dst::AbstractArray{T, N}, src::SwizzledArray{<:T, N}) where {T, N}
+    quote
         Base.@_propagate_inbounds_meta
         arg = src.arg
         if has_identity(operator(src), eltype(src), eltype(arg))
@@ -245,8 +236,6 @@ end
             return dst
         end
     end
-    #:(println($(QuoteNode(thunk))); $thunk)
-    thunk
 end
 
 function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:T, <:Any, <:Any, <:Any, Op}}}) where {T, Op}
