@@ -25,8 +25,6 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 @inline Base.Broadcast.materialize(A::GeneratedArray) = copy(instantiate(broadcasted(identity, A)))
 @inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = copyto!(dst, instantiate(broadcasted(identity, A)))
 
-Base.copy(src::GeneratedArray) = identity.(src)
-
 #Beware infinite recursion!
 
 Base.copyto!(dst, src::GeneratedArray) = copyto!(dst, Array(src))
@@ -64,8 +62,16 @@ function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 =#
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I))[]
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = copyto!(Array{eltype(arr), 0}(undef), view(arr, I...))[]
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = _getindex(arr, I) # could be identity.(view(arr, I)), but the necessary overrides become more complicated.
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = _getindex(arr, I)
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
+
+Base.@propagate_inbounds function _getindex(arr, I...)
+    arr = view(arr, I...)
+    arr = copyto!(similar(arr), arr)
+    if ndims(arr) == 0
+        return arr[]
+    end
+end
 
 end

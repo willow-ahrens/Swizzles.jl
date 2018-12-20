@@ -188,13 +188,14 @@ function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
     #This method gets called when the destination eltype is unsuitable for
     #accumulating the swizzle. Therefore, we should allocate a suitable
     #destination and then accumulate.
-    copyto!(dst, copy(src))
+    copyto!(dst, copyto!(similar(src), src))
 end
+
 @generated function Base.copyto!(dst::AbstractArray{T, N}, src::SwizzledArray{<:T, N}) where {T, N}
     quote
         Base.@_propagate_inbounds_meta
         arg = src.arg
-        if has_identity(operator(src), eltype(src), eltype(arg))
+        if has_identity(operator(src), eltype(src), eltype(arg)) #=stackoverflow unless next function is uncommented =# && false
             dst .= (get_identity(operator(src), eltype(src), eltype(src.arg)))
             dst .= operator(src).(dst, src)
         else
@@ -238,6 +239,7 @@ end
     end
 end
 
+#=
 function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:T, <:Any, <:Any, <:Any, Op}}}) where {T, Op}
     copyto!(dst, src.args[1])
     arr = src.args[2]
@@ -248,6 +250,7 @@ function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op
     end
     return dst
 end
+=#
 
 """
     `swizzle(A, mask, op=nooperator)`
