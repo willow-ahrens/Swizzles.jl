@@ -256,6 +256,7 @@ function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op
     AXE = map(firstindex, axes(dst))
     CI  = CartesianIndices(arg)
     msk = mask(arr)
+    @boundscheck setindexinto(AXE, Tuple(CI[1]), msk)
     @inbounds for i in eachindex(arg)
         i′ = setindexinto(AXE, Tuple(CI[i]), msk)
         dst[i′...] = arr.op(dst[i′...], arg[i])

@@ -169,7 +169,8 @@ Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Int
 end
 Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:Tuple, TB}
     @boundscheck foreach(i->(i isa Drop || A[i]), I)
-    TR = promote_type(eltype(TA), eltype(TB))
+    _TR = promote_type(eltype(TA), eltype(TB))
+    TR = _TR <: Integer ? _TR : Any
     R  = SVector{length(A), TR}(A)
     @inbounds for j in eachindex(I)
         i = I[j]
@@ -179,14 +180,15 @@ Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {T
 end
 Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:AbstractVector, TB}
     @boundscheck foreach(i->(i isa Drop || A[i]), I)
-    TR = promote_type(eltype(TA), eltype(TB))
+    _TR = promote_type(eltype(TA), eltype(TB))
+    TR = _TR <: Integer ? _TR : Any
     R = similar(A, TR)
     copyto!(R, A)
     @inbounds for j in eachindex(I)
         i = I[j]
         i isa Drop || (R[i] = B[j])
     end
-    return isconcretetype(TR) ? R : [R...]
+    return isconcretetype(TR) ? R : map(identity, R)
 end
 
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
