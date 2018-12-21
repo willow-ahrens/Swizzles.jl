@@ -145,10 +145,10 @@ julia> setindexinto(A, (-1, -2), (drop, 3))
   (2, 4, -2, 3, 1)
 ```
 """
-setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B, I)
+Base.@propagate_inbounds setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B, I)
 
-_vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
-_vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
+@inbounds _vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
+@inbounds _vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
 Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
 Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
 Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
@@ -168,7 +168,9 @@ Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Int
     ntuple(j -> j == I[2] ? B[2] : (j == I[1] ? B[1] : A[j]), length(A))
 end
 Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:Tuple, TB}
-    @boundscheck foreach(i->(i isa Drop || A[i]), I)
+    @boundscheck begin
+        foreach(i->(i isa Drop || A[i]), I)
+    end
     _TR = promote_type(eltype(TA), eltype(TB))
     TR = _TR <: Integer ? _TR : Any
     R  = SVector{length(A), TR}(A)
@@ -177,6 +179,28 @@ Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {T
         i isa Drop || (R = setindex(R, B[j], i))
     end
     return Tuple(R)
+end
+@generated function _vector_setindexinto(A::TA, B::TB, I::TI) where {TA<:Tuple, TB, TI<:Tuple}
+    idxs = (findall(!isequal(Drop), I.parameters)...,)
+    n    = length(idxs)
+    _TR  = promote_type(eltype(A), eltype(B))
+    TR   = _TR <: Integer ? _TR : Any
+    len  = length(A.parameters)
+    quote
+        Base.@_propagate_inbounds_meta
+        @boundscheck begin
+            Base.Cartesian.@nexprs $n i -> A[I[$idxs[i]]]
+        end
+        R  = SVector{$len, $TR}(A)
+        @inbounds begin
+            Base.Cartesian.@nexprs $n k -> begin
+                j = $idxs[k]
+                i = I[j]
+                R = setindex(R, B[j], i)
+            end
+        end
+        return Tuple(R)
+    end
 end
 Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:AbstractVector, TB}
     @boundscheck foreach(i->(i isa Drop || A[i]), I)
