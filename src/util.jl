@@ -1,3 +1,5 @@
+using StaticArrays: SVector, setindex
+
 struct Drop end
 
 const drop = Drop()
@@ -147,35 +149,44 @@ setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B,
 
 _vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
 _vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
-_vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
-_vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
+Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
+Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
     @boundscheck A[I[1]]
     ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Drop})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Drop})
     @boundscheck A[I[1]]
     ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Drop, Integer})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Drop, Integer})
     @boundscheck A[I[2]]
     ntuple(j -> j == I[2] ? B[2] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Integer})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Integer})
     @boundscheck A[max(I[1], I[2])]
     ntuple(j -> j == I[2] ? B[2] : (j == I[1] ? B[1] : A[j]), length(A))
 end
-_vector_setindexinto(A::Tuple, B, I) = (_vector_setindexinto([A...,], B, I)...,)
-function _vector_setindexinto(A::AbstractVector, B, I)
-    R = similar(A, Any)
-    copyto!(R, A)
-    for j in eachindex(I)
+Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:Tuple, TB}
+    @boundscheck foreach(i->(i isa Drop || A[i]), I)
+    TR = promote_type(eltype(TA), eltype(TB))
+    R  = SVector{length(A), TR}(A)
+    @inbounds for j in eachindex(I)
         i = I[j]
-        if !isa(i, Drop)
-            R[i] = B[j]
-        end
+        i isa Drop || (R = setindex(R, B[j], i))
     end
-    return map(identity, R)
+    return Tuple(R)
+end
+Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:AbstractVector, TB}
+    @boundscheck foreach(i->(i isa Drop || A[i]), I)
+    TR = promote_type(eltype(TA), eltype(TB))
+    R = similar(A, TR)
+    copyto!(R, A)
+    @inbounds for j in eachindex(I)
+        i = I[j]
+        i isa Drop || (R[i] = B[j])
+    end
+    return isconcretetype(TR) ? R : [R...]
 end
 
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted

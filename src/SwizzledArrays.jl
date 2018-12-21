@@ -253,9 +253,12 @@ function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op
     copyto!(dst, src.args[1])
     arr = src.args[2]
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
-    for i in eachindex(arg)
-        i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
-        @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
+    AXE = map(firstindex, axes(dst))
+    CI  = CartesianIndices(arg)
+    msk = mask(arr)
+    @inbounds for i in eachindex(arg)
+        i′ = setindexinto(AXE, Tuple(CI[i]), msk)
+        dst[i′...] = arr.op(dst[i′...], arg[i])
     end
     return dst
 end
