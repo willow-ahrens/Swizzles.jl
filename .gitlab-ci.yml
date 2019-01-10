@@ -50,20 +50,20 @@
 #   `\(\d+.\d+\%\) covered` in the `test coverage parsing` textfield.
 
 # Example documentation deployment
-pages:
-  image: julia:1.1
-  stage: deploy
-  script:
-    - apt-get update -qq && apt-get install -y git # needed by Documenter
-    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzle");' # rebuild Julia (can be put somewhere else I'm sure
-    - julia -e 'using Pkg; import Swizzle; Pkg.add("Documenter")' # install Documenter
-    - julia --color=yes docs/make.jl # make documentation
-    - mv docs/build public # move to the directory picked up by Gitlab pages
-  artifacts:
-    paths:
-      - public
-  only:
-  - master
+#pages:
+#  image: julia:1.1
+#  stage: deploy
+#  script:
+#    - apt-get update -qq && apt-get install -y git # needed by Documenter
+#    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzle");' # rebuild Julia (can be put somewhere else I'm sure
+#    - julia -e 'using Pkg; import Swizzle; Pkg.add("Documenter")' # install Documenter
+#    - julia --color=yes docs/make.jl # make documentation
+#    - mv docs/build public # move to the directory picked up by Gitlab pages
+#  artifacts:
+#    paths:
+#      - public
+#  only:
+#  - master
 
 
 # WARNING: This template is using the `julia` images from [Docker
