@@ -29,18 +29,14 @@
 # Name a test and select an appropriate image.
 # images comes from Docker hub
 
-#test:0.7:
-#  image: julia:0.7
+#test:1.1:
+#  image: julia:1.1
 #  <<: *test_definition
-
-test:nightly:
-  image: julia:nightly
-  <<: *test_definition
 
 # Maybe you would like to test your package against the development branch:
 
-#test:1.1-dev (not sure there is such an image in docker, so not tested yet):
-#  image: julia:v1.1-dev
+#test:nightly (not sure there is such an image in docker, so not tested yet):
+#  image: julia:nightly
 #  # ... allowing for failures, since we are testing against the development
 #  # branch:
 #  allow_failure: true
@@ -55,7 +51,7 @@ test:nightly:
 
 # Example documentation deployment
 pages:
-  image: julia:0.7
+  image: julia:1.1
   stage: deploy
   script:
     - apt-get update -qq && apt-get install -y git # needed by Documenter
