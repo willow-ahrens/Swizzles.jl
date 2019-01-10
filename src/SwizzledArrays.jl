@@ -176,11 +176,19 @@ end
 end
 @inline _convert_remask(indices) = ()
 
+function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
+    dst = Array{T, 0}(undef)
+    Base.copyto!(dst, src.args[1])
+    return dst[]
+end
+
+function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
+    return Base.copyto!(dst, src.args[1])
+end
+
 function Base.copyto!(dst::AbstractArray, src::SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of dropping view indices). Therefore, we convert to a
-    #accumulating the swizzle. Therefore, we should allocate a suitable
-    #destination and then accumulate.
+    #complexity of dropping view indices). Therefore, we convert first.
     return Base.copyto!(dst, convert(SwizzledArray, src))
 end
 
