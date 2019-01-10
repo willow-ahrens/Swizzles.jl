@@ -42,11 +42,8 @@
 #  <<: *test_definition
 
 # Maybe you would like to test your package against the development branch:
- test:1.1-dev (not sure there is such an image in docker, so not tested yet):
+test:1.1-dev (not sure there is such an image in docker, so not tested yet):
   image: julia:v1.1-dev
-#  # ... allowing for failures, since we are testing against the development
-#  # branch:
-#  allow_failure: true
   <<: *test_definition
 
 # REMARK: Do not forget to enable the coverage feature for your project, if you
