@@ -21,7 +21,7 @@
     # want coverage results.
     - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzle"); Pkg.test("Swizzle"; coverage = true)'
     # Comment out below if you do not want coverage results.
-    - julia -e 'using Pkg; Pkg.add("Coverage"); 
+    - julia -e 'using Pkg; Pkg.add("Coverage");
       import Swizzle; cd(joinpath(dirname(pathof(Swizzle)), ".."));
       using Coverage; cl, tl = get_summary(process_folder());
       println("(", cl/tl*100, "%) covered")'
@@ -32,9 +32,9 @@
 #test:0.7:
 #  image: julia:0.7
 #  <<: *test_definition
-  
-test:latest:
-  image: julia:latest
+
+test:nightly:
+  image: julia:nightly
   <<: *test_definition
 
 # Maybe you would like to test your package against the development branch:
