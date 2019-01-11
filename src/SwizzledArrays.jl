@@ -264,6 +264,7 @@ end
 #TODO create specialized reindex function
 @generated function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, Arr}}) where {T, Op, Arg, Arr<:SwizzledArray{<:T, <:Any, Arg, <:Any, Op}}
     return quote
+        Base.@_propagate_inbounds_meta
         copyto!(dst, src.args[1])
         arr = src.args[2]
         arg = BroadcastedArrays.preprocess(dst, arr.arg)
