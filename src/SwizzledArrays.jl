@@ -152,12 +152,10 @@ end
     end
 end
 
-#Here's the tricky copy overrides
-
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
     #complexity of dropping view indices). Therefore, we convert first.
-    dst = Array{T, 0}(undef)
+    dst = Array{T, 0}(undef) #if you use this method for scalar getindex, this line can get pretty costly
     Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
     return dst[]
 end
@@ -213,7 +211,8 @@ end
         arg = src.arg
         if mask(src) isa Tuple{Vararg{Int}}
             for i in eachindex(arg)
-                i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
+                #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
+                i′ = unindex(dst, arr, i)
                 @inbounds dst[i′...] = arg[i]
             end
         elseif has_identity(operator(src), eltype(src), eltype(arg))
@@ -265,19 +264,30 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     arr = src.args[2]
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
     for i in eachindex(arg)
-        i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
+        #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
+        i′ = unindex(dst, arr, i)
         @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
     end
     return dst
 end
 
-
-
-#=
-function unindex(arr::SwizzledArray, i)
-
+@inline function unindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+    return unindex(dst, arr, CartesianIndices(arr.arg)[i])
 end
-=#
+
+@inline function unindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+    return unindex(dst, arr, Tuple(i)...)
+end
+
+@inline function unindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+    if @generated
+        quote
+            return ($(setindexinto([:(firstindex(dst, $d)) for d in 1:max(0, maximum(mask(arr)))], [:(i[$d]) for d in 1:length(mask(arr))], mask(arr))...),)
+        end
+    else
+        return setindexinto(map(firstindex, axes(dst)), i, mask(arr))
+    end
+end
 
 #=
 #TODO create specialized reindex function
