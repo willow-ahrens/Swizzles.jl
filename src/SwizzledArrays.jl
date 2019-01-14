@@ -152,12 +152,30 @@ end
     end
 end
 
+#=
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
     #complexity of dropping view indices). Therefore, we convert first.
     dst = Array{T, 0}(undef) #if you use this method for scalar getindex, this line can get pretty costly
     Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
     return dst[]
+end
+=#
+
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
+    #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+    #complexity of dropping view indices). Therefore, we convert first.
+    arr = parent(src.args[1])
+    if mask(arr) isa Tuple{Vararg{Int}}
+        arg = parent(arr)
+        inds = parentindices(src.args[1])
+        return arg[reindex(arr, inds...)...]
+        #=
+        return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
+        =#
+    else
+        return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
+    end
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
@@ -198,6 +216,31 @@ end
 end
 @inline _convert_remask(indices) = ()
 
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray}}) where {T, N}
+    Base.@_propagate_inbounds_meta
+    arr = src.args[1]
+    arg = arr.arg
+    if mask(arr) isa Tuple{Vararg{Int}}
+        @inbounds return arg[]
+    elseif has_identity(operator(arr), eltype(arr), eltype(arg))
+        dst = get_identity(operator(arr), eltype(arr), eltype(arg))
+        arg = BroadcastedArrays.preprocess(dst, arg)
+        for i in eachindex(arg)
+            @inbounds dst = arr.op(dst, arg[i])
+        end
+        return dst
+    else
+        dst = get_identity(operator(arr), eltype(arr), eltype(arg))
+        arg = BroadcastedArrays.preprocess(dst, arg)
+        (i, inds) = peel(eachindex(arg))
+        @inbounds dst = arg[i]
+        for i in inds
+            @inbounds dst = arr.op(dst, arg[i])
+        end
+        return dst
+    end
+end
+
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
     #This method gets called when the destination eltype is unsuitable for
     #accumulating the swizzle. Therefore, we should allocate a suitable
@@ -212,7 +255,7 @@ end
         if mask(src) isa Tuple{Vararg{Int}}
             for i in eachindex(arg)
                 #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
-                i′ = unindex(dst, arr, i)
+                i′ = unindex(dst, src, i)
                 @inbounds dst[i′...] = arg[i]
             end
         elseif has_identity(operator(src), eltype(src), eltype(arg))
@@ -271,6 +314,24 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     return dst
 end
 
+@inline function reindex(arr::SwizzledArray, i::Integer)
+    return reindex(arr, CartesianIndices(arr)[i])
+end
+
+@inline function reindex(arr::SwizzledArray, i::CartesianIndex)
+    return reindex(arr, Tuple(i)...)
+end
+
+@inline function reindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
+    if @generated
+        quote
+            return ($(getindexinto([:(Base.Slice(axes(arr.arg, $d))) for d in 1:ndims(Arg)], [:(i[$d]) for d in 1:ndims(arr)], mask(arr))...),)
+        end
+    else
+        return getindexinto(map(Base.Slice, axes(arr.arg)), i, mask(arr))
+    end
+end
+
 @inline function unindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
     return unindex(dst, arr, CartesianIndices(arr.arg)[i])
 end
@@ -282,32 +343,12 @@ end
 @inline function unindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
     if @generated
         quote
-            return ($(setindexinto([:(firstindex(dst, $d)) for d in 1:max(0, maximum(mask(arr)))], [:(i[$d]) for d in 1:length(mask(arr))], mask(arr))...),)
+            return ($(setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], [:(i[$d]) for d in 1:length(mask(arr))], mask(arr))...),)
         end
     else
         return setindexinto(map(firstindex, axes(dst)), i, mask(arr))
     end
 end
-
-#=
-#TODO create specialized reindex function
-@generated function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, Arr}}) where {T, Op, Arg, Arr<:SwizzledArray{<:T, <:Any, Arg, <:Any, Op}}
-    return quote
-        Base.@_propagate_inbounds_meta
-        copyto!(dst, src.args[1])
-        arr = src.args[2]
-        arg = BroadcastedArrays.preprocess(dst, arr.arg)
-        inds = CartesianIndices(arg)
-        for i in eachindex(arg)
-            ind = Tuple(inds[i])
-            i′ = ($(setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], [:(ind[$d]) for d in 1:ndims(Arg)], mask(Arr))...),)
-            @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
-        end
-        return dst
-    end
-end
-=#
-
 
 """
     `swizzle(A, mask, op=nooperator)`
