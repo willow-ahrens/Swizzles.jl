@@ -249,6 +249,7 @@ end
         Base.@_propagate_inbounds_meta
         arg = src.arg
         if mask(src) isa Tuple{Vararg{Int}}
+            arg = BroadcastedArrays.preprocess(dst, src.arg)
             for i in eachindex(arg)
                 #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
                 i′ = unindex(dst, src, i)
