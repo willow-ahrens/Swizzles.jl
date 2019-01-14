@@ -168,9 +168,7 @@ Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Int
     ntuple(j -> j == I[2] ? B[2] : (j == I[1] ? B[1] : A[j]), length(A))
 end
 Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:Tuple, TB}
-    @boundscheck begin
-        foreach(i->(i isa Drop || A[i]), I)
-    end
+    @boundscheck foreach(i->(i isa Drop || A[i]), I)
     _TR = promote_type(eltype(TA), eltype(TB))
     TR = _TR <: Integer ? _TR : Any
     R  = SVector{length(A), TR}(A)
