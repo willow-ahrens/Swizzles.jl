@@ -163,17 +163,15 @@ end
 =#
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
-    #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of dropping view indices). Therefore, we convert first.
     arr = parent(src.args[1])
     if mask(arr) isa Tuple{Vararg{Int}}
+        #This swizzle doesn't reduce so this is just a scalar getindex.
         arg = parent(arr)
         inds = parentindices(src.args[1])
-        return arg[reindex(arr, inds...)...]
-        #=
-        return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
-        =#
+        @inbounds return arg[reindex(arr, inds...)...]
     else
+        #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+        #complexity of dropping view indices). Therefore, we convert first.
         return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
     end
 end
@@ -189,19 +187,17 @@ end
     arg = parent(arr)
     inds = parentindices(src)
     if @generated
-        inds′ = :($(getindexinto([:(Base.Slice(axes(arg, $d))) for d in 1:ndims(Arg)], [:(inds[$d]) for d in 1:ndims(Arr)], mask(Arr))...),)
         if M == 0
             mask′ = ((filter(d -> d isa Drop, collect(mask(Arr)))...,))
         else
             mask′ = :(_convert_remask(inds, mask(arr)...))
         end
         quote
-            return SwizzledArray{eltype(src)}(SubArray(arg, $inds′), $mask′, operator(arr))
+            return SwizzledArray{eltype(src)}(SubArray(arg, reindex(arr, inds)), $mask′, operator(arr))
         end
     else
-        inds′ = getindexinto(map(Base.Slice, axes(arg)), inds, mask(arr))
         mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src)}(SubArray(arg, inds′), mask′, operator(arr))
+        return SwizzledArray{eltype(src)}(SubArray(arg, reindex(arr, inds)), mask′, operator(arr))
     end
 end
 
@@ -320,6 +316,10 @@ end
 
 @inline function reindex(arr::SwizzledArray, i::CartesianIndex)
     return reindex(arr, Tuple(i)...)
+end
+
+@inline function reindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
+    return invoke(reindex, Tuple{typeof(arr), Any}, arr, i)
 end
 
 @inline function reindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}

@@ -5,11 +5,11 @@ using InteractiveUtils
 
 f(A, B) = Sum(2).(A .* Beam(2, 3).(B))
 
-A = B = rand(4,4)
+A = B = rand(64,64)
 
 f(A, B)
 @profile begin
-    for i = 1:10000
+    for i = 1:1000
         f(A, B)
     end
 end
