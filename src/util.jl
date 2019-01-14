@@ -178,8 +178,6 @@ function _vector_setindexinto(A::AbstractVector, B, I)
     return map(identity, R)
 end
 
-
-
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
 
 struct Unwrap
