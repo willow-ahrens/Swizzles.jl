@@ -1,3 +1,5 @@
+using StaticArrays: SVector, setindex
+
 struct Drop end
 
 const drop = Drop()
@@ -143,39 +145,72 @@ julia> setindexinto(A, (-1, -2), (drop, 3))
   (2, 4, -2, 3, 1)
 ```
 """
-setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B, I)
+Base.@propagate_inbounds setindexinto(A::Union{Tuple, AbstractVector}, B, I) = _vector_setindexinto(A, B, I)
 
-_vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
-_vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
-_vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
-_vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
+@inbounds _vector_setindexinto(A::Tuple, B, I::Tuple{Vararg{Drop}}) = A
+@inbounds _vector_setindexinto(A::Tuple, B, I::AbstractVector{Drop}) = A
+Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::Tuple{Vararg{Drop}}) = map(identity, A)
+Base.@propagate_inbounds _vector_setindexinto(A::AbstractVector, B, I::AbstractVector{Drop}) = map(identity, A)
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer})
     @boundscheck A[I[1]]
     ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Drop})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Drop})
     @boundscheck A[I[1]]
     ntuple(j -> j == I[1] ? B[1] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Drop, Integer})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Drop, Integer})
     @boundscheck A[I[2]]
     ntuple(j -> j == I[2] ? B[2] : A[j], length(A))
 end
-function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Integer})
+Base.@propagate_inbounds function _vector_setindexinto(A::Tuple, B, I::Tuple{Integer, Integer})
     @boundscheck A[max(I[1], I[2])]
     ntuple(j -> j == I[2] ? B[2] : (j == I[1] ? B[1] : A[j]), length(A))
 end
-_vector_setindexinto(A::Tuple, B, I) = (_vector_setindexinto([A...,], B, I)...,)
-function _vector_setindexinto(A::AbstractVector, B, I)
-    R = similar(A, Any)
-    copyto!(R, A)
-    for j in eachindex(I)
+Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:Tuple, TB}
+    @boundscheck foreach(i->(i isa Drop || A[i]), I)
+    _TR = promote_type(eltype(TA), eltype(TB))
+    TR = _TR <: Integer ? _TR : Any
+    R  = SVector{length(A), TR}(A)
+    @inbounds for j in eachindex(I)
         i = I[j]
-        if !isa(i, Drop)
-            R[i] = B[j]
-        end
+        i isa Drop || (R = setindex(R, B[j], i))
     end
-    return map(identity, R)
+    return Tuple(R)
+end
+@generated function _vector_setindexinto(A::TA, B::TB, I::TI) where {TA<:Tuple, TB, TI<:Tuple}
+    idxs = (findall(!isequal(Drop), I.parameters)...,)
+    n    = length(idxs)
+    _TR  = promote_type(eltype(A), eltype(B))
+    TR   = _TR <: Integer ? _TR : Any
+    len  = length(A.parameters)
+    quote
+        Base.@_propagate_inbounds_meta
+        @boundscheck begin
+            Base.Cartesian.@nexprs $n i -> A[I[$idxs[i]]]
+        end
+        R  = SVector{$len, $TR}(A)
+        @inbounds begin
+            Base.Cartesian.@nexprs $n k -> begin
+                j = $idxs[k]
+                i = I[j]
+                R = setindex(R, B[j], i)
+            end
+        end
+        return Tuple(R)
+    end
+end
+Base.@propagate_inbounds function _vector_setindexinto(A::TA, B::TB, I) where {TA<:AbstractVector, TB}
+    @boundscheck foreach(i->(i isa Drop || A[i]), I)
+    _TR = promote_type(eltype(TA), eltype(TB))
+    TR = _TR <: Integer ? _TR : Any
+    R = similar(A, TR)
+    copyto!(R, A)
+    @inbounds for j in eachindex(I)
+        i = I[j]
+        i isa Drop || (R[i] = B[j])
+    end
+    return isconcretetype(TR) ? R : map(identity, R)
 end
 
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
