@@ -168,7 +168,7 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
         #This swizzle doesn't reduce so this is just a scalar getindex.
         arg = parent(arr)
         inds = parentindices(src.args[1])
-        @inbounds return arg[proindex(arr, inds...)...]
+        @inbounds return arg[parentindex(arr, inds...)...]
     else
         #A view of a Swizzle can be computed as a swizzle of a view (hiding the
         #complexity of dropping view indices). Therefore, we convert first.
@@ -193,11 +193,11 @@ end
             mask′ = :(_convert_remask(inds, mask(arr)...))
         end
         quote
-            return SwizzledArray{eltype(src)}(SubArray(arg, proindex(arr, inds)), $mask′, operator(arr))
+            return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds)), $mask′, operator(arr))
         end
     else
         mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src)}(SubArray(arg, proindex(arr, inds)), mask′, operator(arr))
+        return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds)), mask′, operator(arr))
     end
 end
 
@@ -252,7 +252,7 @@ end
             arg = BroadcastedArrays.preprocess(dst, src.arg)
             for i in eachindex(arg)
                 #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
-                i′ = preindex(dst, src, i)
+                i′ = childindex(dst, src, i)
                 @inbounds dst[i′...] = arg[i]
             end
         elseif has_identity(operator(src), eltype(src), eltype(arg))
@@ -305,25 +305,29 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
     for i in eachindex(arg)
         #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
-        i′ = preindex(dst, arr, i)
+        i′ = childindex(dst, arr, i)
         @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
     end
     return dst
 end
 
-@inline function proindex(arr::SwizzledArray, i::Integer)
-    return proindex(arr, CartesianIndices(arr)[i])
+@inline function parentindex(arr::SubArray, i...)
+    return Base.reindex(arr, Base.parentindices(arr), i)
 end
 
-@inline function proindex(arr::SwizzledArray, i::CartesianIndex)
-    return proindex(arr, Tuple(i)...)
+@inline function parentindex(arr::SwizzledArray, i::Integer)
+    return parentindex(arr, CartesianIndices(arr)[i])
 end
 
-@inline function proindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
-    return invoke(proindex, Tuple{typeof(arr), Any}, arr, i)
+@inline function parentindex(arr::SwizzledArray, i::CartesianIndex)
+    return parentindex(arr, Tuple(i)...)
 end
 
-@inline function proindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
+@inline function parentindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
+    return invoke(parentindex, Tuple{typeof(arr), Any}, arr, i)
+end
+
+@inline function parentindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
     if @generated
         quote
             return ($(getindexinto([:(Base.Slice(axes(arr.arg, $d))) for d in 1:ndims(Arg)], [:(i[$d]) for d in 1:ndims(arr)], mask(arr))...),)
@@ -335,24 +339,24 @@ end
 
 
 """
-   proindex(arr, i)
+   parentindex(arr, i)
 
    For all wrapper arrays arr such that `arr` involves an index remapping,
    return the indices into `parent(arr)` which affect the indices `i` of `arr`.
 
    See also: [`swizzle`](@ref).
 """
-proindex
+parentindex
 
-@inline function preindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
-    return preindex(dst, arr, CartesianIndices(arr.arg)[i])
+@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+    return childindex(dst, arr, CartesianIndices(arr.arg)[i])
 end
 
-@inline function preindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
-    return preindex(dst, arr, Tuple(i)...)
+@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+    return childindex(dst, arr, Tuple(i)...)
 end
 
-@inline function preindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
     if @generated
         quote
             return ($(setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], [:(i[$d]) for d in 1:length(mask(arr))], mask(arr))...),)
@@ -363,14 +367,14 @@ end
 end
 
 """
-   preindex(arr, i)
+   childindex(arr, i)
 
    For all wrapper arrays arr such that `arr` involves an index remapping,
    return the indices into `arr` which affect the indices `i` of `parent(arr)`.
 
    See also: [`swizzle`](@ref).
 """
-preindex
+childindex
 
 """
     `swizzle(A, mask, op=nooperator)`
