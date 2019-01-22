@@ -1,13 +1,8 @@
 module WrapperArrays
 
-using Base.Broadcast: broadcast_axes, BroadcastStyle
-using Base: dataids, unaliascopy, unalias
-
 import LinearAlgebra
 
 export iswrapper, adopt, storage
-
-export WrapperArray
 
 #=
     This file defines
@@ -15,7 +10,7 @@ export WrapperArray
         must define the `adopt` function, which describes how to construct
         analogous wrapper arrays with new parents, and specialize Base.parent.
         2. Corresponding methods for "simple wrapper arrays" in Base.
-        3. A conveience type `WrapperArray` which defines several pass-through
+        3. A conveience type `ShallowArray` which defines several pass-through
         methods for easy construction of wrapper arrays.
     Ideally, numbers 1 and 2 should live in Adapt.jl, (note that `adapt` can be
     implemented with adopt).
@@ -103,50 +98,6 @@ adopt(arg, arr::Base.ReshapedArray) = reshape(arg, arr.dims)
 iswrapper(::PermutedDimsArray) = true
 function adopt(arg::Arg, arr::PermutedDimsArray{<:Any,N,perm,iperm}) where {T,N,perm,iperm,Arg<:AbstractArray{T, N}}
     return PermutedDimsArray{T,N,perm,iperm,Arg}(arg)
-end
-
-"""
-    WrapperArray
-
-A convenience type for constructing simple wrapper arrays. Provides default
-implementations of `AbstractArray` methods. Subtypes of `WrapperArray` must
-define [`parent`](@ref) and [`adopt`](@ref)
-
-See also: [`parent`](@ref), [`adopt`](@ref)
-"""
-abstract type WrapperArray{T, N, Arg} <: AbstractArray{T, N} end
-
-Base.parent(arr::WrapperArray) = throw(MethodError(parent, (arr)))
-
-iswrapper(arr::WrapperArray) = true
-
-IndexStyle(arr::WrapperArray) = IndexStyle(parent(arr))
-
-Base.dataids(arr::WrapperArray) = dataids(parent(arr))
-Base.unaliascopy(arr::A) where {A <:WrapperArray} = adopt(unaliascopy(parent(arr)), arr)::A
-Base.unalias(dest, arr::A) where {A <:WrapperArray} = adopt(unalias(dest, arr.arg), arr)::A
-
-
-Base.eltype(::Type{<:WrapperArray{T}}) where {T} = T
-Base.eltype(::WrapperArray{T}) where {T} = T
-
-Base.ndims(::Type{<:WrapperArray{<:Any, N}}) where {N} = N
-Base.ndims(::WrapperArray{<:Any, N}) where {N} = N
-
-Base.size(arr::WrapperArray{<:Any, <:Any, <:AbstractArray}) = size(parent(arr))
-
-Base.axes(arr::WrapperArray{<:Any, <:Any, <:AbstractArray}) = axes(parent(arr))
-
-Base.getindex(arr::WrapperArray, inds...) = getindex(parent(arr), inds...)
-
-Base.setindex!(arr::WrapperArray, val, inds...) = setindex!(parent(arr), val, inds...)
-
-@inline Broadcast.BroadcastStyle(arr::Type{<:WrapperArray{<:Any, <:Any, Arg}}) where {Arg} = BroadcastStyle(Arg)
-
-function Base.show(io::IO, arr::WrapperArray{T, N, Arg}) where {T, N, Arg}
-    print(io, typeof(arr))
-    print(io, '(', parent(A), ')')
-    nothing
 end
 
 end

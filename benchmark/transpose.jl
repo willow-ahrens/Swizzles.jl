@@ -1,5 +1,5 @@
 using BenchmarkTools
-using Swizzle
+using Swizzles
 using Base.Iterators
 
 suite["transpose"] = BenchmarkGroup()

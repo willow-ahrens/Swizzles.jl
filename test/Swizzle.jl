@@ -69,13 +69,13 @@
   R = [0]
   @test swizzle((11, 12, 13), (), max) == 13
 
-  @test Swizzler((), +).(A) == 45
-  @test Swizzler((2,), +).(A) == [6 15 24]
-  @test Swizzler((1,), +).(A) == [6; 15; 24]
-  @test Swizzler((1,2), +).(A) == A
-  @test Swizzler((1,2,3), +).(A) == A
-  @test Swizzler((2,1), +).(A) == transpose(A)
-  @test Swizzler((2,1,3), +).(A) == transpose(A)
+  @test Swizzle((), +).(A) == 45
+  @test Swizzle((2,), +).(A) == [6 15 24]
+  @test Swizzle((1,), +).(A) == [6; 15; 24]
+  @test Swizzle((1,2), +).(A) == A
+  @test Swizzle((1,2,3), +).(A) == A
+  @test Swizzle((2,1), +).(A) == transpose(A)
+  @test Swizzle((2,1,3), +).(A) == transpose(A)
 
   @test_throws ArgumentError Beam().(A)
   @test_throws ArgumentError Beam(2).(A)
@@ -113,13 +113,13 @@
   @test Min(2, 1).(A) == 1
   @test Min(2, 1, 3).(A) == 1
 
-  @test Swizzler((), +).(A.+A) == 90
-  @test Swizzler((2,), +).(A.+A) == [12 30 48]
-  @test Swizzler((1,), +).(A.+A) == [12; 30; 48]
-  @test Swizzler((1,2), +).(A.+A) == A.+A
-  @test Swizzler((1,2,3), +).(A.+A) == A.+A
-  @test Swizzler((2,1), +).(A.+A) == transpose(A.+A)
-  @test Swizzler((2,1,3), +).(A.+A) == transpose(A.+A)
+  @test Swizzle((), +).(A.+A) == 90
+  @test Swizzle((2,), +).(A.+A) == [12 30 48]
+  @test Swizzle((1,), +).(A.+A) == [12; 30; 48]
+  @test Swizzle((1,2), +).(A.+A) == A.+A
+  @test Swizzle((1,2,3), +).(A.+A) == A.+A
+  @test Swizzle((2,1), +).(A.+A) == transpose(A.+A)
+  @test Swizzle((2,1,3), +).(A.+A) == transpose(A.+A)
 
   @test_throws ArgumentError Beam().(A.+A)
   @test_throws ArgumentError Beam(2).(A.+A)
@@ -238,7 +238,7 @@
   @test MinTo(2, 1, 3).(A.+A) == transpose(A.+A)
 
   @test Beam(1).((1, 2)) isa Tuple
-  @test Swizzler(1, +).((1, 2)) isa Tuple
+  @test Swizzle(1, +).((1, 2)) isa Tuple
   @test Sum(1).((1.0, 2)) isa Float64
 
   A = rand(1,1)

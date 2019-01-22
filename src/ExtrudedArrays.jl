@@ -3,13 +3,14 @@ module ExtrudedArrays
     using Base: RefValue
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
-    using Swizzle.WrapperArrays
-    using Swizzle.BroadcastedArrays
+    using Swizzles.WrapperArrays
+    using Swizzles.BroadcastedArrays
+    using Swizzles.ShallowArrays
 
     export ExtrudedArray
     export keeps, lift_keeps
 
-    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: WrapperArray{T, N, Arg}
+    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: ShallowArray{T, N, Arg}
         arg::Arg
         function ExtrudedArray{T, N, Arg, keeps}(arg::Arg) where {T, N, keeps, Arg}
             @assert keeps isa Tuple{Vararg{Bool, N}}
@@ -29,7 +30,7 @@ module ExtrudedArrays
     #keeps is a complicated function. It returns a tuple where each element of
     #the tuple specifies whether the corresponding dimension is intended to have
     #size 1. The complicated aspect of keeps is that while it should work on
-    #ArrayifiedArray, it must also work on the type wrapped by ArrayifiedArray.
+    #BroadcastedArray, it must also work on the type wrapped by BroadcastedArray.
     #This way, lift_keeps only needs to use ArrayifiedArrays when it's creating
     #an ExtrudedArray.
     keeps(x) = newindexer(x)[1]
@@ -39,11 +40,11 @@ module ExtrudedArrays
     keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
     keeps(::Type{<:ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
     keeps(Arr::Type{<:StaticArray{<:Any, <:Any, N}}) where {N} = ntuple(n -> length(axes(Arr)[n]) == 1, N)
-    keeps(Arr::Type{<:ArrayifiedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
     keeps(::Type{<:Tuple}) = (true,)
     keeps(::Type{<:Tuple{<:Any}}) = (false,)
     keeps(::Type{<:Number}) = ()
     keeps(::Type{<:RefValue}) = ()
+    keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
 
     function keeps(bc::Broadcasted)
         args = map(keeps, bc.args)
@@ -57,10 +58,10 @@ module ExtrudedArrays
     end
 
     lift_keeps(x) = ExtrudedArray(x)
+    lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(x::StaticArray) = x
     lift_keeps(x::Tuple) = x
     lift_keeps(x::Number) = x
     lift_keeps(x::RefValue) = x
-    lift_keeps(x::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
 end

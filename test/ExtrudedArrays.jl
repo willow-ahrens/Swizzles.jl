@@ -1,5 +1,5 @@
 using Base.Broadcast: broadcastable, Broadcasted
-using Swizzle.ExtrudedArrays
+using Swizzles.ExtrudedArrays
 
 myidentity(x) = x
 
