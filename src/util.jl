@@ -215,15 +215,15 @@ end
 
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
 
-struct Unwrap
+struct Delay
   value
 end
 
-Unwrap() = Unwrap(nothing)
+Delay() = Delay(nothing)
 
-Base.Broadcast.broadcasted(::BroadcastStyle, ::Unwrap, bc) = Unwrap(bc)
+Base.Broadcast.broadcasted(::BroadcastStyle, ::Delay, bc) = Delay(bc)
 
-Base.Broadcast.materialize(uw::Unwrap) = uw.value
+Base.Broadcast.materialize(uw::Delay) = uw.value
 
 abstract type Intercept end
 
