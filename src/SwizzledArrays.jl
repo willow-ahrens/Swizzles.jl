@@ -68,7 +68,7 @@ mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
 operator(arr::S) where {S <: SwizzledArray} = arr.op
 
-struct Swizzle{mask, Op} <: BroadcastedArray.Intercept 
+struct Swizzle{mask, Op} <: BroadcastedArrays.Intercept 
     op::Op
 end
 

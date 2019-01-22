@@ -1,11 +1,11 @@
-module Swizzle
+module Swizzles
 
 export Drop, drop
 export getindexinto, setindexinto #maybe dont export...
 export BroadcastedArray, WrapperArrayConstructor, wrap
 export SwizzledArray
 export swizzle, swizzle!
-export Swizzler, Reduce, Sum, Max, Min, Beam
+export Swizzle, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Unwrap
 
@@ -29,7 +29,7 @@ argument `arg`, the dimension `arg[i]` appears as dimension `mask[i]` in the
 output. If dimension `i` is known to have size `1`, it may be dropped by setting
 `mask[i] = drop`.
 
-See also: [`Swizzler`](@ref).
+See also: [`Swizzle`](@ref).
 
 # Examples
 ```jldoctest
@@ -51,7 +51,7 @@ julia> Beam(drop, 3).(A)
 ```
 """
 function Beam(dims::Union{Int, Drop}...)
-    Swizzler(dims, nooperator)
+    Swizzle(dims, nooperator)
 end
 
 """
@@ -62,7 +62,7 @@ argument `arg`, the result is a lazy view of a reduction over the specified
 dimensions, collapsing remaining dimensions downward. If no dimensions are
 specified, all dimensions are reduced over.
 
-See also: [`Swizzler`](@ref).
+See also: [`Swizzle`](@ref).
 
 # Examples
 ```jldoctest
@@ -89,15 +89,15 @@ function _Reduce(op, ::Val{dims}) where {dims}
         s = Set(dims)
         c = 0
         mask = flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1)))
-        return :(return Swizzler($(mask), op))
+        return :(return Swizzle($(mask), op))
     else
         m = maximum((0, dims...))
         s = Set(dims)
         c = 0
-        return Swizzler(flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1))), op)
+        return Swizzle(flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1))), op)
     end
 end
-Reduce(op) = Swizzler(repeated(drop), op)
+Reduce(op) = Swizzle(repeated(drop), op)
 
 """
     `Sum(dims...)`
@@ -196,7 +196,7 @@ function Min(dims::Int...)
 end
 
 function SwizzleTo(imask, op)
-    Swizzler(setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), op)
+    Swizzle(setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), op)
 end
 
 function BeamTo(dims::Union{Int, Drop}...)
