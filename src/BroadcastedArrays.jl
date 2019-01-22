@@ -122,8 +122,4 @@ end
 
 @inline Base.Broadcast.BroadcastStyle(::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
-abstract type Intercept end
-
-@inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Intercept, args...) = cstr(map(arrayify, args)...)
-
 end

@@ -2,7 +2,6 @@ using Swizzles.WrapperArrays
 using Swizzles.BroadcastedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
-using Swizzles.MatchedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -68,7 +67,7 @@ mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
 operator(arr::S) where {S <: SwizzledArray} = arr.op
 
-struct Swizzle{mask, Op} <: BroadcastedArrays.Intercept 
+struct Swizzle{mask, Op} <: Swizzles.Intercept
     op::Op
 end
 
@@ -109,7 +108,8 @@ julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
 mask(::Type{Swizzle{_mask, Op}}) where {_mask, Op} = _mask
 mask(szr::Szr) where {Szr <: Swizzle} = mask(Szr)
 
-@inline (szr::Swizzle)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(szr)), szr.op))
+@inline (szr::Swizzle)(arg) = SwizzledArray(_SwizzledArray(Any, arrayify(arg), Val(mask(szr)), szr.op))
+
 
 function Base.show(io::IO, arr::SwizzledArray)
     print(io, SwizzledArray)

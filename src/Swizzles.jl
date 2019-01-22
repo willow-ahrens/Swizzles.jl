@@ -7,7 +7,7 @@ export SwizzledArray
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
-export Unwrap
+export Delay, Intercept
 
 include("util.jl")
 
