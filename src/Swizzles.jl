@@ -16,7 +16,6 @@ include("GeneratedArrays.jl")
 include("BroadcastedArrays.jl")
 include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
-include("MatchedArrays.jl")
 include("SwizzledArrays.jl")
 
 include("properties.jl")
