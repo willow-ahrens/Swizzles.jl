@@ -68,12 +68,12 @@ mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
 operator(arr::S) where {S <: SwizzledArray} = arr.op
 
-struct Swizzler{mask, Op} <: Arrayifier
+struct Swizzle{mask, Op} <: Arrayifier
     op::Op
 end
 
 """
-    `Swizzler(mask, op=nooperator)`
+    `Swizzle(mask, op=nooperator)`
 
 Produce an object `s` such that when `s` is broadcasted as a function over an
 argument `arg`, the result is a lazy view of the result of `swizzle(arg, mask,
@@ -90,26 +90,26 @@ julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
  5   6
  7   8
  9  10
-julia> Swizzler((1,), +).(A)
+julia> Swizzle((1,), +).(A)
 5×1 Array{Int64,2}:
  3
  7
  11
  15
  19
-julia> Swizzler((), +).(A)
+julia> Swizzle((), +).(A)
 55
-julia> Swizzler((2,)).(parse.(Int, ["1", "2"]))
+julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
 1x2-element Array{Int64,1}:
  1 2
 ```
 """
-@inline Swizzler(mask, op::Op) where {Op} = Swizzler{mask, Op}(op)
+@inline Swizzle(mask, op::Op) where {Op} = Swizzle{mask, Op}(op)
 
-mask(::Type{Swizzler{_mask, Op}}) where {_mask, Op} = _mask
-mask(szr::Szr) where {Szr <: Swizzler} = mask(Szr)
+mask(::Type{Swizzle{_mask, Op}}) where {_mask, Op} = _mask
+mask(szr::Szr) where {Szr <: Swizzle} = mask(Szr)
 
-@inline (szr::Swizzler)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(szr)), szr.op))
+@inline (szr::Swizzle)(arg::AbstractArray) = SwizzledArray(_SwizzledArray(Any, arg, Val(mask(szr)), szr.op))
 
 function Base.show(io::IO, arr::SwizzledArray)
     print(io, SwizzledArray)
@@ -388,9 +388,9 @@ The resulting container type from `materialize(B)` is established by the followi
    customize the result when they appear as an argument.
 The swizzle operation is represented with a special lazy `SwizzledArray` type.
 `swizzle` results in `materialize(SwizzledArray(...))`.  The swizzle operation can use the
-`Swizzler` type to take advantage of special broadcast syntax. A statement like:
+`Swizzle` type to take advantage of special broadcast syntax. A statement like:
 ```
-   y = Swizzler((1,), +).(x .* (Swizzler((2, 1)).x .+ 1))
+   y = Swizzle((1,), +).(x .* (Swizzle((2, 1)).x .+ 1))
 ```
 will result in code that is essentially:
 ```
@@ -398,7 +398,7 @@ will result in code that is essentially:
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one big operation.
 
-See also: [`swizzle!`](@ref), [`Swizzler`](@ref).
+See also: [`swizzle!`](@ref), [`Swizzle`](@ref).
 
 # Examples
 ```jldoctest
@@ -431,7 +431,7 @@ swizzle(A, mask, op=nooperator) = materialize(SwizzledArray(A, mask, op))
 Like [`swizzle`](@ref), but store the result of `swizzle(A, mask, op)` in the
 `dest` type.  Results in `materialize!(dest, SwizzledArray(...))`.
 
-See also: [`swizzle`](@ref), [`Swizzler`](@ref).
+See also: [`swizzle`](@ref), [`Swizzle`](@ref).
 
 # Examples
 ```jldoctest
