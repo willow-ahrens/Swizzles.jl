@@ -5,7 +5,7 @@ using Swizzles.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
 
 @inline myidentity(x) = x
 

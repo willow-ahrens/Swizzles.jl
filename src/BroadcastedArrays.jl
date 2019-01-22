@@ -3,7 +3,7 @@ module BroadcastedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
+using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 using Swizzles.WrapperArrays
 using Swizzles.GeneratedArrays
 
@@ -76,7 +76,7 @@ Base.dataids(arr::BroadcastedArray) = dataids(arr.arg)
 Base.unaliascopy(arr::BroadcastedArray{T, N, Arg}) where {T, N, Arg} = BroadcastedArray{T, N, Arg}(unaliascopy(arr.arg))
 Base.unalias(dst, arr::BroadcastedArray{T, N, Arg}) where {T, N, Arg} = BroadcastedArray{T, N, Arg}(unalias(dst, arr.arg))
 
-@inline Base.axes(arr::BroadcastedArray) = broadcast_axes(arr.arg)
+@inline Base.axes(arr::BroadcastedArray) = axes(arr.arg)
 
 @inline Base.size(arr::BroadcastedArray) = map(length, axes(arr.arg))
 

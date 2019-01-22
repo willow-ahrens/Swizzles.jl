@@ -3,7 +3,7 @@ module GeneratedArrays
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
 using Base.Broadcast: Broadcasted
-using Base.Broadcast: broadcast_axes, instantiate, broadcasted
+using Base.Broadcast: instantiate, broadcasted
 
 export GeneratedArray
 
@@ -34,8 +34,8 @@ Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{Abst
 
 totallynotidentity(x) = x
 function _copyto!(dst::AbstractArray, src)
-    if axes(dst) != broadcast_axes(src)
-        copyto!(reshape(dst, broadcast_axes(src)), instantiate(broadcasted(totallynotidentity, src)))
+    if axes(dst) != axes(src)
+        copyto!(reshape(dst, axes(src)), instantiate(broadcasted(totallynotidentity, src)))
     else
         copyto!(dst, instantiate(broadcasted(totallynotidentity, src)))
     end

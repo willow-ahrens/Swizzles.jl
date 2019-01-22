@@ -2,7 +2,7 @@ module ShallowArrays
 
 using Swizzles.WrapperArrays
 
-using Base.Broadcast: broadcast_axes, BroadcastStyle
+using Base.Broadcast: BroadcastStyle
 using Base: dataids, unaliascopy, unalias
 
 export ShallowArray
