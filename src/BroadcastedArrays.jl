@@ -7,7 +7,7 @@ using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, br
 using Swizzles.WrapperArrays
 using Swizzles.GeneratedArrays
 
-export BroadcastedArray, Arrayifier, arrayify
+export BroadcastedArray, arrayify
 
 struct BroadcastedArray{T, N, Arg} <: GeneratedArray{T, N}
     arg::Arg
@@ -122,8 +122,8 @@ end
 
 @inline Base.Broadcast.BroadcastStyle(::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
 
-abstract type Arrayifier end
+abstract type Intercept end
 
-@inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Arrayifier, args...) = cstr(map(arrayify, args)...)
+@inline Base.Broadcast.broadcasted(style::BroadcastStyle, cstr::Intercept, args...) = cstr(map(arrayify, args)...)
 
 end
