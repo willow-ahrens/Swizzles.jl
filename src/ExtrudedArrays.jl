@@ -3,9 +3,9 @@ module ExtrudedArrays
     using Base: RefValue
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
-    using Swizzle.WrapperArrays
-    using Swizzle.BroadcastedArrays
-    using Swizzle.ShallowArrays
+    using Swizzles.WrapperArrays
+    using Swizzles.BroadcastedArrays
+    using Swizzles.ShallowArrays
 
     export ExtrudedArray
     export keeps, lift_keeps

@@ -1,8 +1,8 @@
-using Swizzle.WrapperArrays
-using Swizzle.BroadcastedArrays
-using Swizzle.GeneratedArrays
-using Swizzle.ExtrudedArrays
-using Swizzle.MatchedArrays
+using Swizzles.WrapperArrays
+using Swizzles.BroadcastedArrays
+using Swizzles.GeneratedArrays
+using Swizzles.ExtrudedArrays
+using Swizzles.MatchedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -539,7 +539,7 @@ end
 end
 =#
 
-@inline function Swizzle.ExtrudedArrays.keeps(arr::SwizzledArray)
+@inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     if @generated
         args = setindexinto(ntuple(d->:(false), ndims(arr)), ntuple(d->:(arg_keeps[$d]), length(mask(arr))), mask(arr))
         return quote
@@ -551,11 +551,11 @@ end
     end
 end
 
-function Swizzle.ExtrudedArrays.keeps(::Type{Arr}) where {Arg, Arr <: SwizzledArray{<:Any, <:Any, <:Arg}}
+function Swizzles.ExtrudedArrays.keeps(::Type{Arr}) where {Arg, Arr <: SwizzledArray{<:Any, <:Any, <:Arg}}
     setindexinto(ntuple(d->false, ndims(Arr)), keeps(Arg), mask(Arr))
 end
 
-function Swizzle.ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
+function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
     arg = arrayify(lift_keeps(arr.arg))
     return SwizzledArray{T, N, typeof(arg), mask, Op}(arg, arr.op)
 end

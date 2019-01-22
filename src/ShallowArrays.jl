@@ -1,6 +1,6 @@
 module ShallowArrays
 
-using Swizzle.WrapperArrays
+using Swizzles.WrapperArrays
 
 using Base.Broadcast: broadcast_axes, BroadcastStyle
 using Base: dataids, unaliascopy, unalias

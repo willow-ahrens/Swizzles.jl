@@ -1,8 +1,8 @@
 using Documenter
-using Swizzle
+using Swizzles
 
 makedocs(
-    modules = [Swizzle]
+    modules = [Swizzles]
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

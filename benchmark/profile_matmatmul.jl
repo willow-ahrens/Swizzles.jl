@@ -1,6 +1,6 @@
 using Profile
 using Cthulhu
-using Swizzle
+using Swizzles
 using InteractiveUtils
 
 f(A, B) = Sum(2).(A .* Beam(2, 3).(B))

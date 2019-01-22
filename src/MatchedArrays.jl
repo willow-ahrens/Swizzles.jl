@@ -1,8 +1,8 @@
 module MatchedArrays
 
-using Swizzle.WrapperArrays
-using Swizzle.ShallowArrays
-using Swizzle.BroadcastedArrays
+using Swizzles.WrapperArrays
+using Swizzles.ShallowArrays
+using Swizzles.BroadcastedArrays
 
 using Base.Broadcast: Broadcasted, BroadcastStyle, AbstractArrayStyle
 using Base.Broadcast: result_style

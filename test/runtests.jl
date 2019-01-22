@@ -1,4 +1,4 @@
-using Swizzle
+using Swizzles
 using Test
 
 include("Swizzle.jl")

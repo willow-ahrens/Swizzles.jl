@@ -4,8 +4,8 @@ using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, 
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, broadcast_axes, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
-using Swizzle.WrapperArrays
-using Swizzle.GeneratedArrays
+using Swizzles.WrapperArrays
+using Swizzles.GeneratedArrays
 
 export BroadcastedArray, Arrayifier, arrayify
 

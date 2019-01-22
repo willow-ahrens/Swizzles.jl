@@ -1,6 +1,6 @@
 using Base.Broadcast: broadcastable
-using Swizzle.ShallowArrays
-using Swizzle.WrapperArrays
+using Swizzles.ShallowArrays
+using Swizzles.WrapperArrays
 
 struct SimpleShallowArray{T, N, P} <: ShallowArray{T, N, P}
     arg::P
