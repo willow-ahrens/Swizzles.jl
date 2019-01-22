@@ -224,3 +224,7 @@ Unwrap() = Unwrap(nothing)
 Base.Broadcast.broadcasted(::BroadcastStyle, ::Unwrap, bc) = Unwrap(bc)
 
 Base.Broadcast.materialize(uw::Unwrap) = uw.value
+
+abstract type Intercept end
+
+@inline Base.Broadcast.broadcasted(style::BroadcastStyle, intr::Intercept, args...) = intr(args...)
