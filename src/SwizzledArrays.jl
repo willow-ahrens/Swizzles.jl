@@ -1,8 +1,8 @@
+using Swizzles.Properties
 using Swizzles.WrapperArrays
 using Swizzles.BroadcastedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
-using Swizzles: declare_narrow_eltype
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -31,7 +31,7 @@ end
 
 @inline function SwizzledArray(arg, mask, op)
     arr = SwizzledArray{Any}(arg, mask, op)
-    return SwizzledArray{get_narrow_eltype(arg)}(arr)
+    return SwizzledArray{Properties.eltype_bound(arg)}(arr)
 end
 
 @inline SwizzledArray{T}(arg, mask, op) where {T} = SwizzledArray{T}(arg, Val(mask), op)
@@ -52,17 +52,17 @@ end
 mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
 mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
-@inline function Swizzles.declare_narrow_eltype(arr::SwizzledArray)
-    T = get_narrow_eltype(arr.arg)
+@inline function Properties.eltype_bound(arr::SwizzledArray)
+    T = Properties.eltype_bound(arr.arg)
     if eltype(mask(arr)) <: Int
         return T
     end
-    T! = Union{T, get_return_type(arr.op, T, T)}
+    T! = Union{T, Properties.return_type(arr.op, T, T)}
     if T! <: T
         return T!
     end
     T = T!
-    T! = Union{T, get_return_type(arr.op, T, T)}
+    T! = Union{T, Properties.return_type(arr.op, T, T)}
     if T! <: T
         return T!
     end
@@ -223,16 +223,14 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
     arg = arr.arg
     if mask(arr) isa Tuple{Vararg{Int}}
         @inbounds return arg[]
-    elseif has_identity(operator(arr), eltype(arr), eltype(arg))
-        dst = get_identity(operator(arr), eltype(arr), eltype(arg))
+    elseif Properties.initial(operator(arr), eltype(arr), eltype(arg)) != nothing
+        dst = something(Properties.initial(operator(arr), eltype(arr), eltype(arg)))
         arg = BroadcastedArrays.preprocess(dst, arg)
         for i in eachindex(arg)
             @inbounds dst = arr.op(dst, arg[i])
         end
         return dst
     else
-        dst = get_identity(operator(arr), eltype(arr), eltype(arg))
-        arg = BroadcastedArrays.preprocess(dst, arg)
         (i, inds) = peel(eachindex(arg))
         @inbounds dst = arg[i]
         for i in inds
@@ -260,8 +258,8 @@ end
                 i′ = childindex(dst, src, i)
                 @inbounds dst[i′...] = arg[i]
             end
-        elseif has_identity(operator(src), eltype(src), eltype(arg))
-            dst .= (get_identity(operator(src), eltype(src), eltype(src.arg)))
+        elseif Properties.initial(operator(src), eltype(src), eltype(arg)) != nothing
+            dst .= something(Properties.initial(operator(src), eltype(src), eltype(src.arg)))
             dst .= operator(src).(dst, src)
         else
             arg = BroadcastedArrays.preprocess(dst, src.arg)

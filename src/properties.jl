@@ -1,40 +1,68 @@
-struct Undefined end
+module Properties
 
-@inline function get_return_type(f, args...)
-    if declare_return_type(f, args...) isa Undefined
-        Core.Compiler.return_type(f, args)
-    else
-        declare_return_type(f, args...)
-    end
-end
+"""
+    return_type(f, args...)
 
-@inline declare_return_type(f, args...) = Undefined()
-@inline declare_return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline declare_return_type(::typeof(-), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline declare_return_type(::typeof(*), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline declare_return_type(::typeof(/), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline declare_return_type(::typeof(max), a, b) = Union{a, b}
-@inline declare_return_type(::typeof(min), a, b) = Union{a, b}
-@inline declare_return_type(::typeof(+), a::Type{<:Number}) = a
-@inline declare_return_type(::typeof(-), a::Type{<:Number}) = a
+Returns a type `T` containing the return type of the function `f` called with
+arguments of type `args...`. Should run in time linear with the description of
+the types of its arguments.
 
-@inline has_identity(f, T, S) = !(declare_identity(f, T, S) isa Undefined)
-@inline get_identity(f, T, S) = declare_identity(f, T, S)
+See also: [`Core.Compiler.return_type`](@ref).
 
-@inline declare_identity(f, T, S) = Undefined()
-@inline declare_identity(::typeof(+), T::Type{<:Number}, S::Type{<:Number}) = zero(T)
-@inline declare_identity(::typeof(*), T::Type{<:Number}, S::Type{<:Number}) = one(T)
-@inline declare_identity(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) = typemin(T)
-@inline declare_identity(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) = typemax(T)
+# Examples
+```jldoctest
+julia> return_type(+, Int, Int)
+Int64
+julia> return_type(+, Real, Real)
+Any
+```
+"""
+@inline return_type(f, args...) = Core.Compiler.return_type(f, args)
+@inline return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(-), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(*), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(/), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(max), a, b) = Union{a, b}
+@inline return_type(::typeof(min), a, b) = Union{a, b}
+@inline return_type(::typeof(+), a::Type{<:Number}) = a
+@inline return_type(::typeof(-), a::Type{<:Number}) = a
 
-@inline function get_narrow_eltype(arg)
-    if declare_narrow_eltype(arg) isa Undefined
-        eltype(arg)
-    else
-        declare_narrow_eltype(arg)
-    end
-end
+"""
+    initial(f, T, S)
 
-@inline declare_narrow_eltype(arg) = Undefined()
+Return the value `i` such that `something(i)::T`, `f(something(i), x)::T`, and
+`f(something(i), x) == x` for all values `x` of type `S`. Return `nothing` if no
+such value exists.
+
+See also: [`zero`](@ref), [`oneunit`](@ref).
+
+# Examples
+```jldoctest
+julia> initial(+, Int, Int)
+0
+julia> initial(+, Real, Real)
+false
+julia> initial(+, Int, Real)
+nothing
+```
+"""
+@inline initial(f, T, S) = nothing
+@inline initial(::typeof(+), T::Type{<:Number}, S::Type{<:Number}) = Some(zero(T))
+@inline initial(::typeof(*), T::Type{<:Number}, S::Type{<:Number}) = Some(one(T))
+@inline initial(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) = Some(typemin(T))
+@inline initial(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) = Some(typemax(T))
+
+"""
+    eltype_bound(A)
+
+Return the strictest bound on the element type of `A` that is possible to obtain
+in constant time. This may be stricter than `eltype(A)`, which corresponds to
+the declared element type of `A`
+
+See also: [`eltype`](@ref).
+"""
+@inline eltype_bound(arg) = eltype(arg)
 
 #declare opposite
+
+end

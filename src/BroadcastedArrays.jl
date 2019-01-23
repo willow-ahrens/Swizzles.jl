@@ -1,13 +1,14 @@
 module BroadcastedArrays
 
+using Swizzles.Properties
+using Swizzles.WrapperArrays
+using Swizzles.GeneratedArrays
+using Swizzles
+
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
-using Swizzles.WrapperArrays
-using Swizzles: get_narrow_eltype
-using Swizzles.GeneratedArrays
-using Swizzles
 
 export BroadcastedArray, arrayify
 
@@ -22,7 +23,7 @@ end
 @inline function BroadcastedArray(arg)
     arg = instantiate(broadcastable(arg))
     arr = BroadcastedArray{Any}(arg)
-    return BroadcastedArray{get_narrow_eltype(arr)}(arg)
+    return BroadcastedArray{Properties.eltype_bound(arr)}(arg)
 end
 
 @inline function BroadcastedArray{T}(arg) where {T}
@@ -42,8 +43,8 @@ end
 @inline BroadcastedArray{T, N}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
 @inline BroadcastedArray{T, N, Arg}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
 
-@inline function Swizzles.declare_narrow_eltype(arr::BroadcastedArray)
-    T = get_narrow_eltype(arr.arg)
+@inline function Properties.eltype_bound(arr::BroadcastedArray)
+    T = Properties.eltype_bound(arr.arg)
     if T <: eltype(arr)
         return T
     else
@@ -51,7 +52,7 @@ end
     end
 end
 
-@inline function Swizzles.declare_narrow_eltype(arr::BroadcastedArray{<:Any, <:Any, <:Broadcasted})
+@inline function Properties.eltype_bound(arr::BroadcastedArray{<:Any, <:Any, <:Broadcasted})
     return combine_eltypes(arr.arg.f, arr.arg.args)
 end
 
