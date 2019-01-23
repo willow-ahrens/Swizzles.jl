@@ -5,7 +5,9 @@ using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeU
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 using Swizzles.WrapperArrays
+using Swizzles: get_narrow_eltype
 using Swizzles.GeneratedArrays
+using Swizzles
 
 export BroadcastedArray, arrayify
 
@@ -13,40 +15,22 @@ struct BroadcastedArray{T, N, Arg} <: GeneratedArray{T, N}
     arg::Arg
     @inline function BroadcastedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         arg = instantiate(broadcastable(arg))
-        @assert typeof(arg) <: Arg
-        @assert ndims(typeof(arg)) == N
-        @assert T <: eltype(arg)
         return new{T, N, typeof(arg)}(arg)
-    end
-    @inline function BroadcastedArray{T, 1, Arg}(arg::Arg) where {T, Arg <: Tuple}
-        arg = instantiate(broadcastable(arg))
-        @assert typeof(arg) <: Arg
-        @assert T <: eltype(arg)
-        return new{T, 1, typeof(arg)}(arg)
     end
 end
 
 @inline function BroadcastedArray(arg)
     arg = instantiate(broadcastable(arg))
-    return BroadcastedArray{eltype(arg), ndims(typeof(arg)), typeof(arg)}(arg)
-end
-
-@inline function BroadcastedArray(arg::Broadcasted)
-    arg = instantiate(arg)
-    return BroadcastedArray{combine_eltypes(arg.f, arg.args), ndims(typeof(arg)), typeof(arg)}(arg)
-end
-
-@inline function BroadcastedArray(arg::Tuple)
-    return BroadcastedArray{eltype(arg), 1, typeof(arg)}(arg)
+    arr = BroadcastedArray{Any}(arg)
+    return BroadcastedArray{get_narrow_eltype(arr)}(arg)
 end
 
 @inline function BroadcastedArray{T}(arg) where {T}
-    arg = instantiate(broadcastable(arg))
-    return BroadcastedArray{T, ndims(typeof(arg)), typeof(arg)}(arg)
+    return BroadcastedArray{T, ndims(arg)}(arg)
 end
 
 @inline function BroadcastedArray{T}(arg::Tuple) where {T}
-    return BroadcastedArray{T, 1, typeof(arg)}(arg)
+    return BroadcastedArray{T, 1}(arg)
 end
 
 @inline function BroadcastedArray{T, N}(arg) where {T, N}
@@ -54,8 +38,21 @@ end
     return BroadcastedArray{T, N, typeof(arg)}(arg)
 end
 
-@inline function BroadcastedArray{T, 1}(arg::Tuple) where {T, N}
-    return BroadcastedArray{T, 1, typeof(arg)}(arg)
+@inline BroadcastedArray{T}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
+@inline BroadcastedArray{T, N}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
+@inline BroadcastedArray{T, N, Arg}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
+
+@inline function Swizzles.declare_narrow_eltype(arr::BroadcastedArray)
+    T = get_narrow_eltype(arr.arg)
+    if T <: eltype(arr)
+        return T
+    else
+        return eltype(arr)
+    end
+end
+
+@inline function Swizzles.declare_narrow_eltype(arr::BroadcastedArray{<:Any, <:Any, <:Broadcasted})
+    return combine_eltypes(arr.arg.f, arr.arg.args)
 end
 
 function Base.show(io::IO, arr::BroadcastedArray{T, N}) where {T, N}

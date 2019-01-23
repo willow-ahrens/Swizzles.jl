@@ -27,6 +27,7 @@ struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: GeneratedArray{T, N}
 end
 
 @inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
+@inline SwizzledArray{T, N, Arg, mask, Op}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
 @inline function SwizzledArray(arg, mask, op)
     arr = SwizzledArray{Any}(arg, mask, op)
@@ -52,7 +53,7 @@ mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} =
 mask(arr::S) where {S <: SwizzledArray} = mask(S)
 
 @inline function Swizzles.declare_narrow_eltype(arr::SwizzledArray)
-    T = eltype(arr.arg)
+    T = get_narrow_eltype(arr.arg)
     if eltype(mask(arr)) <: Int
         return T
     end
