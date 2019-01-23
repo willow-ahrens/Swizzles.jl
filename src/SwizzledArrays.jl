@@ -193,11 +193,11 @@ end
             mask′ = :(_convert_remask(inds, mask(arr)...))
         end
         quote
-            return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds)), $mask′, operator(arr))
+            return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), $mask′, operator(arr))
         end
     else
         mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds)), mask′, operator(arr))
+        return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), mask′, operator(arr))
     end
 end
 
