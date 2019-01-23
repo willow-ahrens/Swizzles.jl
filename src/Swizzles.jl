@@ -10,6 +10,7 @@ export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Delay, Intercept
 
 include("util.jl")
+include("properties.jl")
 
 include("WrapperArrays.jl")
 include("GeneratedArrays.jl")
@@ -18,7 +19,6 @@ include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
 
-include("properties.jl")
 
 """
     `Beam(mask...)`

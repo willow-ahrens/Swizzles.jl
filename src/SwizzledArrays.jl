@@ -2,6 +2,7 @@ using Swizzles.WrapperArrays
 using Swizzles.BroadcastedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
+using Swizzles: declare_narrow_eltype
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -25,37 +26,22 @@ struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: GeneratedArray{T, N}
     end
 end
 
-@inline function SwizzledArray(arr::SwizzledArray)
-    T = eltype(arr.arg)
-    if eltype(mask(arr)) <: Int
-        return SwizzledArray{T}(arr)
-    end
-    T! = Union{T, get_return_type(arr.op, T, T)}
-    if T! <: T
-        return SwizzledArray{T!}(arr)
-    end
-    T = T!
-    T! = Union{T, get_return_type(arr.op, T, T)}
-    if T! <: T
-        return SwizzledArray{T!}(arr)
-    end
-    return SwizzledArray{Any}(arr)
-end
-
 @inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
-@inline SwizzledArray(arg, mask, op) = SwizzledArray(_SwizzledArray(Any, arrayify(arg), Val(mask), op))
+@inline function SwizzledArray(arg, mask, op)
+    arr = SwizzledArray{Any}(arg, mask, op)
+    return SwizzledArray{get_narrow_eltype(arg)}(arr)
+end
 
-@inline SwizzledArray{T}(arg, mask, op) where {T} = _SwizzledArray(T, arrayify(arg), Val(mask), op)
-
-@inline function _SwizzledArray(::Type{T}, arg::AbstractArray{S, N}, ::Val{mask}, op) where {T, S, N, mask}
+@inline SwizzledArray{T}(arg, mask, op) where {T} = SwizzledArray{T}(arg, Val(mask), op)
+@inline function SwizzledArray{T}(arg, ::Val{mask}, op) where {T, mask}
     if @generated
-        mask! = (take(flatten((mask, repeated(drop))), N)...,)
+        mask! = (take(flatten((mask, repeated(drop))), ndims(arg))...,)
         M = maximum((0, mask!...))
         #return :(return SwizzledArray{T, $M, typeof(arg), $mask!, Core.Typeof(op)}(arg, op))
         return :(return SwizzledArray{T, $M, typeof(arg), $mask!, typeof(op)}(arg, op))
     else
-        mask! = (take(flatten((mask, repeated(drop))), N)...,)
+        mask! = (take(flatten((mask, repeated(drop))), ndims(arg))...,)
         M = maximum((0, mask!...))
         #return SwizzledArray{T, M, typeof(arg), mask!, Core.Typeof(op)}(arg, op)
         return SwizzledArray{T, M, typeof(arg), mask!, typeof(op)}(arg, op)
@@ -64,6 +50,23 @@ end
 
 mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
 mask(arr::S) where {S <: SwizzledArray} = mask(S)
+
+@inline function Swizzles.declare_narrow_eltype(arr::SwizzledArray)
+    T = eltype(arr.arg)
+    if eltype(mask(arr)) <: Int
+        return T
+    end
+    T! = Union{T, get_return_type(arr.op, T, T)}
+    if T! <: T
+        return T!
+    end
+    T = T!
+    T! = Union{T, get_return_type(arr.op, T, T)}
+    if T! <: T
+        return T!
+    end
+    return Any
+end
 
 operator(arr::S) where {S <: SwizzledArray} = arr.op
 
@@ -108,7 +111,8 @@ julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
 mask(::Type{Swizzle{_mask, Op}}) where {_mask, Op} = _mask
 mask(szr::Szr) where {Szr <: Swizzle} = mask(Szr)
 
-@inline (szr::Swizzle)(arg) = SwizzledArray(_SwizzledArray(Any, arrayify(arg), Val(mask(szr)), szr.op))
+@inline (szr::Swizzle)(arg) = SwizzledArray(arrayify(arg), Val(mask(szr)), szr.op)
+
 
 
 function Base.show(io::IO, arr::SwizzledArray)
@@ -427,7 +431,7 @@ julia> swizzle(parse.(Int, ["1", "2"]), (2,))
  1 2
 ```
 """
-swizzle(A, mask, op=nooperator) = materialize(SwizzledArray(A, mask, op))
+swizzle(A, mask, op=nooperator) = materialize(SwizzledArray(arrayify(A), mask, op))
 
 """
     `swizzle!(dest, A, mask, op=nooperator)`
@@ -469,7 +473,7 @@ julia> B
  19
 ```
 """
-swizzle!(dest, A, mask, op=nooperator) = materialize!(dest, SwizzledArray(A, mask, op))
+swizzle!(dest, A, mask, op=nooperator) = materialize!(dest, SwizzledArray(arrayify(A), mask, op))
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}
 #    arg = preprocess(dest, arr.arg)

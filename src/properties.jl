@@ -27,4 +27,14 @@ end
 @inline declare_identity(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) = typemin(T)
 @inline declare_identity(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) = typemax(T)
 
+@inline function get_narrow_eltype(arg)
+    if declare_narrow_eltype(arg) isa Undefined
+        eltype(arg)
+    else
+        declare_narrow_eltype(arg)
+    end
+end
+
+@inline declare_narrow_eltype(arg) = Undefined()
+
 #declare opposite
