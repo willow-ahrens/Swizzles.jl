@@ -69,8 +69,6 @@ mask(arr::S) where {S <: SwizzledArray} = mask(S)
     return Any
 end
 
-operator(arr::S) where {S <: SwizzledArray} = arr.op
-
 struct Swizzle{T, mask, Op} <: Swizzles.Intercept
     op::Op
 end
@@ -209,11 +207,11 @@ end
             mask′ = :(_convert_remask(inds, mask(arr)...))
         end
         quote
-            return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), $mask′, operator(arr))
+            return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), $mask′, arr.op)
         end
     else
         mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), mask′, operator(arr))
+        return SwizzledArray{eltype(src)}(SubArray(arg, parentindex(arr, inds...)), mask′, arr.op)
     end
 end
 
@@ -234,8 +232,8 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
     arg = arr.arg
     if mask(arr) isa Tuple{Vararg{Int}}
         @inbounds return arg[]
-    elseif Properties.initial(operator(arr), eltype(arr), eltype(arg)) != nothing
-        dst = something(Properties.initial(operator(arr), eltype(arr), eltype(arg)))
+    elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) != nothing
+        dst = something(Properties.initial(arr.op, eltype(arr), eltype(arg)))
         arg = BroadcastedArrays.preprocess(dst, arg)
         for i in eachindex(arg)
             @inbounds dst = arr.op(dst, arg[i])
@@ -269,9 +267,9 @@ end
                 i′ = childindex(dst, src, i)
                 @inbounds dst[i′...] = arg[i]
             end
-        elseif Properties.initial(operator(src), eltype(src), eltype(arg)) != nothing
-            dst .= something(Properties.initial(operator(src), eltype(src), eltype(src.arg)))
-            dst .= operator(src).(dst, src)
+        elseif Properties.initial(src.op, eltype(src), eltype(arg)) != nothing
+            dst .= something(Properties.initial(src.op, eltype(src), eltype(src.arg)))
+            dst .= (src.op).(dst, src)
         else
             arg = BroadcastedArrays.preprocess(dst, src.arg)
             arg_axes = axes(arg)
