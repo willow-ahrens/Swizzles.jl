@@ -2,8 +2,8 @@ module Swizzles
 
 export Drop, drop
 export getindexinto, setindexinto #maybe dont export...
-export BroadcastedArray, WrapperArrayConstructor, wrap
-export SwizzledArray
+export BroadcastedArray, arrayify
+export SwizzledArray, mask
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo

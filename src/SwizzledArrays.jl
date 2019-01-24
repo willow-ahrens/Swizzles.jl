@@ -50,7 +50,7 @@ end
 end
 
 mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
-mask(arr::S) where {S <: SwizzledArray} = mask(S)
+mask(::SwizzledArray{T, N, Arg, _mask, Op}) where {T, N, Arg, _mask, Op} = _mask
 
 @inline function Properties.eltype_bound(arr::SwizzledArray)
     T = Properties.eltype_bound(arr.arg)
@@ -118,7 +118,7 @@ See also: [`Swizzle`](@ref).
 @inline Swizzle{T}(mask, op::Op) where {T, Op} = Swizzle{T, mask, Op}(op)
 
 mask(::Type{Swizzle{T, _mask, Op}}) where {T, _mask, Op} = _mask
-mask(sz::Sz) where {Sz <: Swizzle} = mask(Sz)
+mask(::Swizzle{T, _mask, Op}) where {T, _mask, Op} = _mask
 
 @inline (sz::Swizzle{nothing})(arg) = SwizzledArray(arrayify(arg), Val(mask(sz)), sz.op)
 @inline (sz::Swizzle{T})(arg) where {T} = SwizzledArray{T}(arrayify(arg), Val(mask(sz)), sz.op)
