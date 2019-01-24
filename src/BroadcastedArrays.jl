@@ -105,6 +105,7 @@ Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg
 @inline Base.copyto!(dst, arr::BroadcastedArray) = copyto!(dst, arr.arg)
 @inline Base.Broadcast.materialize!(dst, arr::BroadcastedArray) = copyto!(dst, arr)
 
+#This should do the same thing as Broadcast preprocess does, but apply the BroadcastedArrays preprocess first
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
 function preprocess(dst, arr)
     if iswrapper(arr)

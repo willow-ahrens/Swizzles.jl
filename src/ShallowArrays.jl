@@ -47,7 +47,7 @@ Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, in
 
 function Base.show(io::IO, arr::ShallowArray{T, N, Arg}) where {T, N, Arg}
     print(io, typeof(arr))
-    print(io, '(', parent(A), ')')
+    print(io, '(', parent(arr), ')')
     nothing
 end
 
