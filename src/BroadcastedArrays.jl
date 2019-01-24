@@ -15,23 +15,22 @@ export BroadcastedArray, arrayify
 struct BroadcastedArray{T, N, Arg} <: GeneratedArray{T, N}
     arg::Arg
     @inline function BroadcastedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
-        arg = instantiate(broadcastable(arg))
         return new{T, N, typeof(arg)}(arg)
     end
 end
 
 @inline function BroadcastedArray(arg)
-    arg = instantiate(broadcastable(arg))
     arr = BroadcastedArray{Any}(arg)
     return BroadcastedArray{Properties.eltype_bound(arr)}(arg)
 end
 
 @inline function BroadcastedArray{T}(arg) where {T}
-    return BroadcastedArray{T, ndims(arg)}(arg)
+    arg = instantiate(broadcastable(arg))
+    return BroadcastedArray{T, ndims(arg), typeof(arg)}(arg)
 end
 
 @inline function BroadcastedArray{T}(arg::Tuple) where {T}
-    return BroadcastedArray{T, 1}(arg)
+    return BroadcastedArray{T, 1, typeof(arg)}(arg)
 end
 
 @inline function BroadcastedArray{T, N}(arg) where {T, N}
@@ -68,7 +67,7 @@ arrayify(arg) = BroadcastedArray(arg)
 #The general philosophy of a BroadcastedArray is that it should use broadcast to answer questions unless it's arg is an abstract Array, then it should fall back to the parent
 #We can go through and add more base Abstract Array stuff later.
 Base.parent(arr::BroadcastedArray) = arr
-WrapperArrays.iswrapper(arr::BroadcastedArray) = false
+WrapperArrays.iswrapper(arr::BroadcastedArray) = arr.arg isa AbstractArray
 
 Base.dataids(arr::BroadcastedArray) = dataids(arr.arg)
 Base.unaliascopy(arr::BroadcastedArray{T, N, Arg}) where {T, N, Arg} = BroadcastedArray{T, N, Arg}(unaliascopy(arr.arg))
@@ -115,8 +114,11 @@ function preprocess(dst, arr)
     end
 end
 function preprocess(dst, arr::BroadcastedArray{T, N}) where {T, N}
+    if arr.arg isa AbstractArray
+        return arr
+    end
     arg = Base.Broadcast.preprocess(dst, arr.arg)
-    x = BroadcastedArray{T, N, typeof(arg)}(arg)
+    return BroadcastedArray{T, N, typeof(arg)}(arg)
 end
 
 @inline Base.Broadcast.BroadcastStyle(::Type{BroadcastedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
