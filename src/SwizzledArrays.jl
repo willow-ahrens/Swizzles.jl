@@ -71,7 +71,7 @@ end
 
 operator(arr::S) where {S <: SwizzledArray} = arr.op
 
-struct Swizzle{mask, Op} <: Swizzles.Intercept
+struct Swizzle{T, mask, Op} <: Swizzles.Intercept
     op::Op
 end
 
@@ -107,12 +107,23 @@ julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
  1 2
 ```
 """
-@inline Swizzle(mask, op::Op) where {Op} = Swizzle{mask, Op}(op)
+@inline Swizzle(mask, op::Op) where {Op} = Swizzle{nothing}(mask, op)
 
-mask(::Type{Swizzle{_mask, Op}}) where {_mask, Op} = _mask
-mask(szr::Szr) where {Szr <: Swizzle} = mask(Szr)
+"""
+    `Swizzle{T}(mask, op=nooperator)`
 
-@inline (szr::Swizzle)(arg) = SwizzledArray(arrayify(arg), Val(mask(szr)), szr.op)
+Similar to [`Swizzle`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Swizzle`](@ref).
+"""
+@inline Swizzle{T}(mask, op::Op) where {T, Op} = Swizzle{T, mask, Op}(op)
+
+mask(::Type{Swizzle{T, _mask, Op}}) where {T, _mask, Op} = _mask
+mask(sz::Sz) where {Sz <: Swizzle} = mask(Sz)
+
+@inline (sz::Swizzle{nothing})(arg) = SwizzledArray(arrayify(arg), Val(mask(sz)), sz.op)
+@inline (sz::Swizzle{T})(arg) where {T} = SwizzledArray{T}(arrayify(arg), Val(mask(sz)), sz.op)
 
 
 
