@@ -489,46 +489,22 @@ swizzle!(dest, A, mask, op=nooperator) = materialize!(dest, SwizzledArray(arrayi
 #end
 
 """
-    `SwizzleStyle(style, ::Type{<:SwizzledArray})`
+    `childstyle(::Type{<:AbstractArray}, ::BroadcastStyle)`
 
 Broadcast styles are used to determine behavior of objects under broadcasting.
-To customize the broadcasting behavior of a type under swizzling, one can first
-define an appropriate Broadcast style for the the type, then declare how the
-broadcast style should behave under broadcasting after the swizzle by
-overriding the `SwizzleStyle` method.
+To customize the broadcasting behavior of a wrapper array, one can first declare
+how the broadcast style should behave under broadcasting after the wrapper array
+is applied by overriding the `childstyle` method.
 """
-SwizzleStyle
+@inline childstyle(Arr::Type{<:AbstractArray}, ::Any) = BroadcastStyle(Arr)
 
-function SwizzleStyle(::S, ::Type{A}) where {N, S <: AbstractArrayStyle{N}, A <:SwizzledArray} #TODO orthogonalize
-    if @generated
-        return :(return S(Val($(max(0, maximum(take(mask(A), N)))))))
-    else
-        return S(Val(max(0, maximum(take(mask(A), N)))))
-    end
-end
-SwizzleStyle(::BroadcastStyle, arr) = DefaultArrayStyle{ndims(arr)}()
-SwizzleStyle(::ArrayConflict, arr) = ArrayConflict()
+@inline childstyle(Arr::Type{<:SwizzledArray}, ::DefaultArrayStyle) = DefaultArrayStyle{ndims(Arr)}()
+@inline childstyle(Arr::Type{<:SwizzledArray}, ::BroadcastStyle) = DefaultArrayStyle{ndims(Arr)}()
+@inline childstyle(::Type{<:SwizzledArray}, ::ArrayConflict) = ArrayConflict()
+@inline childstyle(Arr::Type{<:SwizzledArray}, ::Style{Tuple}) = mask(Arr) == (1,) ? Style{Tuple}() : DefaultArrayStyle{ndims(Arr)}()
 
-@inline function Broadcast.BroadcastStyle(::Type{A}) where {T, N, Arg, A <: SwizzledArray{T, N, Arg}}
-    if @generated
-        if mask(A) == ((1:ndims(Arg))...,)
-            return quote
-                Base.@_inline_meta()
-                return BroadcastStyle(Arg)
-            end
-        else
-            return quote
-                Base.@_inline_meta()
-                return (SwizzleStyle(BroadcastStyle(Arg), A))
-            end
-        end
-    else
-        if mask(A) == ((1:ndims(Arg))...,)
-            return BroadcastStyle(Arg)
-        else
-            return (SwizzleStyle(BroadcastStyle(Arg), A))
-        end
-    end
+@inline function Broadcast.BroadcastStyle(::Type{Arr}) where {Arg, Arr <: SwizzledArray{<:Any, <:Any, Arg}}
+    childstyle(Arr, BroadcastStyle(Arg))
 end
 
 #=
