@@ -31,7 +31,7 @@ end
 
 @inline function SwizzledArray(arg, mask, op)
     arr = SwizzledArray{Any}(arg, mask, op)
-    return SwizzledArray{Properties.eltype_bound(arg)}(arr)
+    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
 end
 
 @inline SwizzledArray{T}(arg, mask, op) where {T} = SwizzledArray{T}(arg, Val(mask), op)

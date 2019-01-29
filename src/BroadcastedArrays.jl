@@ -43,12 +43,13 @@ end
 @inline BroadcastedArray{T, N, Arg}(arr::BroadcastedArray{S, N, Arg}) where {T, S, N, Arg} = BroadcastedArray{T, N, Arg}(arr.arg)
 
 @inline function Properties.eltype_bound(arr::BroadcastedArray)
-    T = Properties.eltype_bound(arr.arg)
-    if T <: eltype(arr)
-        return T
-    else
-        return eltype(arr)
+    if arr.arg isa AbstractArray
+        T = Properties.eltype_bound(arr.arg)
+        if T <: eltype(arr)
+            return eltype(arr.arg)
+        end
     end
+    return eltype(arr)
 end
 
 @inline function Properties.eltype_bound(arr::BroadcastedArray{<:Any, <:Any, <:Broadcasted})
