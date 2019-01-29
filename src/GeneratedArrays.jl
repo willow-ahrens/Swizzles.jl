@@ -32,12 +32,11 @@ Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
 
-totallynotidentity(x) = x
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        copyto!(reshape(dst, axes(src)), instantiate(broadcasted(totallynotidentity, src)))
+        copyto!(reshape(dst, axes(src)), instantiate(broadcasted(identity, src)))
     else
-        copyto!(dst, instantiate(broadcasted(totallynotidentity, src)))
+        copyto!(dst, instantiate(broadcasted(identity, src)))
     end
 end
 

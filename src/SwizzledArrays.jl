@@ -233,44 +233,46 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
     end
 end
 
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::SwizzledArray)
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
     #This method gets called when the destination eltype is unsuitable for
     #accumulating the swizzle. Therefore, we should allocate a suitable
     #destination and then accumulate.
-    copyto!(dst, copyto!(similar(src), src))
+    arr = src.args[1]
+    copyto!(dst, copyto!(similar(arr), arr))
 end
 
-@generated function Base.copyto!(dst::AbstractArray{T, N}, src::SwizzledArray{<:T, N}) where {T, N}
+@generated function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     quote
         Base.@_propagate_inbounds_meta
-        arg = src.arg
-        if mask(src) isa Tuple{Vararg{Int}}
-            arg = BroadcastedArrays.preprocess(dst, src.arg)
+        arr = src.args[1]
+        arg = arr.arg
+        if mask(arr) isa Tuple{Vararg{Int}}
+            arg = BroadcastedArrays.preprocess(dst, arr.arg)
             for i in eachindex(arg)
-                i′ = childindex(dst, src, i)
+                i′ = childindex(dst, arr, i)
                 @inbounds dst[i′...] = arg[i]
             end
-        elseif Properties.initial(src.op, eltype(src), eltype(arg)) != nothing
-            dst .= something(Properties.initial(src.op, eltype(src), eltype(src.arg)))
-            dst .= (src.op).(dst, src)
+        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) != nothing
+            dst .= something(Properties.initial(arr.op, eltype(arr), eltype(arr.arg)))
+            dst .= (arr.op).(dst, arr)
         else
-            arg = BroadcastedArrays.preprocess(dst, src.arg)
+            arg = BroadcastedArrays.preprocess(dst, arr.arg)
             arg_axes = axes(arg)
-            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((src))))...),)
-            arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(src)))...),)
+            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
+            arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(Arr)))...),)
             arg_keeps = keeps(arg)
             $(begin
-                i′ = [Symbol("i′_$d") for d = 1:length(mask(src))]
-                i = imasktuple(d->:(firstindex(dst, $d)), d->i′[d], mask(src))
+                i′ = [Symbol("i′_$d") for d = 1:length(mask(Arr))]
+                i = imasktuple(d->:(firstindex(dst, $d)), d->i′[d], mask(Arr))
                 thunk = Expr(:block)
-                for n = vcat(0, findall(d -> d isa Drop, mask(src)))
+                for n = vcat(0, findall(d -> d isa Drop, mask(Arr)))
                     if n > 0
-                        nest = :(dst[$(i...)] = src.op(dst[$(i...)], @inbounds getindex(arg, $(i′...))))
+                        nest = :(dst[$(i...)] = arr.op(dst[$(i...)], @inbounds getindex(arg, $(i′...))))
                     else
                         nest = :(dst[$(i...)] = @inbounds getindex(arg, $(i′...)))
                     end
-                    for d = 1:length(mask(src))
-                        if mask(src)[d] isa Drop
+                    for d = 1:length(mask(Arr))
+                        if mask(Arr)[d] isa Drop
                             if d == n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
                             elseif d < n
