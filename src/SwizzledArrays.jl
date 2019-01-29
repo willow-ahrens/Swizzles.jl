@@ -49,8 +49,8 @@ end
     end
 end
 
-mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
-mask(::SwizzledArray{T, N, Arg, _mask, Op}) where {T, N, Arg, _mask, Op} = _mask
+@inline mask(::Type{SwizzledArray{T, N, Arg, _mask, Op}}) where {T, N, Arg, _mask, Op} = _mask
+@inline mask(::SwizzledArray{T, N, Arg, _mask, Op}) where {T, N, Arg, _mask, Op} = _mask
 
 @inline function Properties.eltype_bound(arr::SwizzledArray)
     T = Properties.eltype_bound(arr.arg)
@@ -143,27 +143,11 @@ Base.unaliascopy(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask
 Base.unalias(dest, arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(unalias(dest, arr.arg), unalias(dest, arr.op))
 
 @inline function Base.size(arr::SwizzledArray)
-    if @generated
-        args = setindexinto(ntuple(d->:(1), ndims(arr)), ntuple(d->:(arg_size[$d]), length(mask(arr))), mask(arr))
-        return quote
-            arg_size = size(arr.arg)
-            return ($(args...),)
-        end
-    else
-        setindexinto(ntuple(d->1, ndims(arr)), size(arr.arg), mask(arr))
-    end
+    imasktuple(d->1, d->size(arr.arg, d), Val(mask(arr)))
 end
 
 @inline function Base.axes(arr::SwizzledArray)
-    if @generated
-        args = setindexinto(ntuple(d->:(Base.OneTo(1)), ndims(arr)), ntuple(d->:(arg_axes[$d]), length(mask(arr))), mask(arr))
-        return quote
-            arg_axes = axes(arr.arg)
-            return ($(args...),)
-        end
-    else
-        setindexinto(ntuple(d->Base.OneTo(1), ndims(arr)), axes(arr.arg), mask(arr))
-    end
+    imasktuple(d->Base.OneTo(1), d->axes(arr.arg, d), Val(mask(arr)))
 end
 
 #=
@@ -263,7 +247,6 @@ end
         if mask(src) isa Tuple{Vararg{Int}}
             arg = BroadcastedArrays.preprocess(dst, src.arg)
             for i in eachindex(arg)
-                #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(src))
                 i′ = childindex(dst, src, i)
                 @inbounds dst[i′...] = arg[i]
             end
@@ -278,7 +261,7 @@ end
             arg_keeps = keeps(arg)
             $(begin
                 i′ = [Symbol("i′_$d") for d = 1:length(mask(src))]
-                i = setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], i′, mask(src))
+                i = imasktuple(d->:(firstindex(dst, $d)), d->i′[d], mask(src))
                 thunk = Expr(:block)
                 for n = vcat(0, findall(d -> d isa Drop, mask(src)))
                     if n > 0
@@ -316,7 +299,6 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     arr = src.args[2]
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
     for i in eachindex(arg)
-        #i′ = setindexinto(map(firstindex, axes(dst)), Tuple(CartesianIndices(arg)[i]), mask(arr))
         i′ = childindex(dst, arr, i)
         @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
     end
@@ -340,13 +322,7 @@ end
 end
 
 @inline function parentindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
-    if @generated
-        quote
-            return ($(getindexinto([:(Base.Slice(axes(arr.arg, $d))) for d in 1:ndims(Arg)], [:(i[$d]) for d in 1:ndims(arr)], mask(arr))...),)
-        end
-    else
-        return getindexinto(map(Base.Slice, axes(arr.arg)), i, mask(arr))
-    end
+    masktuple(d->Base.Slice(axes(arr.arg, d)), d->i[d], Val(mask(arr)))
 end
 
 
@@ -369,13 +345,7 @@ end
 end
 
 @inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    if @generated
-        quote
-            return ($(setindexinto([:(firstindex(dst, $d)) for d in 1:ndims(dst)], [:(i[$d]) for d in 1:length(mask(arr))], mask(arr))...),)
-        end
-    else
-        return setindexinto(map(firstindex, axes(dst)), i, mask(arr))
-    end
+    imasktuple(d->firstindex(axes(dst, d)), d->i[d], Val(mask(arr)))
 end
 
 """
@@ -532,19 +502,13 @@ end
 =#
 
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
-    if @generated
-        args = setindexinto(ntuple(d->:(false), ndims(arr)), ntuple(d->:(arg_keeps[$d]), length(mask(arr))), mask(arr))
-        return quote
-            arg_keeps = keeps(arr.arg)
-            return ($(args...),)
-        end
-    else
-        setindexinto(ntuple(d->false, ndims(arr)), keeps(arr.arg), mask(arr))
-    end
+    arg_keeps = keeps(arr.arg)
+    imasktuple(d->false, d->arg_keeps[d], Val(mask(arr)))
 end
 
 function Swizzles.ExtrudedArrays.keeps(::Type{Arr}) where {Arg, Arr <: SwizzledArray{<:Any, <:Any, <:Arg}}
-    setindexinto(ntuple(d->false, ndims(Arr)), keeps(Arg), mask(Arr))
+    arg_keeps = keeps(Arg)
+    imasktuple(d->false, d->arg_keeps[d], Val(mask(Arr)))
 end
 
 function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Arg, mask, Op}) where {T, N, Arg, mask, Op}

@@ -1,7 +1,7 @@
 module Swizzles
 
 export Drop, drop
-export getindexinto, setindexinto #maybe dont export...
+export masktuple, imasktuple #maybe dont export...
 export BroadcastedArray, arrayify
 export SwizzledArray, mask
 export swizzle, swizzle!
@@ -195,7 +195,7 @@ function Min(dims::Int...)
 end
 
 function SwizzleTo(imask, op)
-    Swizzle(setindexinto(ntuple(d->drop, maximum((0, imask...))), 1:length(imask), imask), op)
+    Swizzle(imasktuple(d->drop, identity, imask), op)
 end
 
 function BeamTo(dims::Union{Int, Drop}...)
