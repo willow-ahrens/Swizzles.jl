@@ -218,4 +218,99 @@ function MinTo(dims::Union{Int, Drop}...)
     SwizzleTo(dims, min)
 end
 
+"""
+    `swizzle(A, mask, op=nooperator)`
+
+Create a new object `B` such that the dimension `i` of `A` is mapped to
+dimension `mask[i]` of `B`. If `mask[i]` is an instance of the singleton type
+`Drop`, the dimension is reduced over using `op`. `mask` may be any (possibly
+infinite) iterable over elements of type `Int` and `Drop`. The integers in
+`mask` must be unique, and if `mask` is not long enough, additional `Drop`s are
+added to the end.
+The resulting container type from `materialize(B)` is established by the following rules:
+ - If all elements of `mask` are `Drop`, it returns an unwrapped scalar.
+ - All other combinations of arguments default to returning an `Array`, but
+   custom container types can define their own implementation rules to
+   customize the result when they appear as an argument.
+The swizzle operation is represented with a special lazy `SwizzledArray` type.
+`swizzle` results in `materialize(SwizzledArray(...))`.  The swizzle operation can use the
+`Swizzle` type to take advantage of special broadcast syntax. A statement like:
+```
+   y = Swizzle((1,), +).(x .* (Swizzle((2, 1)).x .+ 1))
+```
+will result in code that is essentially:
+```
+   y = materialize(SwizzledArray(BroadcastedArray(Broadcasted(*, SwizzledArray(x, (2, 1)), Broadcasted(+, x, 1))), (1,), +))
+```
+If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one big operation.
+
+See also: [`swizzle!`](@ref), [`Swizzle`](@ref).
+
+# Examples
+```jldoctest
+julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
+5×2 Array{Int64,2}:
+ 1   2
+ 3   4
+ 5   6
+ 7   8
+ 9  10
+julia> swizzle(A, (1,), +)
+5×1 Array{Int64,2}:
+ 3
+ 7
+ 11
+ 15
+ 19
+julia> swizzle(A, (), +)
+55
+julia> swizzle(parse.(Int, ["1", "2"]), (2,))
+1x2-element Array{Int64,1}:
+ 1 2
+```
+"""
+swizzle(A, mask, op=nooperator) = Swizzle(mask, op).(A)
+
+"""
+    `swizzle!(dest, A, mask, op=nooperator)`
+
+Like [`swizzle`](@ref), but store the result of `swizzle(A, mask, op)` in the
+`dest` type.  Results in `materialize!(dest, SwizzledArray(...))`.
+
+See also: [`swizzle`](@ref), [`Swizzle`](@ref).
+
+# Examples
+```jldoctest
+julia> B = [1; 2; 3; 4; 5]
+5x1-element Array{Int64,1}:
+ 1
+ 2
+ 3
+ 4
+ 5
+julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
+5×2 Array{Int64,2}:
+ 1   2
+ 3   4
+ 5   6
+ 7   8
+ 9  10
+julia> swizzle!(B, A, (1,), +)
+5×1 Array{Int64,2}:
+ 3
+ 7
+ 11
+ 15
+ 19
+julia> B
+5×1 Array{Int64,2}:
+ 3
+ 7
+ 11
+ 15
+ 19
+```
+"""
+swizzle!(dest, A, mask, op=nooperator) = dest .= Swizzle(mask, op).(A)
+
 end
