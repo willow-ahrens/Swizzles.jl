@@ -19,6 +19,59 @@ include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
 
+struct Swizzle{T, mask, Op} <: Swizzles.Intercept
+    op::Op
+end
+
+"""
+    `Swizzle(mask, op=nooperator)`
+
+Produce an object `s` such that when `s` is broadcasted as a function over an
+argument `arg`, the result is a lazy view of the result of `swizzle(arg, mask,
+op)`.
+
+See also: [`swizzle`](@ref).
+
+# Examples
+```jldoctest
+julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
+5×2 Array{Int64,2}:
+ 1   2
+ 3   4
+ 5   6
+ 7   8
+ 9  10
+julia> Swizzle((1,), +).(A)
+5×1 Array{Int64,2}:
+ 3
+ 7
+ 11
+ 15
+ 19
+julia> Swizzle((), +).(A)
+55
+julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
+1x2-element Array{Int64,1}:
+ 1 2
+```
+"""
+@inline Swizzle(mask, op::Op) where {Op} = Swizzle{nothing}(mask, op)
+
+"""
+    `Swizzle{T}(mask, op=nooperator)`
+
+Similar to [`Swizzle`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Swizzle`](@ref).
+"""
+@inline Swizzle{T}(mask, op::Op) where {T, Op} = Swizzle{T, mask, Op}(op)
+
+mask(::Type{Swizzle{T, _mask, Op}}) where {T, _mask, Op} = _mask
+mask(::Swizzle{T, _mask, Op}) where {T, _mask, Op} = _mask
+
+@inline (sz::Swizzle{nothing})(arg) = SwizzledArray(arrayify(arg), Val(mask(sz)), sz.op)
+@inline (sz::Swizzle{T})(arg) where {T} = SwizzledArray{T}(arrayify(arg), Val(mask(sz)), sz.op)
 
 """
     `Beam(mask...)`
