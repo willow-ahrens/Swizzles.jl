@@ -30,22 +30,20 @@ end
 @inline SwizzledArray{T, N, Arg, mask, Op}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
 @inline function SwizzledArray(arg, mask, op)
+    return SwizzledArray(arg, Val(mask), op)
+end
+@inline function SwizzledArray(arg, mask::Val, op)
     arr = SwizzledArray{Any}(arg, mask, op)
     return SwizzledArray{Properties.eltype_bound(arr)}(arr)
 end
-
-@inline SwizzledArray{T}(arg, mask, op) where {T} = SwizzledArray{T}(arg, Val(mask), op)
+@inline function SwizzledArray{T}(arg, mask, op) where {T}
+    return SwizzledArray{T}(arg, Val(mask), op)
+end
 @inline function SwizzledArray{T}(arg, ::Val{mask}, op) where {T, mask}
     if @generated
-        mask! = (take(flatten((mask, repeated(drop))), ndims(arg))...,)
-        M = maximum((0, mask!...))
-        #return :(return SwizzledArray{T, $M, typeof(arg), $mask!, Core.Typeof(op)}(arg, op))
-        return :(return SwizzledArray{T, $M, typeof(arg), $mask!, typeof(op)}(arg, op))
+        return :(return SwizzledArray{T, $(max(0, mask...)), typeof(arg), mask, typeof(op)}(arg, op))
     else
-        mask! = (take(flatten((mask, repeated(drop))), ndims(arg))...,)
-        M = maximum((0, mask!...))
-        #return SwizzledArray{T, M, typeof(arg), mask!, Core.Typeof(op)}(arg, op)
-        return SwizzledArray{T, M, typeof(arg), mask!, typeof(op)}(arg, op)
+        return SwizzledArray{T, max(0, mask...), typeof(arg), mask, typeof(op)}(arg, op)
     end
 end
 

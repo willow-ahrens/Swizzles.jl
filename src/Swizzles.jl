@@ -19,7 +19,9 @@ include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
 
-struct Swizzle{T, mask, Op} <: Swizzles.Intercept
+
+
+struct Swizzle{T, _mask, Op} <: Swizzles.Intercept
     op::Op
 end
 
@@ -55,7 +57,7 @@ julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
  1 2
 ```
 """
-@inline Swizzle(mask, op::Op) where {Op} = Swizzle{nothing}(mask, op)
+@inline Swizzle(_mask, op::Op) where {Op} = Swizzle{nothing}(_mask, op)
 
 """
     `Swizzle{T}(mask, op=nooperator)`
@@ -65,13 +67,32 @@ declared to be `T`.
 
 See also: [`Swizzle`](@ref).
 """
-@inline Swizzle{T}(mask, op::Op) where {T, Op} = Swizzle{T, mask, Op}(op)
+@inline Swizzle{T}(_mask, op::Op) where {T, Op} = Swizzle{T, _mask, Op}(op)
 
-mask(::Type{Swizzle{T, _mask, Op}}) where {T, _mask, Op} = _mask
-mask(::Swizzle{T, _mask, Op}) where {T, _mask, Op} = _mask
+@inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
+@inline function _Swizzle_parse_mask(_mask::NTuple{M, Union{Int, Drop}}, ::Val{N}) where {M, N}
+    return ntuple(d -> d <= M ? _mask[d] : drop, Val(N))
+end
+@inline function(sz::Swizzle{nothing, _mask})(arg::AbstractArray{<:Any, N}) where {_mask, N}
+    if @generated
+        mask = _Swizzle_parse_mask(_mask, Val(N))
+        return :(return SwizzledArray(arg, $(Val(mask)), sz.op))
+    else
+        mask = _Swizzle_parse_mask(_mask, Val(N))
+        return SwizzledArray(arg, mask, sz.op)
+    end
+end
+@inline function(sz::Swizzle{T, mask′})(arg::AbstractArray{<:Any, N}) where {T, mask′, N}
+    if @generated
+        mask = _Swizzle_parse_mask(_mask, Val(N))
+        return :(return SwizzledArray{T}(arg, $(Val(mask)), sz.op))
+    else
+        mask = _Swizzle_parse_mask(_mask, Val(N))
+        return SwizzledArray{T}(arg, mask, sz.op)
+    end
+end
 
-@inline (sz::Swizzle{nothing})(arg) = SwizzledArray(arrayify(arg), Val(mask(sz)), sz.op)
-@inline (sz::Swizzle{T})(arg) where {T} = SwizzledArray{T}(arrayify(arg), Val(mask(sz)), sz.op)
+
 
 """
     `Beam(mask...)`
@@ -106,6 +127,12 @@ function Beam(dims::Union{Int, Drop}...)
     Swizzle(dims, nooperator)
 end
 
+
+
+struct Reduce{T, Op, dims} <: Swizzles.Intercept
+    op::Op
+end
+
 """
     `Reduce(op, dims...)`
 
@@ -134,22 +161,45 @@ julia> Reduce(+, 2).(A)
  19
 ```
 """
-Reduce(op, dims::Int...) = _Reduce(op, Val(dims))
-function _Reduce(op, ::Val{dims}) where {dims}
+@inline Reduce(op::Op, dims...) where {Op} = Reduce{nothing, Op, dims}(op)
+
+"""
+    `Reduce{T}(op, dims...)`
+
+Similar to [`Reduce`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Reduce`](@ref).
+"""
+@inline Reduce{T}(op::Op, dims...) where {T, Op} = Reduce{T, Op, dims}(op)
+
+@inline (rd::Reduce)(arg) = rd(BroadcastedArray(arg))
+@inline function _Reduce_parse_mask(dims::Tuple{Vararg{Int}}, ::Val{N}) where {M, N}
+    c = 0
+    return ntuple(d -> d in dims ? drop : c += 1, Val(N))
+end
+@inline function _Reduce_parse_mask(dims::Tuple{}, ::Val{N}) where {M, N}
+    return ntuple(d -> drop, Val(N))
+end
+@inline function(rd::Reduce{nothing, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {dims, N}
     if @generated
-        m = maximum((0, dims...))
-        s = Set(dims)
-        c = 0
-        mask = flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1)))
-        return :(return Swizzle($(mask), op))
+        mask = _Reduce_parse_mask(dims, Val(N))
+        return :(return SwizzledArray(arg, $(Val(mask)), rd.op))
     else
-        m = maximum((0, dims...))
-        s = Set(dims)
-        c = 0
-        return Swizzle(flatten((ntuple(d -> d in s ? drop : c += 1, m), countfrom(m - length(s) + 1))), op)
+        mask = _Reduce_parse_mask(dims, Val(N))
+        return SwizzledArray(arg, mask, rd.op)
     end
 end
-Reduce(op) = Swizzle(repeated(drop), op)
+@inline function(rd::Reduce{T, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {T, dims, N}
+    if @generated
+        mask = _Reduce_parse_mask(dims, Val(N))
+        return :(return SwizzledArray{T}(arg, $(Val(mask)), rd.op))
+    else
+        mask = _Reduce_parse_mask(dims, Val(N))
+        return SwizzledArray{T}(arg, mask, rd.op)
+    end
+end
+
 
 """
     `Sum(dims...)`

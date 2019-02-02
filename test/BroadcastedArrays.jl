@@ -6,4 +6,5 @@ myidentity(x) = x
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
         @test myidentity.(BroadcastedArray(arg)) == myidentity.(arg)
     end
+    @test BroadcastedArray([1 2; 3 4])[3] == 2
 end

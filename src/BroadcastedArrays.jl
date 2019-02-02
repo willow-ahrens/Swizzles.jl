@@ -91,9 +91,15 @@ Base.ndims(::BroadcastedArray{T, N}) where {T, N} = N
 Base.length(arr::BroadcastedArray{T, N, <:AbstractArray}) where {T, N} = length(arr.arg)
 Base.length(arr::BroadcastedArray) = prod(map(length, axes(arr)))
 
-Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int) = _broadcast_getindex(arr.arg, I)
-Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
-Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
+#FIXME define some IndexStyle stuffs
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray{<:Any, <:Any, Broadcasted}, I::Int) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray{<:Any, <:Any, Broadcasted}, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray{<:Any, <:Any, Broadcasted}, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray{<:Any, <:Any, Broadcasted}) = error("FIXME")
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I...) = getindex(arr.arg, I...)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int) = getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::CartesianIndex) = getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray, I::Int...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::BroadcastedArray) = getindex(arr.arg)
 
 @inline myidentity(x) = x

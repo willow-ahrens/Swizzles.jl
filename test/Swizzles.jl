@@ -4,8 +4,8 @@
 
   @test swizzle(A, (1, drop), max) == [3; 6; 9]
   @test swizzle(A, (1, drop), min) == [1; 4; 7]
-  @test swizzle(A, (1), max) == [3; 6; 9]
-  @test swizzle(A, (1), min) == [1; 4; 7]
+  @test swizzle(A, (1,), max) == [3; 6; 9]
+  @test swizzle(A, (1,), min) == [1; 4; 7]
   @test swizzle(A, (drop, 1), max) == [7; 8; 9]
   @test swizzle(A, (drop, 1), min) == [1; 2; 3]
   @test swizzle(A, (2, drop), max) == [3  6  9]
@@ -18,9 +18,9 @@
   R = [0; 0; 0;]
   @test swizzle!(R, A, (1, drop), min) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1), max) == [3; 6; 9]
+  @test swizzle!(R, A, (1,), max) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1), min) == [1; 4; 7]
+  @test swizzle!(R, A, (1,), min) == [1; 4; 7]
   R = [0; 0; 0;]
   @test swizzle!(R, A, (drop, 1), max) == [7; 8; 9]
   R = [0; 0; 0;]
@@ -238,7 +238,7 @@
   @test MinTo(2, 1, 3).(A.+A) == transpose(A.+A)
 
   @test Beam(1).((1, 2)) isa Tuple
-  @test Swizzle(1, +).((1, 2)) isa Tuple
+  @test Swizzle((1,), +).((1, 2)) isa Tuple
   @test Sum(1).((1.0, 2)) isa Float64
 
   A = rand(1,1)
