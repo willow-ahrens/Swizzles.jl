@@ -70,28 +70,13 @@ See also: [`Swizzle`](@ref).
 @inline Swizzle{T}(_mask, op::Op) where {T, Op} = Swizzle{T, _mask, Op}(op)
 
 @inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
-@inline function parse_swizzle_mask(_mask::NTuple{M, Union{Int, Drop}}, ::Val{N}) where {M, N}
-    return ntuple(d -> d <= M ? _mask[d] : drop, Val(N))
-end
+
 @inline function(sz::Swizzle{nothing, _mask})(arg::AbstractArray{<:Any, N}) where {_mask, N}
-    if @generated
-        mask = parse_swizzle_mask(_mask, Val(N))
-        return :(return SwizzledArray(arg, $(Val(mask)), sz.op))
-    else
-        mask = parse_swizzle_mask(_mask, Val(N))
-        return SwizzledArray(arg, mask, sz.op)
-    end
+    return SwizzledArray(arg, Val(_mask), sz.op)
 end
 @inline function(sz::Swizzle{T, _mask})(arg::AbstractArray{<:Any, N}) where {T, _mask, N}
-    if @generated
-        mask = parse_swizzle_mask(_mask, Val(N))
-        return :(return SwizzledArray{T}(arg, $(Val(mask)), sz.op))
-    else
-        mask = parse_swizzle_mask(_mask, Val(N))
-        return SwizzledArray{T}(arg, mask, sz.op)
-    end
+    return SwizzledArray{T}(arg, Val(_mask), sz.op)
 end
-
 
 
 """
@@ -174,28 +159,28 @@ See also: [`Reduce`](@ref).
 @inline Reduce{T}(op::Op, dims...) where {T, Op} = Reduce{T, Op, dims}(op)
 
 @inline (rd::Reduce)(arg) = rd(BroadcastedArray(arg))
-@inline function parse_reduce_mask(dims::Tuple{Vararg{Int}}, ::Val{N}) where {M, N}
+@inline function parse_reduce_mask(arr, dims::Tuple{Vararg{Int}}) where {M, N}
     c = 0
-    return ntuple(d -> d in dims ? drop : c += 1, Val(N))
+    return ntuple(d -> d in dims ? drop : c += 1, Val(ndims(arr)))
 end
-@inline function parse_reduce_mask(dims::Tuple{}, ::Val{N}) where {M, N}
-    return ntuple(d -> drop, Val(N))
+@inline function parse_reduce_mask(arr, dims::Tuple{}) where {M, N}
+    return ntuple(d -> drop, Val(ndims(arr)))
 end
 @inline function(rd::Reduce{nothing, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {dims, N}
     if @generated
-        mask = parse_reduce_mask(dims, Val(N))
+        mask = parse_reduce_mask(arg, dims)
         return :(return SwizzledArray(arg, $(Val(mask)), rd.op))
     else
-        mask = parse_reduce_mask(dims, Val(N))
+        mask = parse_reduce_mask(arg, dims)
         return SwizzledArray(arg, mask, rd.op)
     end
 end
 @inline function(rd::Reduce{T, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {T, dims, N}
     if @generated
-        mask = parse_reduce_mask(dims, Val(N))
+        mask = parse_reduce_mask(arg, dims)
         return :(return SwizzledArray{T}(arg, $(Val(mask)), rd.op))
     else
-        mask = parse_reduce_mask(dims, Val(N))
+        mask = parse_reduce_mask(arg, dims)
         return SwizzledArray{T}(arg, mask, rd.op)
     end
 end
@@ -298,7 +283,7 @@ function Min(dims::Int...)
 end
 
 function SwizzleTo(imask, op)
-    Swizzle(imasktuple(d->drop, identity, imask), op)
+    Swizzle(imasktuple(d->drop, identity, imask), op) #FIXME computation should occur in type domain.
 end
 
 function BeamTo(dims::Union{Int, Drop}...)

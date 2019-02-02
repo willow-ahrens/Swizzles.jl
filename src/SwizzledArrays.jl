@@ -17,6 +17,10 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
+@inline function parse_swizzle_mask(arr, _mask::Tuple{Vararg{Union{Int, Drop}, M}}) where {M}
+    return ntuple(d -> d <= M ? _mask[d] : drop, Val(ndims(arr)))
+end
+
 struct SwizzledArray{T, N, Arg<:AbstractArray, mask, Op} <: GeneratedArray{T, N}
     arg::Arg
     op::Op
@@ -29,20 +33,22 @@ end
 @inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 @inline SwizzledArray{T, N, Arg, mask, Op}(arr::SwizzledArray{S, N, Arg, mask, Op}) where {T, S, N, Arg, mask, Op} = SwizzledArray{T, N, Arg, mask, Op}(arr.arg, arr.op)
 
-@inline function SwizzledArray(arg, mask, op)
-    return SwizzledArray(arg, Val(mask), op)
+@inline function SwizzledArray(arg, _mask, op)
+    return SwizzledArray(arg, Val(_mask), op)
 end
-@inline function SwizzledArray(arg, mask::Val, op)
-    arr = SwizzledArray{Any}(arg, mask, op)
+@inline function SwizzledArray(arg, _mask::Val, op)
+    arr = SwizzledArray{Any}(arg, _mask, op)
     return SwizzledArray{Properties.eltype_bound(arr)}(arr)
 end
-@inline function SwizzledArray{T}(arg, mask, op) where {T}
-    return SwizzledArray{T}(arg, Val(mask), op)
+@inline function SwizzledArray{T}(arg, _mask, op) where {T}
+    return SwizzledArray{T}(arg, Val(_mask), op)
 end
-@inline function SwizzledArray{T}(arg, ::Val{mask}, op) where {T, mask}
+@inline function SwizzledArray{T}(arg, ::Val{_mask}, op) where {T, _mask}
     if @generated
-        return :(return SwizzledArray{T, $(max(0, mask...)), typeof(arg), mask, typeof(op)}(arg, op))
+        mask = parse_swizzle_mask(arg, _mask)
+        return :(return SwizzledArray{T, $(max(0, mask...)), typeof(arg), $mask, typeof(op)}(arg, op))
     else
+        mask = parse_swizzle_mask(arg, _mask)
         return SwizzledArray{T, max(0, mask...), typeof(arg), mask, typeof(op)}(arg, op)
     end
 end
