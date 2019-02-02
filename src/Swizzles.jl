@@ -82,7 +82,7 @@ end
         return SwizzledArray(arg, mask, sz.op)
     end
 end
-@inline function(sz::Swizzle{T, mask′})(arg::AbstractArray{<:Any, N}) where {T, mask′, N}
+@inline function(sz::Swizzle{T, _mask})(arg::AbstractArray{<:Any, N}) where {T, _mask, N}
     if @generated
         mask = parse_swizzle_mask(_mask, Val(N))
         return :(return SwizzledArray{T}(arg, $(Val(mask)), sz.op))
