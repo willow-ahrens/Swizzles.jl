@@ -79,6 +79,9 @@ end
 end
 
 
+
+struct Beam{T} end
+
 """
     `Beam(mask...)`
 
@@ -108,8 +111,20 @@ julia> Beam(drop, 3).(A)
  5
 ```
 """
-function Beam(dims::Union{Int, Drop}...)
-    Swizzle(dims, nooperator)
+function Beam(_mask::Union{Int, Drop}...)
+    Swizzle(_mask, nooperator)
+end
+
+"""
+    `Beam{T}(mask...)`
+
+Similar to [`Beam`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Beam`](@ref).
+"""
+function Beam{T}(_mask::Union{Int, Drop}...) where {T}
+    Swizzle{T}(_mask, nooperator)
 end
 
 
@@ -186,6 +201,8 @@ end
 end
 
 
+struct Sum{T} end
+
 """
     `Sum(dims...)`
 
@@ -217,6 +234,22 @@ julia> Sum(2).(A)
 function Sum(dims::Int...)
     Reduce(+, dims...)
 end
+
+"""
+    `Sum{T}(dims...)`
+
+Similar to [`Sum`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Sum`](@ref).
+"""
+function Sum{T}(dims::Int...) where {T}
+    Reduce{T}(+, dims...)
+end
+
+
+
+struct Max{T} end
 
 """
     `Max(dims...)`
@@ -251,6 +284,22 @@ function Max(dims::Int...)
 end
 
 """
+    `Max{T}(dims...)`
+
+Similar to [`Max`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Max`](@ref).
+"""
+function Max{T}(dims::Int...) where {T}
+    Reduce{T}(max, dims...)
+end
+
+
+
+struct Min{T} end
+
+"""
     `Min(dims...)`
 
 Produce an object `s` such that when `s` is broadcasted as a function over an
@@ -282,16 +331,26 @@ function Min(dims::Int...)
     Reduce(min, dims...)
 end
 
-function SwizzleTo(imask, op)
-    Swizzle(imasktuple(d->drop, identity, imask), op) #FIXME computation should occur in type domain.
+"""
+    `Min{T}(dims...)`
+
+Similar to [`Min`](@ref), but the eltype of the resulting swizzle is
+declared to be `T`.
+
+See also: [`Min`](@ref).
+"""
+function Min{T}(dims::Int...) where {T}
+    Reduce{T}(min, dims...)
+end
+
+
+
+function SwizzleTo(_imask, op)
+    Swizzle(imasktuple(d->drop, identity, _imask), op) #FIXME computation should occur in type domain.
 end
 
 function BeamTo(dims::Union{Int, Drop}...)
     SwizzleTo(dims, nooperator)
-end
-
-function ReduceTo(op, dims::Union{Int, Drop}...)
-    SwizzleTo(dims, op)
 end
 
 function SumTo(dims::Union{Int, Drop}...)
