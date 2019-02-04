@@ -10,7 +10,6 @@ export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Delay, Intercept
 
 
-export nooperator
 
 include("util.jl")
 include("properties.jl")
@@ -42,12 +41,8 @@ end
 
 struct Beam{T} end
 
-@inline function Beam(_mask...)
-    Swizzle(nooperator, _mask...)
-end
-@inline function Beam{T}(_mask...) where {T}
-    Swizzle{T}(nooperator, _mask...)
-end
+@inline Beam(_mask...) = Beam{nothing}(_mask...)
+@inline Beam{T}(_mask...) where {T} = Swizzle{T}(nooperator, _mask...)
 
 
 
@@ -74,12 +69,8 @@ end
 
 struct BeamTo{T} end
 
-@inline function BeamTo(_imask...)
-    Swizzle(nooperator, _imask...)
-end
-@inline function BeamTo{T}(_imask...) where {T}
-    Swizzle{T}(nooperator, _imask...)
-end
+@inline BeamTo(_imask...) = BeamTo{nothing}(_imask...)
+@inline BeamTo{T}(_imask...) where {T} = Swizzle{T}(nooperator, _imask...)
 
 
 
@@ -114,35 +105,21 @@ end
 
 struct Sum{T} end
 
-@inline function Sum(dims...)
-    Reduce(+, dims...)
-end
-
-@inline function Sum{T}(dims...) where {T}
-    Reduce{T}(+, dims...)
-end
+@inline Sum(dims...) = Sum{nothing}(dims...)
+@inline Sum{T}(dims...) where {T} = Reduce{T}(+, dims...)
 
 
 
 struct Max{T} end
-@inline function Max(dims...)
-    Reduce(max, dims...)
-end
 
-@inline function Max{T}(dims...) where {T}
-    Reduce{T}(max, dims...)
-end
+@inline Max(dims...) = Max{nothing}(dims...)
+@inline Max{T}(dims...) where {T} = Reduce{T}(max, dims...)
 
 
 
 struct Min{T} end
 
-@inline function Min(dims...)
-    Reduce(min, dims...)
-end
-
-@inline function Min{T}(dims...) where {T}
-    Reduce{T}(min, dims...)
-end
+@inline Min(dims...) = Min{nothing}(dims...)
+@inline Min{T}(dims...) where {T} = Reduce{T}(min, dims...)
 
 end
