@@ -30,17 +30,20 @@ struct SwizzledArray{T, N, Arg<:AbstractArray, Op, mask} <: GeneratedArray{T, N}
     end
 end
 
-@inline SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, Op, mask}) where {T, S, N, Arg, Op, mask} = SwizzledArray{T, N, Arg, Op, mask}(arr.arg, arr.op)
-@inline SwizzledArray{T, N, Arg, Op, mask}(arr::SwizzledArray{S, N, Arg, Op, mask}) where {T, S, N, Arg, Op, mask} = SwizzledArray{T, N, Arg, Op, mask}(arr.arg, arr.op)
+@inline function SwizzledArray{T}(arr::SwizzledArray{S, N, Arg, Op, mask}) where {T, S, N, Arg, Op, mask}
+    return SwizzledArray{T, N, Arg, Op, mask}(arr.arg, arr.op)
+end
+@inline function SwizzledArray{T, N, Arg, Op, mask}(arr::SwizzledArray{S, N, Arg, Op, mask}) where {T, S, N, Arg, Op, mask}
+    return SwizzledArray{T, N, Arg, Op, mask}(arr.arg, arr.op)
+end
 
-@inline function SwizzledArray(arg, op, _mask)
-    return SwizzledArray(arg, op, Val(_mask))
+@inline function SwizzledArray(arg, op, _mask...)
+    return SwizzledArray{nothing}(arg, op, _mask...)
 end
-@inline function SwizzledArray(arg, op, _mask::Val)
-    arr = SwizzledArray{Any}(arg, op, _mask)
-    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
+@inline function SwizzledArray{T}(arg, op, _mask...) where {T}
+    return SwizzledArray{T}(arg, op, Val(_mask))
 end
-@inline function SwizzledArray{T}(arg, op, _mask) where {T}
+@inline function SwizzledArray{T}(arg, op, _mask::Tuple) where {T}
     return SwizzledArray{T}(arg, op, Val(_mask))
 end
 @inline function SwizzledArray{T}(arg, op, ::Val{_mask}) where {T, _mask}
@@ -52,6 +55,12 @@ end
         return SwizzledArray{T, max(0, mask...), typeof(arg), typeof(op), mask}(arg, op)
     end
 end
+@inline function SwizzledArray{nothing, N, Arg, Op, mask}(arg::Arg, op::Op) where {N, Arg, Op, mask}
+    arr = SwizzledArray{Any, N, Arg, Op, mask}(arg, op)
+    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
+end
+
+
 
 @inline mask(::Type{SwizzledArray{T, N, Arg, Op, _mask}}) where {T, N, Arg, Op, _mask} = _mask
 @inline mask(::SwizzledArray{T, N, Arg, Op, _mask}) where {T, N, Arg, Op, _mask} = _mask
