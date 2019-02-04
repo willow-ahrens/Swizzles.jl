@@ -223,4 +223,7 @@
 
   @test Beam(3).(z) == 13
 
+  A = [1 2 3 4 5]
+  BeamTo(drop, drop, 2).(A) == Beam(drop, 3).(A)
+
 end
