@@ -386,7 +386,7 @@ reduction results) is declared to be `T`.
 
 See also: [`Min`](@ref).
 """
-    @inline Min{T}(dims...) where {T} = Reduce{T}(max, dims...)
+    @inline Min{T}(dims...) where {T} = Reduce{T}(min, dims...)
 end
 
 """
