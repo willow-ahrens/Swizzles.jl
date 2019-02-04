@@ -34,7 +34,7 @@ end
 @inline Swizzle{T}(op::Op, ::Val{_mask}) where {T, Op, _mask} = Swizzle{T, Op, _mask}(op)
 
 @inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
-@inline function(sz::Swizzle{T, Op, _mask})(arg::AbstractArray{<:Any, N}) where {T, Op, _mask, N}
+@inline function(sz::Swizzle{T, Op, _mask})(arg::AbstractArray) where {T, Op, _mask}
     return SwizzledArray{T}(arg, sz.op, Val(_mask))
 end
 
@@ -42,49 +42,43 @@ end
 
 struct Beam{T} end
 
-"""
-    `Beam(mask...)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the dimension `arg[i]` appears as dimension `mask[i]` in the
-output. If dimension `i` is known to have size `1`, it may be dropped by setting
-`mask[i] = drop`.
-
-See also: [`Swizzle`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2 3 4 5]
-1×5 Array{Int64,2}:
- 1  2  3  4  5
-julia> Beam(drop, 3).(A)
-1×1×5 Array{Int64,3}:
-[:, :, 1] =
- 1
-[:, :, 2] =
- 2
-[:, :, 3] =
- 3
-[:, :, 4] =
- 4
-[:, :, 5] =
- 5
-```
-"""
 @inline function Beam(_mask...)
     Swizzle(nooperator, _mask...)
 end
-
-"""
-    `Beam{T}(mask...)`
-
-Similar to [`Beam`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Beam`](@ref).
-"""
 @inline function Beam{T}(_mask...) where {T}
     Swizzle{T}(nooperator, _mask...)
+end
+
+
+
+struct SwizzleTo{T, Op, _imask} <: Swizzles.Intercept
+    op::Op
+end
+
+@inline SwizzleTo(op, _imask...) = SwizzleTo{nothing}(op, _imask...)
+@inline SwizzleTo{T}(op::Op, _imask...) where {T, Op} = SwizzleTo{T, Op, _imask}(op)
+@inline SwizzleTo{T}(op::Op, _imask::Tuple) where {T, Op} = SwizzleTo{T, Op, _imask}(op)
+@inline SwizzleTo{T}(op::Op, ::Val{_imask}) where {T, Op, _imask} = SwizzleTo{T, Op, _imask}(op)
+
+@inline (sz::SwizzleTo)(arg) = sz(BroadcastedArray(arg))
+@inline function(sz::SwizzleTo{T, Op, _imask})(arg::Arg) where {T, Op, _imask, Arg <: AbstractArray}
+    if @generated
+        mask = parse_swizzle_mask(arg, imasktuple(d->drop, identity, _imask))
+        return :(return SwizzledArray{T}(arg, sz.op, $(Val(mask))))
+    else
+        return SwizzledArray{T}(arg, sz.op, imasktuple(d->drop, identity, _imask))
+    end
+end
+
+
+
+struct BeamTo{T} end
+
+@inline function BeamTo(_imask...)
+    Swizzle(nooperator, _imask...)
+end
+@inline function BeamTo{T}(_imask...) where {T}
+    Swizzle{T}(nooperator, _imask...)
 end
 
 
@@ -301,30 +295,6 @@ See also: [`Min`](@ref).
 """
 function Min{T}(dims::Int...) where {T}
     Reduce{T}(min, dims...)
-end
-
-
-
-function SwizzleTo(op, _imask)
-    Swizzle(op, imasktuple(d->drop, identity, _imask)) #FIXME computation should occur in type domain.
-end
-
-ReduceTo(op, dims...) = SwizzleTo(op, dims)
-
-function BeamTo(dims::Union{Int, Drop}...)
-    SwizzleTo(nooperator, dims)
-end
-
-function SumTo(dims::Union{Int, Drop}...)
-    SwizzleTo(+, dims)
-end
-
-function MaxTo(dims::Union{Int, Drop}...)
-    SwizzleTo(max, dims)
-end
-
-function MinTo(dims::Union{Int, Drop}...)
-    SwizzleTo(min, dims)
 end
 
 """

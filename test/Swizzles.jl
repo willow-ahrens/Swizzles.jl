@@ -173,33 +173,12 @@
   @test BeamTo(2,1).(A.+A) == transpose(A.+A)
   @test BeamTo(2,1,3).(A.+A) == transpose(A.+A)
 
-  @test ReduceTo(+).(A) == 45
-  @test ReduceTo(+, 1).(A) == [6; 15; 24]
-  @test ReduceTo(+, 2).(A) == [12; 15; 18]
-  @test ReduceTo(+, 1, 2).(A) == A
-  @test ReduceTo(+, 2, 1).(A) == transpose(A)
-  @test ReduceTo(+, 2, 1, 3).(A) == transpose(A)
-
-  @test SumTo().(A) == 45
-  @test SumTo(1).(A) == [6; 15; 24]
-  @test SumTo(2).(A) == [12; 15; 18]
-  @test SumTo(1, 2).(A) == A
-  @test SumTo(2, 1).(A) == transpose(A)
-  @test SumTo(2, 1, 3).(A) == transpose(A)
-
-  @test MaxTo().(A) == 9
-  @test MaxTo(1).(A) == [3; 6; 9]
-  @test MaxTo(2).(A) == [7; 8; 9]
-  @test MaxTo(1, 2).(A) == A
-  @test MaxTo(2, 1).(A) == transpose(A)
-  @test MaxTo(2, 1, 3).(A) == transpose(A)
-
-  @test MinTo().(A) == 1
-  @test MinTo(1).(A) == [1; 4; 7]
-  @test MinTo(2).(A) == [1; 2; 3]
-  @test MinTo(1, 2).(A) == A
-  @test MinTo(2, 1).(A) == transpose(A)
-  @test MinTo(2, 1, 3).(A) == transpose(A)
+  @test SwizzleTo(+).(A) == 45
+  @test SwizzleTo(+, 1).(A) == [6; 15; 24]
+  @test SwizzleTo(+, 2).(A) == [12; 15; 18]
+  @test SwizzleTo(+, 1, 2).(A) == A
+  @test SwizzleTo(+, 2, 1).(A) == transpose(A)
+  @test SwizzleTo(+, 2, 1, 3).(A) == transpose(A)
 
   @test SwizzleTo(+, ()).(A.+A) == 90
   @test SwizzleTo(+, (1,)).(A.+A) == [12; 30; 48]
@@ -209,33 +188,12 @@
   @test SwizzleTo(+, (2,1)).(A.+A) == transpose(A.+A)
   @test SwizzleTo(+, (2,1,3)).(A.+A) == transpose(A.+A)
 
-  @test ReduceTo(+).(A.+A) == 90
-  @test ReduceTo(+, 1).(A.+A) == [12; 30; 48]
-  @test ReduceTo(+, 2).(A.+A) == [24; 30; 36]
-  @test ReduceTo(+, 1, 2).(A.+A) == A.+A
-  @test ReduceTo(+, 2, 1).(A.+A) == transpose(A.+A)
-  @test ReduceTo(+, 2, 1, 3).(A.+A) == transpose(A.+A)
-
-  @test SumTo().(A.+A) == 90
-  @test SumTo(1).(A.+A) == [12; 30; 48]
-  @test SumTo(2).(A.+A) == [24; 30; 36]
-  @test SumTo(1, 2).(A.+A) == A.+A
-  @test SumTo(2, 1).(A.+A) == transpose(A.+A)
-  @test SumTo(2, 1, 3).(A.+A) == transpose(A.+A)
-
-  @test MaxTo().(A.+A) == 18
-  @test MaxTo(1).(A.+A) == [6; 12; 18]
-  @test MaxTo(2).(A.+A) == [14; 16; 18]
-  @test MaxTo(1, 2).(A.+A) == A.+A
-  @test MaxTo(2, 1).(A.+A) == transpose(A.+A)
-  @test MaxTo(2, 1, 3).(A.+A) == transpose(A.+A)
-
-  @test MinTo().(A.+A) == 2
-  @test MinTo(1).(A.+A) == [2; 8; 14]
-  @test MinTo(2).(A.+A) == [2; 4; 6]
-  @test MinTo(1, 2).(A.+A) == A.+A
-  @test MinTo(2, 1).(A.+A) == transpose(A.+A)
-  @test MinTo(2, 1, 3).(A.+A) == transpose(A.+A)
+  @test SwizzleTo(+).(A.+A) == 90
+  @test SwizzleTo(+, 1).(A.+A) == [12; 30; 48]
+  @test SwizzleTo(+, 2).(A.+A) == [24; 30; 36]
+  @test SwizzleTo(+, 1, 2).(A.+A) == A.+A
+  @test SwizzleTo(+, 2, 1).(A.+A) == transpose(A.+A)
+  @test SwizzleTo(+, 2, 1, 3).(A.+A) == transpose(A.+A)
 
   @test Beam(1).((1, 2)) isa Tuple
   @test Swizzle(+, (1,)).((1, 2)) isa Tuple
@@ -244,8 +202,8 @@
   A = rand(1,1)
   B = rand(1,1)
 
-  @test SumTo(1, 3).(A.*Beam(2,3).(B)) isa Matrix
-  @test SumTo().(A.*Beam(2,3).(B)) isa Float64
+  @test Sum(2).(A.*Beam(2,3).(B)) isa Matrix
+  @test Sum().(A.*Beam(2,3).(B)) isa Float64
   @test Sum(2).(A.*Beam(2,3).(B)) == A * B
 
   A = rand(5,7)
