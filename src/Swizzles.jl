@@ -9,6 +9,9 @@ export Swizzle, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Delay, Intercept
 
+
+export nooperator
+
 include("util.jl")
 include("properties.jl")
 
@@ -21,12 +24,12 @@ include("SwizzledArrays.jl")
 
 
 
-struct Swizzle{T, _mask, Op} <: Swizzles.Intercept
+struct Swizzle{T, Op, _mask} <: Swizzles.Intercept
     op::Op
 end
 
 """
-    `Swizzle(mask, op=nooperator)`
+    `Swizzle(op, mask)`
 
 Produce an object `s` such that when `s` is broadcasted as a function over an
 argument `arg`, the result is a lazy view of the result of `swizzle(arg, mask,
@@ -57,7 +60,7 @@ julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
  1 2
 ```
 """
-@inline Swizzle(_mask, op::Op) where {Op} = Swizzle{nothing}(_mask, op)
+@inline Swizzle(op::Op, _mask) where {Op} = Swizzle{nothing}(op, _mask)
 
 """
     `Swizzle{T}(mask, op=nooperator)`
@@ -67,15 +70,15 @@ declared to be `T`.
 
 See also: [`Swizzle`](@ref).
 """
-@inline Swizzle{T}(_mask, op::Op) where {T, Op} = Swizzle{T, _mask, Op}(op)
+@inline Swizzle{T}(op::Op, _mask) where {T, Op} = Swizzle{T, Op, _mask}(op)
 
 @inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
 
-@inline function(sz::Swizzle{nothing, _mask})(arg::AbstractArray{<:Any, N}) where {_mask, N}
-    return SwizzledArray(arg, Val(_mask), sz.op)
+@inline function(sz::Swizzle{nothing, Op, _mask})(arg::AbstractArray{<:Any, N}) where {Op, _mask, N}
+    return SwizzledArray(arg, sz.op, Val(_mask))
 end
-@inline function(sz::Swizzle{T, _mask})(arg::AbstractArray{<:Any, N}) where {T, _mask, N}
-    return SwizzledArray{T}(arg, Val(_mask), sz.op)
+@inline function(sz::Swizzle{T, Op, _mask})(arg::AbstractArray{<:Any, N}) where {T, Op, _mask, N}
+    return SwizzledArray{T}(arg, sz.op, Val(_mask))
 end
 
 
@@ -112,7 +115,7 @@ julia> Beam(drop, 3).(A)
 ```
 """
 function Beam(_mask::Union{Int, Drop}...)
-    Swizzle(_mask, nooperator)
+    Swizzle(nooperator, _mask)
 end
 
 """
@@ -124,7 +127,7 @@ declared to be `T`.
 See also: [`Beam`](@ref).
 """
 function Beam{T}(_mask::Union{Int, Drop}...) where {T}
-    Swizzle{T}(_mask, nooperator)
+    Swizzle{T}(nooperator, _mask)
 end
 
 
@@ -184,7 +187,7 @@ end
 @inline function(rd::Reduce{nothing, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {dims, N}
     if @generated
         mask = parse_reduce_mask(arg, dims)
-        return :(return SwizzledArray(arg, $(Val(mask)), rd.op))
+        return :(return SwizzledArray(arg, rd.op, $(Val(mask))))
     else
         mask = parse_reduce_mask(arg, dims)
         return SwizzledArray(arg, mask, rd.op)
@@ -193,10 +196,10 @@ end
 @inline function(rd::Reduce{T, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {T, dims, N}
     if @generated
         mask = parse_reduce_mask(arg, dims)
-        return :(return SwizzledArray{T}(arg, $(Val(mask)), rd.op))
+        return :(return SwizzledArray{T}(arg, rd.op, $(Val(mask))))
     else
         mask = parse_reduce_mask(arg, dims)
-        return SwizzledArray{T}(arg, mask, rd.op)
+        return SwizzledArray{T}(arg, rd.op, mask)
     end
 end
 
@@ -345,24 +348,26 @@ end
 
 
 
-function SwizzleTo(_imask, op)
-    Swizzle(imasktuple(d->drop, identity, _imask), op) #FIXME computation should occur in type domain.
+function SwizzleTo(op, _imask)
+    Swizzle(op, imasktuple(d->drop, identity, _imask)) #FIXME computation should occur in type domain.
 end
 
+ReduceTo(op, dims...) = SwizzleTo(op, dims)
+
 function BeamTo(dims::Union{Int, Drop}...)
-    SwizzleTo(dims, nooperator)
+    SwizzleTo(nooperator, dims)
 end
 
 function SumTo(dims::Union{Int, Drop}...)
-    SwizzleTo(dims, +)
+    SwizzleTo(+, dims)
 end
 
 function MaxTo(dims::Union{Int, Drop}...)
-    SwizzleTo(dims, max)
+    SwizzleTo(max, dims)
 end
 
 function MinTo(dims::Union{Int, Drop}...)
-    SwizzleTo(dims, min)
+    SwizzleTo(min, dims)
 end
 
 """

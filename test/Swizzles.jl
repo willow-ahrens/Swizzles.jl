@@ -2,80 +2,80 @@
 
   A = [1 2 3; 4 5 6; 7 8 9]
 
-  @test swizzle(A, (1, drop), max) == [3; 6; 9]
-  @test swizzle(A, (1, drop), min) == [1; 4; 7]
-  @test swizzle(A, (1,), max) == [3; 6; 9]
-  @test swizzle(A, (1,), min) == [1; 4; 7]
-  @test swizzle(A, (drop, 1), max) == [7; 8; 9]
-  @test swizzle(A, (drop, 1), min) == [1; 2; 3]
-  @test swizzle(A, (2, drop), max) == [3  6  9]
-  @test swizzle(A, (2, drop), min) == [1  4  7]
-  @test swizzle(A, (drop, 2), max) == [7  8  9]
-  @test swizzle(A, (drop, 2), min) == [1  2  3]
+  @test swizzle(A, max, (1, drop)) == [3; 6; 9]
+  @test swizzle(A, min, (1, drop)) == [1; 4; 7]
+  @test swizzle(A, max, (1,)) == [3; 6; 9]
+  @test swizzle(A, min, (1,)) == [1; 4; 7]
+  @test swizzle(A, max, (drop, 1)) == [7; 8; 9]
+  @test swizzle(A, min, (drop, 1)) == [1; 2; 3]
+  @test swizzle(A, max, (2, drop)) == [3  6  9]
+  @test swizzle(A, min, (2, drop)) == [1  4  7]
+  @test swizzle(A, max, (drop, 2)) == [7  8  9]
+  @test swizzle(A, min, (drop, 2)) == [1  2  3]
 
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1, drop), max) == [3; 6; 9]
+  @test swizzle!(R, A, max, (1, drop)) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1, drop), min) == [1; 4; 7]
+  @test swizzle!(R, A, min, (1, drop)) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1,), max) == [3; 6; 9]
+  @test swizzle!(R, A, max, (1,)) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (1,), min) == [1; 4; 7]
+  @test swizzle!(R, A, min, (1,)) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (drop, 1), max) == [7; 8; 9]
+  @test swizzle!(R, A, max, (drop, 1)) == [7; 8; 9]
   R = [0; 0; 0;]
-  @test swizzle!(R, A, (drop, 1), min) == [1; 2; 3]
+  @test swizzle!(R, A, min, (drop, 1)) == [1; 2; 3]
 
   R = [0 0 0]
-  @test swizzle!(R, A, (2, drop), max) == [3  6  9]
+  @test swizzle!(R, A, max, (2, drop)) == [3  6  9]
   R = [0 0 0]
-  @test swizzle!(R, A, (2, drop), min) == [1  4  7]
+  @test swizzle!(R, A, min, (2, drop)) == [1  4  7]
   R = [0 0 0]
-  @test swizzle!(R, A, (drop, 2), max) == [7  8  9]
+  @test swizzle!(R, A, max, (drop, 2)) == [7  8  9]
   R = [0 0 0]
-  @test swizzle!(R, A, (drop, 2), min) == [1  2  3]
+  @test swizzle!(R, A, min, (drop, 2)) == [1  2  3]
 
-  @test swizzle(A, (1, drop, 2), max) == [3; 6; 9]
-  @test swizzle(A, (1, drop, 2), min) == [1; 4; 7]
-  @test swizzle(A, (drop, 1, 2), max) == [7; 8; 9]
-  @test swizzle(A, (drop, 1, 2), min) == [1; 2; 3]
-
-  R = [0; 0; 0;]
-  @test swizzle!(R, A, (1, drop, 2), max) == [3; 6; 9]
-  R = [0; 0; 0;]
-  @test swizzle!(R, A, (1, drop, 2), min) == [1; 4; 7]
-  R = [0; 0; 0;]
-  @test swizzle!(R, A, (drop, 1, 2), max) == [7; 8; 9]
-  R = [0; 0; 0;]
-  @test swizzle!(R, A, (drop, 1, 2), min) == [1; 2; 3]
+  @test swizzle(A, max, (1, drop, 2)) == [3; 6; 9]
+  @test swizzle(A, min, (1, drop, 2)) == [1; 4; 7]
+  @test swizzle(A, max, (drop, 1, 2)) == [7; 8; 9]
+  @test swizzle(A, min, (drop, 1, 2)) == [1; 2; 3]
 
   R = [0; 0; 0;]
-  @test_throws ArgumentError swizzle!(R, A, (drop, 1, 2))
-  @test_throws ArgumentError swizzle(A, (1, drop, 2))
+  @test swizzle!(R, A, max, (1, drop, 2)) == [3; 6; 9]
+  R = [0; 0; 0;]
+  @test swizzle!(R, A, min, (1, drop, 2)) == [1; 4; 7]
+  R = [0; 0; 0;]
+  @test swizzle!(R, A, max, (drop, 1, 2)) == [7; 8; 9]
+  R = [0; 0; 0;]
+  @test swizzle!(R, A, min, (drop, 1, 2)) == [1; 2; 3]
 
-  @test swizzle(A, (2, 1)) == transpose(A)
+  R = [0; 0; 0;]
+  @test_throws ArgumentError swizzle!(R, A, nooperator, (drop, 1, 2)) #FIXME call beam
+  @test_throws ArgumentError swizzle(A, nooperator, (1, drop, 2))
+
+  @test swizzle(A, nooperator, (2, 1)) == transpose(A)
 
   R = [0 0 0;
        0 0 0;
        0 0 0]
-  @test swizzle!(R, A, (2, 1), min) == transpose(A)
+  @test swizzle!(R, A, min, (2, 1)) == transpose(A)
 
-  @test swizzle([11; 12; 13], (2,)) == [11 12 13]
-  @test swizzle([11; 12; 13], (), max) == 13
-  @test swizzle((11, 12, 13), (), max) == 13
+  @test swizzle([11; 12; 13], nooperator, (2,)) == [11 12 13]
+  @test swizzle([11; 12; 13], max, ()) == 13
+  @test swizzle((11, 12, 13), max, ()) == 13
 
   R = [0 0 0]
-  @test swizzle!(R, [11; 12; 13], (2,)) == [11 12 13]
+  @test swizzle!(R, [11; 12; 13], nooperator, (2,)) == [11 12 13]
   R = [0]
-  @test swizzle((11, 12, 13), (), max) == 13
+  @test swizzle((11, 12, 13), max, ()) == 13
 
-  @test Swizzle((), +).(A) == 45
-  @test Swizzle((2,), +).(A) == [6 15 24]
-  @test Swizzle((1,), +).(A) == [6; 15; 24]
-  @test Swizzle((1,2), +).(A) == A
-  @test Swizzle((1,2,3), +).(A) == A
-  @test Swizzle((2,1), +).(A) == transpose(A)
-  @test Swizzle((2,1,3), +).(A) == transpose(A)
+  @test Swizzle(+, ()).(A) == 45
+  @test Swizzle(+, (2,)).(A) == [6 15 24]
+  @test Swizzle(+, (1,)).(A) == [6; 15; 24]
+  @test Swizzle(+, (1,2)).(A) == A
+  @test Swizzle(+, (1,2,3)).(A) == A
+  @test Swizzle(+, (2,1)).(A) == transpose(A)
+  @test Swizzle(+, (2,1,3)).(A) == transpose(A)
 
   @test_throws ArgumentError Beam().(A)
   @test_throws ArgumentError Beam(2).(A)
@@ -113,13 +113,13 @@
   @test Min(2, 1).(A) == 1
   @test Min(2, 1, 3).(A) == 1
 
-  @test Swizzle((), +).(A.+A) == 90
-  @test Swizzle((2,), +).(A.+A) == [12 30 48]
-  @test Swizzle((1,), +).(A.+A) == [12; 30; 48]
-  @test Swizzle((1,2), +).(A.+A) == A.+A
-  @test Swizzle((1,2,3), +).(A.+A) == A.+A
-  @test Swizzle((2,1), +).(A.+A) == transpose(A.+A)
-  @test Swizzle((2,1,3), +).(A.+A) == transpose(A.+A)
+  @test Swizzle(+, ()).(A.+A) == 90
+  @test Swizzle(+, (2,)).(A.+A) == [12 30 48]
+  @test Swizzle(+, (1,)).(A.+A) == [12; 30; 48]
+  @test Swizzle(+, (1,2)).(A.+A) == A.+A
+  @test Swizzle(+, (1,2,3)).(A.+A) == A.+A
+  @test Swizzle(+, (2,1)).(A.+A) == transpose(A.+A)
+  @test Swizzle(+, (2,1,3)).(A.+A) == transpose(A.+A)
 
   @test_throws ArgumentError Beam().(A.+A)
   @test_throws ArgumentError Beam(2).(A.+A)
@@ -157,13 +157,13 @@
   @test Min(2, 1).(A.+A) == 2
   @test Min(2, 1, 3).(A.+A) == 2
 
-  @test SwizzleTo((), +).(A) == 45
-  @test SwizzleTo((1,), +).(A) == [6; 15; 24]
-  @test SwizzleTo((2,), +).(A) == [12; 15; 18]
-  @test SwizzleTo((1,2), +).(A) == A
-  @test SwizzleTo((1,2,3), +).(A) == A
-  @test SwizzleTo((2,1), +).(A) == transpose(A)
-  @test SwizzleTo((2,1,3), +).(A) == transpose(A)
+  @test SwizzleTo(+, ()).(A) == 45
+  @test SwizzleTo(+, (1,)).(A) == [6; 15; 24]
+  @test SwizzleTo(+, (2,)).(A) == [12; 15; 18]
+  @test SwizzleTo(+, (1,2)).(A) == A
+  @test SwizzleTo(+, (1,2,3)).(A) == A
+  @test SwizzleTo(+, (2,1)).(A) == transpose(A)
+  @test SwizzleTo(+, (2,1,3)).(A) == transpose(A)
 
   @test_throws ArgumentError BeamTo().(A.+A)
   @test_throws ArgumentError BeamTo(2).(A.+A)
@@ -201,13 +201,13 @@
   @test MinTo(2, 1).(A) == transpose(A)
   @test MinTo(2, 1, 3).(A) == transpose(A)
 
-  @test SwizzleTo((), +).(A.+A) == 90
-  @test SwizzleTo((1,), +).(A.+A) == [12; 30; 48]
-  @test SwizzleTo((2,), +).(A.+A) == [24; 30; 36]
-  @test SwizzleTo((1,2), +).(A.+A) == A.+A
-  @test SwizzleTo((1,2,3), +).(A.+A) == A.+A
-  @test SwizzleTo((2,1), +).(A.+A) == transpose(A.+A)
-  @test SwizzleTo((2,1,3), +).(A.+A) == transpose(A.+A)
+  @test SwizzleTo(+, ()).(A.+A) == 90
+  @test SwizzleTo(+, (1,)).(A.+A) == [12; 30; 48]
+  @test SwizzleTo(+, (2,)).(A.+A) == [24; 30; 36]
+  @test SwizzleTo(+, (1,2)).(A.+A) == A.+A
+  @test SwizzleTo(+, (1,2,3)).(A.+A) == A.+A
+  @test SwizzleTo(+, (2,1)).(A.+A) == transpose(A.+A)
+  @test SwizzleTo(+, (2,1,3)).(A.+A) == transpose(A.+A)
 
   @test ReduceTo(+).(A.+A) == 90
   @test ReduceTo(+, 1).(A.+A) == [12; 30; 48]
@@ -238,7 +238,7 @@
   @test MinTo(2, 1, 3).(A.+A) == transpose(A.+A)
 
   @test Beam(1).((1, 2)) isa Tuple
-  @test Swizzle((1,), +).((1, 2)) isa Tuple
+  @test Swizzle(+, (1,)).((1, 2)) isa Tuple
   @test Sum(1).((1.0, 2)) isa Float64
 
   A = rand(1,1)
