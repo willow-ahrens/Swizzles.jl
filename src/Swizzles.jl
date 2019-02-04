@@ -87,45 +87,10 @@ struct Reduce{T, Op, dims} <: Swizzles.Intercept
     op::Op
 end
 
-"""
-    `Reduce(op, dims...)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the result is a lazy view of a reduction over the specified
-dimensions, collapsing remaining dimensions downward. If no dimensions are
-specified, all dimensions are reduced over.
-
-See also: [`Swizzle`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
-5×2 Array{Int64,2}:
- 1   2
- 3   4
- 5   6
- 7   8
- 9  10
-julia> Reduce(+, 2).(A)
-5×1 Array{Int64,2}:
- 3
- 7
- 11
- 15
- 19
-```
-"""
-@inline Reduce(op::Op, dims...) where {Op} = Reduce{nothing, Op, dims}(op)
-
-"""
-    `Reduce{T}(op, dims...)`
-
-Similar to [`Reduce`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Reduce`](@ref).
-"""
+@inline Reduce(op, dims...) = Reduce{nothing}(op, dims...)
 @inline Reduce{T}(op::Op, dims...) where {T, Op} = Reduce{T, Op, dims}(op)
+@inline Reduce{T}(op::Op, dims::Tuple) where {T, Op} = Reduce{T, Op, dims}(op)
+@inline Reduce{T}(op::Op, ::Val{dims}) where {T, Op, dims} = Reduce{T, Op, dims}(op)
 
 @inline (rd::Reduce)(arg) = rd(BroadcastedArray(arg))
 @inline function parse_reduce_mask(arr, dims::Tuple{Vararg{Int}}) where {M, N}
@@ -134,15 +99,6 @@ See also: [`Reduce`](@ref).
 end
 @inline function parse_reduce_mask(arr, dims::Tuple{}) where {M, N}
     return ntuple(d -> drop, Val(ndims(arr)))
-end
-@inline function(rd::Reduce{nothing, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {dims, N}
-    if @generated
-        mask = parse_reduce_mask(arg, dims)
-        return :(return SwizzledArray(arg, rd.op, $(Val(mask))))
-    else
-        mask = parse_reduce_mask(arg, dims)
-        return SwizzledArray(arg, mask, rd.op)
-    end
 end
 @inline function(rd::Reduce{T, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {T, dims, N}
     if @generated
@@ -155,97 +111,25 @@ end
 end
 
 
+
 struct Sum{T} end
 
-"""
-    `Sum(dims...)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the result is a lazy view of the sum over the specified
-dimensions, collapsing remaining dimensions downward. If no dimensions are
-specified, all dimensions are summed.
-
-See also: [`Reduce`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
-5×2 Array{Int64,2}:
- 1   2
- 3   4
- 5   6
- 7   8
- 9  10
-julia> Sum(2).(A)
-5×1 Array{Int64,2}:
- 3
- 7
- 11
- 15
- 19
-```
-"""
-function Sum(dims::Int...)
+@inline function Sum(dims...)
     Reduce(+, dims...)
 end
 
-"""
-    `Sum{T}(dims...)`
-
-Similar to [`Sum`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Sum`](@ref).
-"""
-function Sum{T}(dims::Int...) where {T}
+@inline function Sum{T}(dims...) where {T}
     Reduce{T}(+, dims...)
 end
 
 
 
 struct Max{T} end
-
-"""
-    `Max(dims...)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the result is a lazy view of the maximum over the specified
-dimensions, collapsing remaining dimensions downward. If no dimensions are
-specified, all dimensions are reduced.
-
-See also: [`Reduce`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
-5×2 Array{Int64,2}:
- 1   2
- 3   4
- 5   6
- 7   8
- 9  10
-julia> Max(2).(A)
-5×1 Array{Int64,2}:
- 2
- 4
- 6
- 8
- 10
-```
-"""
-function Max(dims::Int...)
+@inline function Max(dims...)
     Reduce(max, dims...)
 end
 
-"""
-    `Max{T}(dims...)`
-
-Similar to [`Max`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Max`](@ref).
-"""
-function Max{T}(dims::Int...) where {T}
+@inline function Max{T}(dims...) where {T}
     Reduce{T}(max, dims...)
 end
 
@@ -253,49 +137,15 @@ end
 
 struct Min{T} end
 
-"""
-    `Min(dims...)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the result is a lazy view of the minimum over the specified
-dimensions, collapsing remaining dimensions downward. If no dimensions are
-specified, all dimensions are reduced.
-
-See also: [`Reduce`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
-5×2 Array{Int64,2}:
- 1   2
- 3   4
- 5   6
- 7   8
- 9  10
-julia> Min(2).(A)
-5×1 Array{Int64,2}:
- 1
- 2
- 5
- 7
- 9
-```
-"""
-function Min(dims::Int...)
+@inline function Min(dims...)
     Reduce(min, dims...)
 end
 
-"""
-    `Min{T}(dims...)`
-
-Similar to [`Min`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Min`](@ref).
-"""
-function Min{T}(dims::Int...) where {T}
+@inline function Min{T}(dims...) where {T}
     Reduce{T}(min, dims...)
 end
+
+
 
 """
     `swizzle(A, mask, op=nooperator)`
