@@ -60,7 +60,7 @@
        0 0 0]
   @test (R .= Swizzle(min, (2, 1)).(A)) == transpose(A)
 
-  @test Swizzle(nooperator, (2,)).([11; 12; 13]) == [11 12 13]
+  @test Beam(2).([11; 12; 13]) == [11 12 13]
   @test Swizzle(max, ()).([11; 12; 13]) == 13
   @test Swizzle(max, ()).((11, 12, 13)) == 13
 

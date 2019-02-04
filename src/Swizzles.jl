@@ -39,10 +39,11 @@ end
 
 
 
-struct Beam{T} end
+struct Beam{T}
+    @inline Beam{T}(_mask...) where {T} = Swizzle{T}(nooperator, _mask...)
+end
 
 @inline Beam(_mask...) = Beam{nothing}(_mask...)
-@inline Beam{T}(_mask...) where {T} = Swizzle{T}(nooperator, _mask...)
 
 
 
@@ -67,10 +68,11 @@ end
 
 
 
-struct BeamTo{T} end
+struct BeamTo{T}
+    @inline BeamTo{T}(_imask...) where {T} = Swizzle{T}(nooperator, _imask...)
+end
 
 @inline BeamTo(_imask...) = BeamTo{nothing}(_imask...)
-@inline BeamTo{T}(_imask...) where {T} = Swizzle{T}(nooperator, _imask...)
 
 
 
@@ -103,23 +105,26 @@ end
 
 
 
-struct Sum{T} end
+struct Sum{T}
+    @inline Sum{T}(dims...) where {T} = Reduce{T}(+, dims...)
+end
 
 @inline Sum(dims...) = Sum{nothing}(dims...)
-@inline Sum{T}(dims...) where {T} = Reduce{T}(+, dims...)
 
 
 
-struct Max{T} end
+struct Max{T}
+    @inline Max{T}(dims...) where {T} = Reduce{T}(max, dims...)
+end
 
 @inline Max(dims...) = Max{nothing}(dims...)
-@inline Max{T}(dims...) where {T} = Reduce{T}(max, dims...)
 
 
 
-struct Min{T} end
+struct Min{T}
+    @inline Min{T}(dims...) where {T} = Reduce{T}(min, dims...)
+end
 
 @inline Min(dims...) = Min{nothing}(dims...)
-@inline Min{T}(dims...) where {T} = Reduce{T}(min, dims...)
 
 end
