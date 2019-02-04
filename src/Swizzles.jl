@@ -28,55 +28,12 @@ struct Swizzle{T, Op, _mask} <: Swizzles.Intercept
     op::Op
 end
 
-"""
-    `Swizzle(op, mask)`
-
-Produce an object `s` such that when `s` is broadcasted as a function over an
-argument `arg`, the result is a lazy view of the result of `swizzle(arg, mask,
-op)`.
-
-See also: [`swizzle`](@ref).
-
-# Examples
-```jldoctest
-julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
-5×2 Array{Int64,2}:
- 1   2
- 3   4
- 5   6
- 7   8
- 9  10
-julia> Swizzle((1,), +).(A)
-5×1 Array{Int64,2}:
- 3
- 7
- 11
- 15
- 19
-julia> Swizzle((), +).(A)
-55
-julia> Swizzle((2,)).(parse.(Int, ["1", "2"]))
-1x2-element Array{Int64,1}:
- 1 2
-```
-"""
-@inline Swizzle(op::Op, _mask) where {Op} = Swizzle{nothing}(op, _mask)
-
-"""
-    `Swizzle{T}(mask, op=nooperator)`
-
-Similar to [`Swizzle`](@ref), but the eltype of the resulting swizzle is
-declared to be `T`.
-
-See also: [`Swizzle`](@ref).
-"""
-@inline Swizzle{T}(op::Op, _mask) where {T, Op} = Swizzle{T, Op, _mask}(op)
+@inline Swizzle(op, _mask...) = Swizzle{nothing}(op, _mask...)
+@inline Swizzle{T}(op::Op, _mask...) where {T, Op} = Swizzle{T, Op, _mask}(op)
+@inline Swizzle{T}(op::Op, _mask::Tuple) where {T, Op} = Swizzle{T, Op, _mask}(op)
+@inline Swizzle{T}(op::Op, ::Val{_mask}) where {T, Op, _mask} = Swizzle{T, Op, _mask}(op)
 
 @inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
-
-@inline function(sz::Swizzle{nothing, Op, _mask})(arg::AbstractArray{<:Any, N}) where {Op, _mask, N}
-    return SwizzledArray(arg, sz.op, Val(_mask))
-end
 @inline function(sz::Swizzle{T, Op, _mask})(arg::AbstractArray{<:Any, N}) where {T, Op, _mask, N}
     return SwizzledArray{T}(arg, sz.op, Val(_mask))
 end
@@ -114,8 +71,8 @@ julia> Beam(drop, 3).(A)
  5
 ```
 """
-function Beam(_mask::Union{Int, Drop}...)
-    Swizzle(nooperator, _mask)
+@inline function Beam(_mask...)
+    Swizzle(nooperator, _mask...)
 end
 
 """
@@ -126,8 +83,8 @@ declared to be `T`.
 
 See also: [`Beam`](@ref).
 """
-function Beam{T}(_mask::Union{Int, Drop}...) where {T}
-    Swizzle{T}(nooperator, _mask)
+@inline function Beam{T}(_mask...) where {T}
+    Swizzle{T}(nooperator, _mask...)
 end
 
 
