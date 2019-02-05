@@ -174,42 +174,39 @@ end
         arg = arr.arg
         if mask(arr) isa Tuple{Vararg{Int}}
             @inbounds return arg[]
-        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) != nothing
+        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) !== nothing
             dst = something(Properties.initial(arr.op, eltype(arr), eltype(arg)))
-            arg = BroadcastedArrays.preprocess([], arg)
-            @simd for i in eachindex(arg)
-                @inbounds dst = arr.op(dst, arg[i])
+            arg = BroadcastedArrays.preprocess(nothing, arg)
+            @inbounds for i in eachindex(arg)
+                dst = arr.op(dst, arg[i])
             end
             return dst
         else
-            arg = BroadcastedArrays.preprocess([], arg)
+            arg = BroadcastedArrays.preprocess(nothing, arg)
             arg_axes = axes(arg)
             arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
             arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(Arr)))...),)
             arg_keeps = keeps(arg)
-            $(begin
+            @inbounds $(begin
                 i′ = [Symbol("i′_$d") for d = 1:length(mask(Arr))]
                 thunk = Expr(:block)
                 for n = vcat(0, findall(d -> d isa Drop, mask(Arr)))
                     if n > 0
-                        nest = :(dst = arr.op(dst, @inbounds getindex(arg, $(i′...))))
+                        nest = :(dst = arr.op(dst, getindex(arg, $(i′...))))
                     else
-                        nest = :(dst = @inbounds getindex(arg, $(i′...)))
+                        nest = :(dst = getindex(arg, $(i′...)))
                     end
                     for d = 1:length(mask(Arr))
                         if mask(Arr)[d] isa Drop
                             if d == n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
-                                nest = Base.SimdLoop.compile(nest, false)
                             elseif d < n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                                nest = Base.SimdLoop.compile(nest, false)
                             else
                                 nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
                             end
                         else
                             nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                            nest = Base.SimdLoop.compile(nest, false)
                         end
                     end
                     if n > 0
@@ -239,11 +236,11 @@ end
         arg = arr.arg
         if mask(arr) isa Tuple{Vararg{Int}}
             arg = BroadcastedArrays.preprocess(dst, arr.arg)
-            @simd for i in eachindex(arg)
+            for i in eachindex(arg)
                 i′ = childindex(dst, arr, i)
                 @inbounds dst[i′...] = arg[i]
             end
-        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) != nothing
+        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) !== nothing
             dst .= something(Properties.initial(arr.op, eltype(arr), eltype(arr.arg)))
             dst .= (arr.op).(dst, arr)
         else
@@ -252,30 +249,27 @@ end
             arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
             arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(Arr)))...),)
             arg_keeps = keeps(arg)
-            $(begin
+            @inbounds $(begin
                 i′ = [Symbol("i′_$d") for d = 1:length(mask(Arr))]
                 i = imasktuple(d->:(firstindex(dst, $d)), d->i′[d], mask(Arr))
                 thunk = Expr(:block)
                 for n = vcat(0, findall(d -> d isa Drop, mask(Arr)))
                     if n > 0
-                        nest = :(dst[$(i...)] = arr.op(dst[$(i...)], @inbounds getindex(arg, $(i′...))))
+                        nest = :(dst[$(i...)] = arr.op(dst[$(i...)], getindex(arg, $(i′...))))
                     else
-                        nest = :(dst[$(i...)] = @inbounds getindex(arg, $(i′...)))
+                        nest = :(dst[$(i...)] = getindex(arg, $(i′...)))
                     end
                     for d = 1:length(mask(Arr))
                         if mask(Arr)[d] isa Drop
                             if d == n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
-                                nest = Base.SimdLoop.compile(nest, false)
                             elseif d < n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                                nest = Base.SimdLoop.compile(nest, false)
                             else
                                 nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
                             end
                         else
                             nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                            nest = Base.SimdLoop.compile(nest, false)
                         end
                     end
                     if n > 0
@@ -294,9 +288,9 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     copyto!(dst, src.args[1])
     arr = src.args[2]
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
-    @simd for i in eachindex(arg)
+    @inbounds for i in eachindex(arg)
         i′ = childindex(dst, arr, i)
-        @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
+        dst[i′...] = arr.op(dst[i′...], arg[i])
     end
     return dst
 end

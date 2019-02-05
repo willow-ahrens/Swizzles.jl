@@ -60,7 +60,7 @@ julia> imasktuple(A, (-1, -2), (drop, 3))
 ```
 """
 @inline function imasktuple(f, g, I::Tuple{Vararg{Union{Int, Drop}}})
-    ntuple(j-> (k = findfirst(isequal(j), I)) isa Nothing ? f(j) : g(k), max(0, I...))
+    ntuple(j-> (k = findfirst(isequal(j), I)) === nothing ? f(j) : g(k), max(0, I...))
 end
 @generated function imasktuple(f, g, ::Val{I}) where {I}
     return quote
