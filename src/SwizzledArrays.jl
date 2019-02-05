@@ -176,14 +176,14 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
     elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) != nothing
         dst = something(Properties.initial(arr.op, eltype(arr), eltype(arg)))
         arg = BroadcastedArrays.preprocess(dst, arg)
-        for i in eachindex(arg)
+        @simd for i in eachindex(arg)
             @inbounds dst = arr.op(dst, arg[i])
         end
         return dst
     else
         (i, inds) = peel(eachindex(arg))
         @inbounds dst = arg[i]
-        for i in inds
+        @simd for i in inds
             @inbounds dst = arr.op(dst, arg[i])
         end
         return dst
@@ -205,7 +205,7 @@ end
         arg = arr.arg
         if mask(arr) isa Tuple{Vararg{Int}}
             arg = BroadcastedArrays.preprocess(dst, arr.arg)
-            for i in eachindex(arg)
+            @simd for i in eachindex(arg)
                 i′ = childindex(dst, arr, i)
                 @inbounds dst[i′...] = arg[i]
             end
@@ -213,6 +213,7 @@ end
             dst .= something(Properties.initial(arr.op, eltype(arr), eltype(arr.arg)))
             dst .= (arr.op).(dst, arr)
         else
+            # TODO: Figure out how @simd fits into this picture.
             arg = BroadcastedArrays.preprocess(dst, arr.arg)
             arg_axes = axes(arg)
             arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
@@ -257,7 +258,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     copyto!(dst, src.args[1])
     arr = src.args[2]
     arg = BroadcastedArrays.preprocess(dst, arr.arg)
-    for i in eachindex(arg)
+    @simd for i in eachindex(arg)
         i′ = childindex(dst, arr, i)
         @inbounds dst[i′...] = arr.op(dst[i′...], arg[i])
     end
