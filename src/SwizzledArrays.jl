@@ -236,9 +236,9 @@ end
         arg = arr.arg
         if mask(arr) isa Tuple{Vararg{Int}}
             arg = BroadcastedArrays.preprocess(dst, arr.arg)
-            for i in eachindex(arg)
+            @inbounds for i in eachindex(arg)
                 i′ = childindex(dst, arr, i)
-                @inbounds dst[i′...] = arg[i]
+                dst[i′...] = arg[i]
             end
         elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) !== nothing
             dst .= something(Properties.initial(arr.op, eltype(arr), eltype(arr.arg)))
