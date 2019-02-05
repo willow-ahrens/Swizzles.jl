@@ -295,23 +295,23 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broad
     return dst
 end
 
-@inline function parentindex(arr::SubArray, i...)
+Base.@propagate_inbounds function parentindex(arr::SubArray, i...)
     return Base.reindex(arr, Base.parentindices(arr), i)
 end
 
-@inline function parentindex(arr::SwizzledArray, i::Integer)
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray, i::Integer)
     return parentindex(arr, CartesianIndices(arr)[i])
 end
 
-@inline function parentindex(arr::SwizzledArray, i::CartesianIndex)
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray, i::CartesianIndex)
     return parentindex(arr, Tuple(i)...)
 end
 
-@inline function parentindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
     return invoke(parentindex, Tuple{typeof(arr), Any}, arr, i)
 end
 
-@inline function parentindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, N, Arg}, i::Vararg{Any, N}) where {N, Arg}
     masktuple(d->Base.Slice(axes(arr.arg, d)), d->i[d], Val(mask(arr)))
 end
 
@@ -326,15 +326,15 @@ end
 """
 parentindex
 
-@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
     return childindex(dst, arr, CartesianIndices(arr.arg)[i])
 end
 
-@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
     return childindex(dst, arr, Tuple(i)...)
 end
 
-@inline function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
     imasktuple(d->firstindex(axes(dst, d)), d->i[d], Val(mask(arr)))
 end
 
