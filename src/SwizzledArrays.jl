@@ -233,13 +233,16 @@ end
                         if mask(Arr)[d] isa Drop
                             if d == n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
+                                nest = Base.SimdLoop.compile(nest, false)
                             elseif d < n
                                 nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
+                                nest = Base.SimdLoop.compile(nest, false)
                             else
                                 nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
                             end
                         else
                             nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
+                            nest = Base.SimdLoop.compile(nest, false)
                         end
                     end
                     if n > 0
