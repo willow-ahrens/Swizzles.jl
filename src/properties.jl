@@ -1,4 +1,5 @@
 module Properties
+using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
 """
     return_type(f, args...)
@@ -19,20 +20,20 @@ Any
 """
 @inline return_type(f, args...) = Core.Compiler.return_type(f, args)
 @inline return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline return_type(::typeof(-), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(add_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline return_type(::typeof(*), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline return_type(::typeof(/), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+@inline return_type(::typeof(mul_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline return_type(::typeof(max), a, b) = Union{a, b}
+@inline return_type(::typeof(max_fast), a, b) = Union{a, b}
 @inline return_type(::typeof(min), a, b) = Union{a, b}
-@inline return_type(::typeof(+), a::Type{<:Number}) = a
-@inline return_type(::typeof(-), a::Type{<:Number}) = a
+@inline return_type(::typeof(min_fast), a, b) = Union{a, b}
 
 """
     initial(f, T, S)
 
 Return the value `i` such that `something(i)::T`, `f(something(i), x)::T`, and
-`f(something(i), x) == x` for all values `x` of type `S`. Return `nothing` if no
-such value exists.
+`f(something(i), x) == x` for all values `x` of type `S`. Return `nothing` if
+you cannot reasonably return such a value.
 
 See also: [`zero`](@ref), [`oneunit`](@ref).
 
@@ -46,11 +47,33 @@ julia> initial(+, Int, Real)
 nothing
 ```
 """
+
 @inline initial(f, T, S) = nothing
-@inline initial(::typeof(+), T::Type{<:Number}, S::Type{<:Number}) = Some(zero(T))
-@inline initial(::typeof(*), T::Type{<:Number}, S::Type{<:Number}) = Some(one(T))
-@inline initial(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) = Some(typemin(T))
-@inline initial(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) = Some(typemax(T))
+
+@inline initial(::typeof(+), T::Type{<:Number}, S::Type{<:Number}) =
+    S <: T                                  ? Some(zero(S)) :
+    return_type(+, typeof(zero(T)), S) <: T ? Some(zero(T)) :
+                                              nothing
+@inline initial(::typeof(add_fast), T::Type{<:Number}, S::Type{<:Number}) =
+    S <: T                                         ? Some(zero(S)) :
+    return_type(add_fast, typeof(zero(T)), S) <: T ? Some(zero(T)) :
+                                                     nothing
+@inline initial(::typeof(*), T::Type{<:Number}, S::Type{<:Number}) =
+    S <: T                                                ? Some(oneunit(S)) :
+    one(S) <: T && return_type(*, typeof(one(S)), S) <: T ? one(S)           :
+                                                            nothing
+@inline initial(::typeof(mul_fast), T::Type{<:Number}, S::Type{<:Number}) =
+    S <: T                                                       ? Some(oneunit(S)) :
+    one(S) <: T && return_type(mul_fast, typeof(one(S)), S) <: T ? one(S)           :
+                                                                   nothing
+@inline initial(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) =
+    Some(typemin(T))
+@inline initial(::typeof(max_fast), T::Type{<:Number}, S::Type{<:Number}) =
+    Some(typemin(T))
+@inline initial(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) =
+    Some(typemax(T))
+@inline initial(::typeof(min_fast), T::Type{<:Number}, S::Type{<:Number}) =
+    Some(typemax(T))
 
 """
     eltype_bound(A)
