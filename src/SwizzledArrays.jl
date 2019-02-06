@@ -15,10 +15,6 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-@inline function parse_swizzle_mask(arr, _mask::Tuple{Vararg{Union{Int, Drop}, M}}) where {M}
-    return ntuple(d -> d <= M ? _mask[d] : drop, Val(ndims(arr)))
-end
-
 struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray} <: GeneratedArray{T, N}
     op::Op
     arg::Arg
@@ -28,28 +24,16 @@ struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray} <: GeneratedArray{T, N}
     end
 end
 
+@inline function SwizzledArray{nothing, N, Op, mask, Arg}(op::Op, arg::Arg) where {N, Op, mask, Arg}
+    arr = SwizzledArray{Any, N, Op, mask, Arg}(op, arg)
+    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
+end
+
 @inline function SwizzledArray{T}(arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
     return SwizzledArray{T, N, Op, mask, Arg}(arr.op, arr.arg)
 end
 @inline function SwizzledArray{T, N, Op, mask, Arg}(arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
     return SwizzledArray{T, N, Op, mask, Arg}(arr.op, arr.arg)
-end
-
-@inline function SwizzledArray{T}(op, _mask::Tuple, arg) where {T}
-    return SwizzledArray{T}(op, Val(_mask), arg)
-end
-@inline function SwizzledArray{T}(op, ::Val{_mask}, arg) where {T, _mask}
-    if @generated
-        mask = parse_swizzle_mask(arg, _mask)
-        return :(return SwizzledArray{T, $(max(0, mask...)), typeof(op), $mask, typeof(arg)}(op, arg))
-    else
-        mask = parse_swizzle_mask(arg, _mask)
-        return SwizzledArray{T, max(0, mask...), typeof(op), mask, typeof(arg)}(op, arg)
-    end
-end
-@inline function SwizzledArray{nothing, N, Op, mask, Arg}(op::Op, arg::Arg) where {N, Op, mask, Arg}
-    arr = SwizzledArray{Any, N, Op, mask, Arg}(op, arg)
-    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
 end
 
 
