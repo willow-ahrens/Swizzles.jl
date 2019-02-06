@@ -167,7 +167,7 @@ end
 end
 @inline _convert_remask(indices) = ()
 
-@generated function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {T, N, Arr <: SwizzledArray}
+@generated function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     return quote
         Base.@_propagate_inbounds_meta
         arr = src.args[1]
