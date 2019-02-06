@@ -100,7 +100,7 @@ See also: [`Swizzle`](@ref).
 
 @inline (sz::Swizzle)(arg) = sz(BroadcastedArray(arg))
 @inline function(sz::Swizzle{T, Op, _mask})(arg::AbstractArray) where {T, Op, _mask}
-    return SwizzledArray{T}(arg, sz.op, Val(_mask))
+    return SwizzledArray{T}(sz.op, Val(_mask), arg)
 end
 
 
@@ -205,9 +205,9 @@ See also: [`SwizzleTo`](@ref).
 @inline function(sz::SwizzleTo{T, Op, _imask})(arg::Arg) where {T, Op, _imask, Arg <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(arg, imasktuple(d->drop, identity, _imask))
-        return :(return SwizzledArray{T}(arg, sz.op, $(Val(mask))))
+        return :(return SwizzledArray{T}(sz.op, $(Val(mask)), arg))
     else
-        return SwizzledArray{T}(arg, sz.op, imasktuple(d->drop, identity, _imask))
+        return SwizzledArray{T}(sz.op, imasktuple(d->drop, identity, _imask), arg)
     end
 end
 
@@ -317,10 +317,10 @@ end
 @inline function(rd::Reduce{T, <:Any, dims})(arg::AbstractArray{<:Any, N}) where {T, dims, N}
     if @generated
         mask = parse_reduce_mask(arg, dims)
-        return :(return SwizzledArray{T}(arg, rd.op, $(Val(mask))))
+        return :(return SwizzledArray{T}(rd.op, $(Val(mask)), arg))
     else
         mask = parse_reduce_mask(arg, dims)
-        return SwizzledArray{T}(arg, rd.op, mask)
+        return SwizzledArray{T}(rd.op, mask, arg)
     end
 end
 
