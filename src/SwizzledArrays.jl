@@ -26,13 +26,10 @@ end
 
 @inline function SwizzledArray{nothing, N, Op, mask, Arg}(op::Op, arg::Arg) where {N, Op, mask, Arg}
     arr = SwizzledArray{Any, N, Op, mask, Arg}(op, arg)
-    return SwizzledArray{Properties.eltype_bound(arr)}(arr)
+    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
 end
 
-@inline function SwizzledArray{T}(arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
-    return SwizzledArray{T, N, Op, mask, Arg}(arr.op, arr.arg)
-end
-@inline function SwizzledArray{T, N, Op, mask, Arg}(arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
+@inline function convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
     return SwizzledArray{T, N, Op, mask, Arg}(arr.op, arr.arg)
 end
 
