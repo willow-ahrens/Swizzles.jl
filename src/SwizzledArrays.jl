@@ -162,7 +162,7 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     inds = parentindices(src)
     arg = arr.arg
     init = arr.init
-    if ndims(init) > 0
+    if ndims(init) > 0 #FIXME could be tighter if we know the keeps, maybe ask for typed keeps?
         init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; keeps(init, n) ? inds[n] : Slice(axes(init, n))), Val(ndims(init))))
     else
         init′ = init
