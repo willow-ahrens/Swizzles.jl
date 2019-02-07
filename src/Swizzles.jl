@@ -123,7 +123,7 @@ Similar to [`Beam`](@ref), but the eltype is declared to be `T`.
 
 See also: [`Beam`](@ref).
 """
-    @inline Beam{T}(_mask...) where {T} = Swizzle{T}(nooperator, _mask...)
+    @inline Beam{T}(_mask...) where {T} = Swizzle{T}(Guard(nooperator), _mask...)
 end
 
 """
@@ -232,7 +232,7 @@ Similar to [`BeamTo`](@ref), but the eltype is declared to be `T`.
 
 See also: [`BeamTo`](@ref).
 """
-    @inline BeamTo{T}(_imask...) where {T} = SwizzleTo{T}(nooperator, _imask...)
+    @inline BeamTo{T}(_imask...) where {T} = SwizzleTo{T}(Guard(nooperator), _imask...)
 end
 
 """

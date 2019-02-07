@@ -20,7 +20,7 @@ end
 @inline Properties.return_type(g::Guard, ::Type{Union{Nothing, T}}, S) where {T} = Properties.return_type(g.op, T, S)
 @inline Properties.return_type(g::Guard, ::Type{Nothing}, S) = S
 
-Properties.initial(::Guard, ::Any, ::Any) = nothing
+@inline Properties.initial(::Guard, ::Any, ::Any) = Some(nothing)
 
 """
     `nooperator(a, b)`
@@ -71,7 +71,7 @@ end
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
     init = Properties.initial(op, T, eltype(arg))
     if init === nothing
-        init = Scalar(nothing) #fixme initial should be part of SwizzledArrays not Properties
+        init = Scalar(nothing)
         op = Guard(op)
     else
         init = Scalar(something(init))
