@@ -23,21 +23,21 @@ nothing
 
 @inline initial(f, T, S) = nothing
 
-@inline initial(::typeof(+), T::Type{<:Number}, S::Type{<:Number}) =
+@inline initial(::typeof(+), T, S::Type{<:Number}) =
     S <: T                                  ? Some(zero(S)) :
     return_type(+, typeof(zero(T)), S) <: T ? Some(zero(T)) :
                                               nothing
-@inline initial(::typeof(add_fast), T::Type{<:Number}, S::Type{<:Number}) =
+@inline initial(::typeof(add_fast), T, S::Type{<:Number}) =
     S <: T                                         ? Some(zero(S)) :
     return_type(add_fast, typeof(zero(T)), S) <: T ? Some(zero(T)) :
                                                      nothing
-@inline initial(::typeof(*), T::Type{<:Number}, S::Type{<:Number}) =
+@inline initial(::typeof(*), T, S::Type{<:Number}) =
     S <: T                                                ? Some(oneunit(S)) :
-    one(S) <: T && return_type(*, typeof(one(S)), S) <: T ? one(S)           :
+    one(S) <: T && return_type(*, typeof(one(S)), S) <: T ? Some(one(S))     :
                                                             nothing
-@inline initial(::typeof(mul_fast), T::Type{<:Number}, S::Type{<:Number}) =
+@inline initial(::typeof(mul_fast), T, S::Type{<:Number}) =
     S <: T                                                       ? Some(oneunit(S)) :
-    one(S) <: T && return_type(mul_fast, typeof(one(S)), S) <: T ? one(S)           :
+    one(S) <: T && return_type(mul_fast, typeof(one(S)), S) <: T ? Some(one(S))     :
                                                                    nothing
 @inline initial(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) =
     Some(typemin(T))
@@ -65,7 +65,14 @@ julia> return_type(+, Real, Real)
 Any
 ```
 """
-@inline return_type(f, args...) = Core.Compiler.return_type(f, args)
+@inline function return_type(f, args...)
+    rt = Core.Compiler.return_type(f, args)
+    if rt === Union{}
+        return Any
+    else
+        return rt
+    end
+end
 @inline return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline return_type(::typeof(add_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline return_type(::typeof(*), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)

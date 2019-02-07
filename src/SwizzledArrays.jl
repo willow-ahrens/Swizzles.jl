@@ -16,6 +16,9 @@ end
 
 (op::Guard)(x::Nothing, y) = y
 (op::Guard)(x, y) = op.op(x, y)
+@inline Properties.return_type(g::Guard, T, S) = Properties.return_type(g.op, T, S)
+@inline Properties.return_type(g::Guard, ::Type{<:Union{Nothing, T}}, S) where {T} = Properties.return_type(g.op, T, S)
+@inline Properties.return_type(g::Guard, ::Type{Nothing}, S) = S
 
 Properties.initial(::Guard, ::Any, ::Any) = nothing
 
@@ -154,7 +157,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
+Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
     inds = parentindices(src)
     arg = arr.arg
@@ -162,26 +165,17 @@ end
     if ndims(init) > 0
         init = SubArray(init, ntuple(n -> keeps(init, n) ? inds[n] : Slice(axes(init, n)), ndims(init)))
     end
-    mask′ = _convert_remask(inds, mask(arr)...)
-    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
-    #=
-    #if !all(ntuple(n-> size(init, n) == 1 || inds[n] == axes(init, n), ndims(init)))
-    #    init = SubArray(init, ntuple(n -> size(init, n) == 1 ? Slice(axes(init, n)) : inds[n], ndims(init))...)
-    #end
-    if @generated
-        if M == 0
-            mask′ = ((filter(d -> d isa Drop, collect(mask(Arr)))...,))
-        else
-            mask′ = :(_convert_remask(inds, mask(arr)...))
-        end
-        quote
-            return SwizzledArray{eltype(src), M, Op, $mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
-        end
+    if M == 0
+        mask′ = _convert_dropmask(mask(arr)...)
     else
-#       @warn "ungenerated convert"
+        mask′ = _convert_remask(inds, mask(arr)...)
     end
-    =#
+    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
 end
+
+@inline _convert_dropmask(::Drop, mask...) = (drop, _convert_dropmask(mask...)...)
+@inline _convert_dropmask(::Any, mask...) = _convert_dropmask(mask...)
+@inline _convert_dropmask() = ()
 
 @inline function _convert_remask(indices, d, mask...)
     if d isa Drop
