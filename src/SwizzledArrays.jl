@@ -154,7 +154,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-@inline function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
+@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
     inds = parentindices(src)
     arg = arr.arg
