@@ -66,12 +66,7 @@ Any
 ```
 """
 @inline function return_type(f, args...)
-    rt = Core.Compiler.return_type(f, args)
-    if rt === Union{}
-        return Any
-    else
-        return rt
-    end
+    return Core.Compiler.return_type(f, args)
 end
 @inline return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
 @inline return_type(::typeof(add_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)

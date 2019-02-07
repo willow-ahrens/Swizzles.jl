@@ -71,10 +71,10 @@ end
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
     init = Properties.initial(op, T, eltype(arg))
     if init === nothing
-        init = Scalar(nothing)
+        init = BroadcastedArray(nothing)
         op = Guard(op)
     else
-        init = Scalar(something(init))
+        init = BroadcastedArray(something(init))
     end
     return SwizzledArray{T, N, typeof(op), mask, Arg}(op, arg, init)
 end
@@ -157,20 +157,22 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
+Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op, <:Any}}
     arr = parent(src)
     inds = parentindices(src)
     arg = arr.arg
     init = arr.init
     if ndims(init) > 0
-        init = SubArray(init, ntuple(n -> (Base.@_inline_meta; keeps(init, n) ? inds[n] : Slice(axes(init, n))), Val(ndims(init))))
+        init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; keeps(init, n) ? inds[n] : Slice(axes(init, n))), Val(ndims(init))))
+    else
+        init′ = init
     end
     if M == 0
         mask′ = _convert_dropmask(mask(arr)...)
     else
         mask′ = _convert_remask(inds, mask(arr)...)
     end
-    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
+    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init′)
 end
 
 @inline _convert_dropmask(::Drop, mask...) = (drop, _convert_dropmask(mask...)...)

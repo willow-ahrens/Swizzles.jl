@@ -46,10 +46,16 @@ end
     if arr.arg isa AbstractArray
         T = Properties.eltype_bound(arr.arg)
         if T <: eltype(arr)
-            return eltype(arr.arg)
+            return T
+        end
+    else
+        T = eltype(arr.arg)
+        if T <: eltype(arr)
+            return T
+        else
+            return eltype(arr)
         end
     end
-    return eltype(arr)
 end
 
 @inline function Properties.eltype_bound(arr::BroadcastedArray{<:Any, <:Any, <:Broadcasted})
