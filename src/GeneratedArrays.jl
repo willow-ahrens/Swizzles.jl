@@ -65,7 +65,7 @@ Base.axes(arr::NullArray) = arr.axes
 Base.setindex!(arr, val, inds...) = val
 
 Base.foreach(f, a::GeneratedArray) = assign!(NullArray(axes(a)), a)
-function ArrayifiedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
+function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 =#
 
 

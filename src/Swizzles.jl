@@ -2,7 +2,7 @@ module Swizzles
 
 export Drop, drop
 export masktuple, imasktuple #maybe dont export...
-export ArrayifiedArray, arrayify
+export BroadcastedArray, arrayify
 export SwizzledArray, mask
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
@@ -16,7 +16,7 @@ include("properties.jl")
 
 include("WrapperArrays.jl")
 include("GeneratedArrays.jl")
-include("ArrayifiedArrays.jl")
+include("BroadcastedArrays.jl")
 include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
@@ -52,7 +52,7 @@ statement like:
 will result in code that is essentially:
 ```
    y = materialize(Broadcasted(+, (3.0,
-     SwizzledArray(ArrayifiedArray(Broadcasted(*, (x, 2))), +, (1,)))))
+     SwizzledArray(BroadcastedArray(Broadcasted(*, (x, 2))), +, (1,)))))
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one
 big happy operation. Use `BroadcastStyles` to customize the behavior for your
@@ -98,7 +98,7 @@ See also: [`Swizzle`](@ref).
 @inline Swizzle{T}(op::Op, _mask::Tuple) where {T, Op} = Swizzle{T, Op, _mask}(op)
 @inline Swizzle{T}(op::Op, ::Val{_mask}) where {T, Op, _mask} = Swizzle{T, Op, _mask}(op)
 
-@inline (ctr::Swizzle)(arg) = ctr(ArrayifiedArray(arg))
+@inline (ctr::Swizzle)(arg) = ctr(BroadcastedArray(arg))
 @inline function parse_swizzle_mask(arr, _mask::Tuple{Vararg{Union{Int, Drop}, M}}) where {M}
     return ntuple(d -> d <= M ? _mask[d] : drop, Val(ndims(arr)))
 end
@@ -210,7 +210,7 @@ See also: [`SwizzleTo`](@ref).
 @inline SwizzleTo{T}(op::Op, _imask::Tuple) where {T, Op} = SwizzleTo{T, Op, _imask}(op)
 @inline SwizzleTo{T}(op::Op, ::Val{_imask}) where {T, Op, _imask} = SwizzleTo{T, Op, _imask}(op)
 
-@inline (ctr::SwizzleTo)(arg) = ctr(ArrayifiedArray(arg))
+@inline (ctr::SwizzleTo)(arg) = ctr(BroadcastedArray(arg))
 @inline function(ctr::SwizzleTo{T, Op, _imask})(arg::Arg) where {T, Op, _imask, Arg <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(Arg, imasktuple(d->drop, identity, _imask))
@@ -316,7 +316,7 @@ See also: [`Reduce`](@ref).
 @inline Reduce{T}(op::Op, dims::Tuple) where {T, Op} = Reduce{T, Op, dims}(op)
 @inline Reduce{T}(op::Op, ::Val{dims}) where {T, Op, dims} = Reduce{T, Op, dims}(op)
 
-@inline (ctr::Reduce)(arg) = ctr(ArrayifiedArray(arg))
+@inline (ctr::Reduce)(arg) = ctr(BroadcastedArray(arg))
 @inline function parse_reduce_mask(arr, dims::Tuple{Vararg{Int}}) where {M, N}
     c = 0
     return ntuple(d -> d in dims ? drop : c += 1, Val(ndims(arr)))

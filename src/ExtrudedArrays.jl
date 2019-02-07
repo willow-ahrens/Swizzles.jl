@@ -4,7 +4,7 @@ module ExtrudedArrays
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
     using Swizzles.WrapperArrays
-    using Swizzles.ArrayifiedArrays
+    using Swizzles.BroadcastedArrays
     using Swizzles.ShallowArrays
 
     export ExtrudedArray
@@ -30,8 +30,8 @@ module ExtrudedArrays
     #keeps is a complicated function. It returns a tuple where each element of
     #the tuple specifies whether the corresponding dimension is intended to have
     #size 1. The complicated aspect of keeps is that while it should work on
-    #ArrayifiedArray, it must also work on the type wrapped by ArrayifiedArray.
-    #This way, lift_keeps only needs to use ArrayifiedArrays when it's creating
+    #BroadcastedArray, it must also work on the type wrapped by BroadcastedArray.
+    #This way, lift_keeps only needs to use BroadcastedArrays when it's creating
     #an ExtrudedArray.
     keeps(x) = newindexer(x)[1]
     keeps(ext::Extruded) = ext.keeps
@@ -44,7 +44,7 @@ module ExtrudedArrays
     keeps(::Type{<:Tuple{<:Any}}) = (false,)
     keeps(::Type{<:Number}) = ()
     keeps(::Type{<:RefValue}) = ()
-    keeps(Arr::Type{<:ArrayifiedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
+    keeps(Arr::Type{<:BroadcastedArray{<:Any, <:Any, Arg}}) where {Arg} = keeps(Arg)
 
     function keeps(bc::Broadcasted)
         args = map(keeps, bc.args)
@@ -58,7 +58,7 @@ module ExtrudedArrays
     end
 
     lift_keeps(x) = ExtrudedArray(x)
-    lift_keeps(x::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_keeps(x.arg))
+    lift_keeps(x::BroadcastedArray{T, N}) where {T, N} = BroadcastedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(x::StaticArray) = x
     lift_keeps(x::Tuple) = x
     lift_keeps(x::Number) = x

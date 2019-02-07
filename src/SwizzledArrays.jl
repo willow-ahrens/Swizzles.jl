@@ -1,6 +1,6 @@
 using Swizzles.Properties
 using Swizzles.WrapperArrays
-using Swizzles.ArrayifiedArrays
+using Swizzles.BroadcastedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
@@ -144,24 +144,30 @@ end
     imasktuple(d->Base.OneTo(1), d->axes(arr.arg, d), Val(mask(arr)))
 end
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
 end
 
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
     #complexity of dropping view indices). Therefore, we convert first.
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-@inline function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:NTuple{N}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
+@inline function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
     inds = parentindices(src)
     arg = arr.arg
     init = arr.init
-    if !all(ntuple(n-> size(init, n) == 1 || inds[n] == axes(init, n), ndims(init)))
-        init = SubArray(init, ntuple(n -> size(init, n) == 1 ? Slice(axes(init, n)) : inds[n], ndims(init))...)
+    if ndims(init) > 0
+        init = SubArray(init, ntuple(n -> keeps(init, n) ? inds[n] : Slice(axes(init, n)), ndims(init)))
     end
+    mask′ = _convert_remask(inds, mask(arr)...)
+    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
+    #=
+    #if !all(ntuple(n-> size(init, n) == 1 || inds[n] == axes(init, n), ndims(init)))
+    #    init = SubArray(init, ntuple(n -> size(init, n) == 1 ? Slice(axes(init, n)) : inds[n], ndims(init))...)
+    #end
     if @generated
         if M == 0
             mask′ = ((filter(d -> d isa Drop, collect(mask(Arr)))...,))
@@ -172,10 +178,9 @@ end
             return SwizzledArray{eltype(src), M, Op, $mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
         end
     else
-#        @warn "ungenerated convert"
-        mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
+#       @warn "ungenerated convert"
     end
+    =#
 end
 
 @inline function _convert_remask(indices, d, mask...)
@@ -206,7 +211,7 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
         return arg[]
     else
         dst = arr.init[]
-        arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
+        arg = BroadcastedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
         @inbounds for i in eachindex(arg)
             dst = arr.op(dst, arg[i])
         end
@@ -227,7 +232,7 @@ end
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     arg = arr.arg
-    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
+    arg = BroadcastedArrays.preprocess(dst, arr.arg)
     if mask(arr) isa Tuple{Vararg{Int}}
         @inbounds for i in eachindex(arg)
             i′ = childindex(dst, arr, i)

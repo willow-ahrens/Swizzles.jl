@@ -1,10 +1,10 @@
-using Swizzles.ArrayifiedArrays
+using Swizzles.BroadcastedArrays
 
 myidentity(x) = x
 
-@testset "ArrayifiedArrays" begin
+@testset "BroadcastedArrays" begin
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
-        @test myidentity.(ArrayifiedArray(arg)) == myidentity.(arg)
+        @test myidentity.(BroadcastedArray(arg)) == myidentity.(arg)
     end
-    @test ArrayifiedArray([1 2; 3 4])[3] == 2
+    @test BroadcastedArray([1 2; 3 4])[3] == 2
 end
