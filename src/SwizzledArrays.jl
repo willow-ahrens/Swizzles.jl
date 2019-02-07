@@ -190,15 +190,16 @@ end
 
 #Ideally, we would have written this.
 #=
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {T, N, Arr <: SwizzledArray}
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     dst = Array{eltype(arr), 0}(undef)
     copyto!(dst, Broadcasted{Nothing}(identity, (arr,))) #TRACE
     return dst[]
 end
 =#
+
 #Instead, we write this:
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {T, N, Arr <: SwizzledArray}
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     arg = arr.arg
     if mask(arr) isa Tuple{Vararg{Int}}
