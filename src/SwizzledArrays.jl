@@ -1,12 +1,23 @@
 using Swizzles.Properties
 using Swizzles.WrapperArrays
-using Swizzles.BroadcastedArrays
+using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
+using StaticArrays
+
+struct Guard{Op}
+    op::Op
+end
+
+(op::Guard)(x::Nothing, y) = y
+(op::Guard)(x, y) = op.op(x, y)
+
+Properties.initial(::Guard, ::Any, ::Any) = nothing
 
 """
     `nooperator(a, b)`
@@ -15,13 +26,49 @@ An operator which does not expect to be called. It startles easily.
 """
 nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
-struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray} <: GeneratedArray{T, N}
+struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray, Init<:AbstractArray} <: GeneratedArray{T, N}
     op::Op
     arg::Arg
-    function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
+    init::Init
+    function SwizzledArray{T, N, Op, mask, Arg, Init}(op::Op, arg::Arg, init::Init) where {T, N, Op, mask, Arg, Init}
         #FIXME check swizzles. also check noop axes!
-        new(op, arg)
+        @assert N == max(0, mask...)
+        new(op, arg, init)
     end
+end
+
+#typeof() constructors
+
+@inline function SwizzledArray{T, N, Op, mask}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
+    SwizzledArray{T, N, Op, mask, Arg}(op, arg)
+end
+
+@inline function SwizzledArray{T, N, Op, mask}(op::Op, arg::Arg, init::Init) where {T, N, Op, mask, Arg, Init}
+    SwizzledArray{T, N, Op, mask, Arg, Init}(op, arg, init)
+end
+
+@inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg, init::Init) where {T, N, Op, mask, Arg, Init}
+    SwizzledArray{T, N, Op, mask, Arg, Init}(op, arg, init)
+end
+
+#nothing constructors
+
+@inline function Properties.eltype_bound(arr::SwizzledArray)
+    T = eltype(arr.init)
+    S = Properties.eltype_bound(arr.arg)
+    if eltype(mask(arr)) <: Int
+        return T
+    end
+    T! = Union{T, Properties.return_type(arr.op, T, S)}
+    if T! <: T
+        return T!
+    end
+    T = T!
+    T! = Union{T, Properties.return_type(arr.op, T, S)}
+    if T! <: T
+        return T!
+    end
+    return Any
 end
 
 @inline function SwizzledArray{nothing, N, Op, mask, Arg}(op::Op, arg::Arg) where {N, Op, mask, Arg}
@@ -29,55 +76,63 @@ end
     return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
 end
 
-@inline function convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Arg}) where {T, S, N, Op, mask, Arg}
-    return SwizzledArray{T, N, Op, mask, Arg}(arr.op, arr.arg)
+@inline function SwizzledArray{nothing, N, Op, mask}(op::Op, arg::Arg, init::Init) where {N, Op, mask, Arg, Init}
+    arr = SwizzledArray{Any, N, Op, mask, Arg, Init}(op, arg, init)
+    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
+end
+
+#adding initial value constructor
+
+@inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
+    init = Properties.initial(op, T, eltype(arg))
+    if init === nothing
+        init = ArrayifiedArray(nothing) #fixme initial should be part of SwizzledArrays not Properties
+        op = Guard(op)
+    else
+        init = ArrayifiedArray(something(init))
+    end
+    return SwizzledArray{T, N, typeof(op), mask, Arg}(op, arg, init)
+end
+
+#eltype converter
+
+@inline function Base.convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Arg, Init}) where {T, S, N, Op, mask, Arg, Init}
+    return SwizzledArray{T, N, Op, mask, Arg, Init}(arr.op, arr.arg, arr.init)
 end
 
 
 
-@inline mask(::Type{SwizzledArray{T, N, Op, _mask, Arg}}) where {T, N, Op, _mask, Arg} = _mask
-@inline mask(::SwizzledArray{T, N, Op, _mask, Arg}) where {T, N, Op, _mask, Arg} = _mask
+@inline mask(::Type{<:SwizzledArray{<:Any, <:Any, <:Any, _mask}}) where {_mask} = _mask
+@inline mask(::SwizzledArray{<:Any, <:Any, <:Any, _mask}) where {_mask} = _mask
 
-@inline function Properties.eltype_bound(arr::SwizzledArray)
-    T = Properties.eltype_bound(arr.arg)
-    if eltype(mask(arr)) <: Int
-        return T
-    end
-    T! = Union{T, Properties.return_type(arr.op, T, T)}
-    if T! <: T
-        return T!
-    end
-    T = T!
-    T! = Union{T, Properties.return_type(arr.op, T, T)}
-    if T! <: T
-        return T!
-    end
-    return Any
-end
 
 
 
 function Base.show(io::IO, arr::SwizzledArray)
     print(io, SwizzledArray)
-    print(io, '(', arr.op, ", ", mask(arr), ", ", arr.arg, ')')
+    print(io, '(', arr.op, ", ", mask(arr), ", ", arr.arg, ", ", arr.init, ')')
     nothing
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
 Base.parent(::Type{<:SwizzledArray{T, N, Op, mask, Arg}}) where {T, N, Op, mask, Arg} = Arg
 WrapperArrays.iswrapper(arr::SwizzledArray) = true
-function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    SwizzledArray{T, N, Op, mask, typeof(arg)}(arr.op, arg)
+function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, Op, mask, <:Any, Init}) where {T, N, Op, mask, Init}
+    SwizzledArray{T, N, Op, mask, typeof(arg), Init}(arr.op, arg, arr.init)
 end
 
-Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.arg))
+Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.arg), dataids(arr.init))
 function Base.unaliascopy(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    op = unaliascopy(arr.op)
     arg = unaliascopy(arr.arg)
-    SwizzledArray{T, N, Op, mask, typeof(arg)}(unaliascopy(arr.op), arg)
+    init = unaliascopy(arr.init)
+    SwizzledArray{T, N, typeof(op), mask, typeof(arg), typeof(init)}(op, arg, init)
 end
-function Base.unalias(dest, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    arg = unalias(dest, arr.arg)
-    SwizzledArray{T, N, Op, mask, typeof(arg)}(unalias(dest, arr.op), arg)
+function Base.unalias(dst, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    op = unalias(dst, arr.op)
+    arg = unalias(dst, arr.arg)
+    init = unalias(dst, arr.init)
+    SwizzledArray{T, N, typeof(op), mask, typeof(arg), typeof(init)}(op, arg, init)
 end
 
 @inline function Base.size(arr::SwizzledArray)
@@ -97,19 +152,11 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
     return dst[]
 end
 =#
+import InteractiveUtils
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
-    arr = parent(src.args[1])
-    if mask(arr) isa Tuple{Vararg{Int}}
-        #This swizzle doesn't reduce so this is just a scalar getindex.
-        arg = parent(arr)
-        inds = parentindices(src.args[1])
-        @inbounds return arg[parentindex(arr, inds...)...]
-    else
-        #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-        #complexity of dropping view indices). Therefore, we convert first.
-        return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
-    end
+    println(InteractiveUtils.@which Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),))))
+    return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:NTuple{N}}}}) where {T, N}
@@ -118,10 +165,14 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-@inline function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:NTuple{N}}) where {T, N, M, Arr <: SwizzledArray{T, N}}
+@inline function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:NTuple{N}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
-    arg = parent(arr)
     inds = parentindices(src)
+    arg = arr.arg
+    init = arr.init
+    if !all(ntuple(n-> size(init, n) == 1 || inds[n] == axes(init, n), ndims(init)))
+        init = SubArray(init, ntuple(n -> size(init, n) == 1 ? Slice(axes(init, n)) : inds[n], ndims(init))...)
+    end
     if @generated
         if M == 0
             mask′ = ((filter(d -> d isa Drop, collect(mask(Arr)))...,))
@@ -129,77 +180,32 @@ end
             mask′ = :(_convert_remask(inds, mask(arr)...))
         end
         quote
-            return SwizzledArray{eltype(src)}(arr.op, $(Val(mask′)), SubArray(arg, parentindex(arr, inds...)))
+            return SwizzledArray{eltype(src), M, Op, $mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
         end
     else
+        @warn "ungenerated convert"
         mask′ = _convert_remask(inds, mask(arr)...)
-        return SwizzledArray{eltype(src)}(arr.op, mask′, SubArray(arg, parentindex(arr, inds...)))
+        return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), init)
     end
 end
 
 @inline function _convert_remask(indices, d, mask...)
     if d isa Drop
         (drop, _convert_remask(indices, mask...)...)
-    elseif Base.index_ndims(indices[d]) isa Tuple{}
+    elseif Base.index_dimsum(indices[d]) isa Tuple{}
         _convert_remask(indices, mask...)
     else
-        (length(Base.index_ndims(indices[1:d])), _convert_remask(indices, mask...)...)
+        (length(Base.index_dimsum(indices[1:d])), _convert_remask(indices, mask...)...)
     end
 end
 @inline _convert_remask(indices) = ()
 
-@generated function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {T, N, Arr <: SwizzledArray}
-    return quote
-        Base.@_propagate_inbounds_meta
-        arr = src.args[1]
-        arg = arr.arg
-        if mask(arr) isa Tuple{Vararg{Int}}
-            @inbounds return arg[]
-        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) !== nothing
-            dst = something(Properties.initial(arr.op, eltype(arr), eltype(arg)))
-            arg = BroadcastedArrays.preprocess(nothing, arg)
-            @inbounds for i in eachindex(arg)
-                dst = arr.op(dst, arg[i])
-            end
-            return dst
-        else
-            arg = BroadcastedArrays.preprocess(nothing, arg)
-            arg_axes = axes(arg)
-            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
-            arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(Arr)))...),)
-            arg_keeps = keeps(arg)
-            @inbounds $(begin
-                i′ = [Symbol("i′_$d") for d = 1:length(mask(Arr))]
-                thunk = Expr(:block)
-                for n = vcat(0, findall(d -> d isa Drop, mask(Arr)))
-                    if n > 0
-                        nest = :(dst = arr.op(dst, getindex(arg, $(i′...))))
-                    else
-                        nest = :(dst = getindex(arg, $(i′...)))
-                    end
-                    for d = 1:length(mask(Arr))
-                        if mask(Arr)[d] isa Drop
-                            if d == n
-                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
-                            elseif d < n
-                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                            else
-                                nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
-                            end
-                        else
-                            nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                        end
-                    end
-                    if n > 0
-                        nest = Expr(:if, :(arg_keeps[$n]), nest)
-                    end
-                    push!(thunk.args, nest)
-                end
-                thunk
-            end)
-            return dst
-        end
-    end
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {T, N, Arr <: SwizzledArray}
+    arr = src.args[1]
+    #dst = MArray{Tuple{}, eltype(arr)}(undef)
+    dst = Array{eltype(arr), 0}(undef)
+    copyto!(dst, Broadcasted{Nothing}(identity, (arr,))) #TRACE
+    return dst[]
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
@@ -207,71 +213,30 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     #accumulating the swizzle. Therefore, we should allocate a suitable
     #destination and then accumulate.
     arr = src.args[1]
+    @info (ndims(dst), ndims(similar(arr)), ndims(arr))
     copyto!(dst, copyto!(similar(arr), arr))
 end
 
-@generated function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
-    quote
-        Base.@_propagate_inbounds_meta
-        arr = src.args[1]
-        arg = arr.arg
-        if mask(arr) isa Tuple{Vararg{Int}}
-            arg = BroadcastedArrays.preprocess(dst, arr.arg)
-            @inbounds for i in eachindex(arg)
-                i′ = childindex(dst, arr, i)
-                dst[i′...] = arg[i]
-            end
-        elseif Properties.initial(arr.op, eltype(arr), eltype(arg)) !== nothing
-            dst .= something(Properties.initial(arr.op, eltype(arr), eltype(arr.arg)))
-            dst .= (arr.op).(dst, arr)
-        else
-            arg = BroadcastedArrays.preprocess(dst, arr.arg)
-            arg_axes = axes(arg)
-            arg_firstindices = ($((:(arg_axes[$n][1]) for n = 1:length(mask((Arr))))...),)
-            arg_restindices = ($((:(view(arg_axes[$n], 2:lastindex(arg_axes[$n]))) for n = 1:length(mask(Arr)))...),)
-            arg_keeps = keeps(arg)
-            @inbounds $(begin
-                i′ = [Symbol("i′_$d") for d = 1:length(mask(Arr))]
-                i = imasktuple(d->:(firstindex(dst, $d)), d->i′[d], mask(Arr))
-                thunk = Expr(:block)
-                for n = vcat(0, findall(d -> d isa Drop, mask(Arr)))
-                    if n > 0
-                        nest = :(dst[$(i...)] = arr.op(dst[$(i...)], getindex(arg, $(i′...))))
-                    else
-                        nest = :(dst[$(i...)] = getindex(arg, $(i′...)))
-                    end
-                    for d = 1:length(mask(Arr))
-                        if mask(Arr)[d] isa Drop
-                            if d == n
-                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_restindices[$d]), nest)
-                            elseif d < n
-                                nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                            else
-                                nest = Expr(:block, :($(Symbol("i′_$d")) = arg_firstindices[$d]), nest)
-                            end
-                        else
-                            nest = Expr(:for, :($(Symbol("i′_$d")) = arg_axes[$d]), nest)
-                        end
-                    end
-                    if n > 0
-                        nest = Expr(:if, :(arg_keeps[$n]), nest)
-                    end
-                    push!(thunk.args, nest)
-                end
-                thunk
-            end)
+#Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{AbstractArrayStyle{N}, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
+#    return copyto!(dst, Broadcasted{Nothing}(src))
+#end
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
+    @info "hello"
+    arr = src.args[1]
+    arg = arr.arg
+    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
+    if mask(arr) isa Tuple{Vararg{Int}}
+        @inbounds for i in eachindex(arg)
+            i′ = childindex(dst, arr, i)
+            dst[i′...] = arg[i]
         end
-        return dst
-    end
-end
-
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T}, src::Broadcasted{Nothing, <:Any, Op, <:Tuple{<:Any, <:SwizzledArray{<:T, <:Any, Op}}}) where {T, Op}
-    copyto!(dst, src.args[1])
-    arr = src.args[2]
-    arg = BroadcastedArrays.preprocess(dst, arr.arg)
-    @inbounds for i in eachindex(arg)
-        i′ = childindex(dst, arr, i)
-        dst[i′...] = arr.op(dst[i′...], arg[i])
+    else
+        println((typeof(dst), typeof(arr.init)))
+        dst .= arr.init
+        @inbounds for i in eachindex(arg)
+            i′ = childindex(dst, arr, i)
+            dst[i′...] = arr.op(dst[i′...], arg[i])
+        end
     end
     return dst
 end
