@@ -17,7 +17,7 @@ end
 (op::Guard)(x::Nothing, y) = y
 (op::Guard)(x, y) = op.op(x, y)
 @inline Properties.return_type(g::Guard, T, S) = Properties.return_type(g.op, T, S)
-@inline Properties.return_type(g::Guard, ::Type{<:Union{Nothing, T}}, S) where {T} = Properties.return_type(g.op, T, S)
+@inline Properties.return_type(g::Guard, ::Type{Union{Nothing, T}}, S) where {T} = Properties.return_type(g.op, T, S)
 @inline Properties.return_type(g::Guard, ::Type{Nothing}, S) = S
 
 Properties.initial(::Guard, ::Any, ::Any) = nothing
