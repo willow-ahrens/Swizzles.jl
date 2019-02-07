@@ -9,7 +9,6 @@ export Swizzle, Reduce, Sum, Max, Min, Beam
 export SwizzleTo, ReduceTo, SumTo, MaxTo, MinTo, BeamTo
 export Delay, Intercept
 
-
 include("base.jl")
 include("util.jl")
 include("properties.jl")
