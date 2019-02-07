@@ -163,7 +163,7 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     arg = arr.arg
     init = arr.init
     if ndims(init) > 0
-        init = SubArray(init, ntuple(n -> keeps(init, n) ? inds[n] : Slice(axes(init, n)), ndims(init)))
+        init = SubArray(init, ntuple(n -> (Base.@_inline_meta; keeps(init, n) ? inds[n] : Slice(axes(init, n))), Val(ndims(init))))
     end
     if M == 0
         mask′ = _convert_dropmask(mask(arr)...)

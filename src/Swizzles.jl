@@ -346,7 +346,7 @@ reduction results) is declared to be `T`.
 
 See also: [`Sum`](@ref).
 """
-    @inline Sum{T}(dims...) where {T} = Reduce{T}(+, dims...)
+    @inline Sum{T}(dims...) where {T} = Reduce{T}(Base.FastMath.add_fast, dims...)
 end
 
 """
