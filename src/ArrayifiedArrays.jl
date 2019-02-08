@@ -98,10 +98,10 @@ Base.length(arr::ArrayifiedArray{T, N, <:AbstractArray}) where {T, N} = length(a
 Base.length(arr::ArrayifiedArray) = prod(map(length, axes(arr)))
 
 #FIXME define some IndexStyle stuffs
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, Broadcasted}, I::Int) = _broadcast_getindex(arr.arg, I)
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, Broadcasted}, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, Broadcasted}, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, Broadcasted}) = error("FIXME")
+Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}, I::Int) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
+Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
+Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}) = _broadcast_getindex(arr.arg, 1)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::Int) = getindex(arr.arg, I)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::CartesianIndex) = getindex(arr.arg, I)
@@ -116,6 +116,7 @@ Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray) = getindex(arr.arg)
 
 @inline Base.copyto!(dst, arr::ArrayifiedArray) = copyto!(dst, arr.arg)
 @inline Base.Broadcast.materialize!(dst, arr::ArrayifiedArray) = copyto!(dst, arr)
+@inline Base.Broadcast.broadcastable(dst, arr::ArrayifiedArray) = broadcastable(parent(arr))
 
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
