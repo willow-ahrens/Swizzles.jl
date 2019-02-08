@@ -110,13 +110,7 @@ Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray) = getindex(arr.arg)
 
 @inline myidentity(x) = x
 
-#it may be that instead of specializing copy, we should just specialize similar
-@inline Base.copy(arr::ArrayifiedArray) = copy(arr.arg)
-@inline Base.Broadcast.materialize(arr::ArrayifiedArray) = copy(arr)
-
-@inline Base.copyto!(dst, arr::ArrayifiedArray) = copyto!(dst, arr.arg)
-@inline Base.Broadcast.materialize!(dst, arr::ArrayifiedArray) = copyto!(dst, arr)
-@inline Base.Broadcast.broadcastable(dst, arr::ArrayifiedArray) = broadcastable(parent(arr))
+@inline Base.Broadcast.broadcastable(arr::ArrayifiedArray) = broadcastable(arr.arg)
 
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))

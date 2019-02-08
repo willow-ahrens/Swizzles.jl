@@ -34,9 +34,9 @@ Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{Abst
 
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        copyto!(reshape(dst, axes(src)), instantiate(broadcasted(identity, src)))
+        reshape(dst, axes(src)) .= src
     else
-        copyto!(dst, instantiate(broadcasted(identity, src)))
+        dst .= src
     end
 end
 
