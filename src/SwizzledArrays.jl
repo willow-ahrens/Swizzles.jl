@@ -1,6 +1,6 @@
 using Swizzles.Properties
 using Swizzles.WrapperArrays
-using Swizzles.BroadcastedArrays
+using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
@@ -71,10 +71,10 @@ end
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
     init = Properties.initial(op, T, eltype(arg))
     if init === nothing
-        init = BroadcastedArray(nothing)
+        init = ArrayifiedArray(nothing)
         op = Guard(op)
     else
-        init = BroadcastedArray(something(init))
+        init = ArrayifiedArray(something(init))
     end
     return SwizzledArray{T, N, typeof(op), mask, Arg}(op, arg, init)
 end
@@ -208,7 +208,7 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
         return arg[]
     else
         dst = arr.init[]
-        arg = BroadcastedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
+        arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
         @inbounds for i in eachindex(arg)
             dst = arr.op(dst, arg[i])
         end
@@ -229,7 +229,7 @@ end
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     arg = arr.arg
-    arg = BroadcastedArrays.preprocess(dst, arr.arg)
+    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     if mask(arr) isa Tuple{Vararg{Int}}
         @inbounds for i in eachindex(arg)
             i′ = childindex(dst, arr, i)

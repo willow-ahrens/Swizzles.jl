@@ -2,7 +2,7 @@ module Swizzles
 
 export Drop, drop
 export masktuple, imasktuple #maybe dont export...
-export BroadcastedArray, arrayify
+export ArrayifiedArray, arrayify
 export SwizzledArray, mask
 export swizzle, swizzle!
 export Swizzle, Reduce, Sum, Max, Min, Beam
@@ -15,7 +15,7 @@ include("properties.jl")
 
 include("WrapperArrays.jl")
 include("GeneratedArrays.jl")
-include("BroadcastedArrays.jl")
+include("ArrayifiedArrays.jl")
 include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
@@ -51,7 +51,7 @@ statement like:
 will result in code that is essentially:
 ```
    y = materialize(Broadcasted(+, (3.0,
-     SwizzledArray(BroadcastedArray(Broadcasted(*, (x, 2))), +, (1,)))))
+     SwizzledArray(ArrayifiedArray(Broadcasted(*, (x, 2))), +, (1,)))))
 ```
 If `SwizzledArray`s are mixed with `Broadcasted`s, the result is fused into one
 big happy operation. Use `BroadcastStyles` to customize the behavior for your
