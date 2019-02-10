@@ -33,6 +33,14 @@ end
     return ArrayifiedArray{T, 1, typeof(arg)}(arg)
 end
 
+@inline function ArrayifiedArray{T}(arg::Broadcasted{<:AbstractArrayStyle{0}, Nothing}) where {T}
+    return ArrayifiedArray{T, 0, typeof(arg)}(arg)
+end
+
+@inline function ArrayifiedArray{T}(arg::Broadcasted{Style{Tuple}, Nothing}) where {T}
+    return ArrayifiedArray{T, 1, typeof(arg)}(arg)
+end
+
 @inline function ArrayifiedArray{T, N}(arg) where {T, N}
     arg = instantiate(broadcastable(arg))
     return ArrayifiedArray{T, N, typeof(arg)}(arg)
