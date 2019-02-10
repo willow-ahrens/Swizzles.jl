@@ -2,7 +2,7 @@
 # Base hotfixes
 ##
 module BaseHacks
-    @info "All your Base belong to us. Activate BaseHacks!!!"
+    @info "all your Base are belong to us. activating BaseHacks..."
 
     import Base.IteratorsMD: inc
     import Base: tail
@@ -22,4 +22,6 @@ module BaseHacks
          newtail = inc(tail(state), tail(start), tail(stop))
          (start[1], newtail...)
     end
+
+    @info "BaseHacks activation complete."
 end
