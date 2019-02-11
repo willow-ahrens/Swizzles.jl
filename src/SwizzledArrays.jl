@@ -35,6 +35,7 @@ struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray, Init<:AbstractArray} <:
     init::Init
     function SwizzledArray{T, N, Op, mask, Arg, Init}(op::Op, arg::Arg, init::Init) where {T, N, Op, mask, Arg, Init}
         #FIXME check swizzles. also check noop axes!
+        @assert T !== nothing
         @assert N == max(0, mask...)
         new(op, arg, init)
     end
