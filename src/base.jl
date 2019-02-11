@@ -23,5 +23,12 @@ module BaseHacks
          (start[1], newtail...)
     end
 
-    @info "BaseHacks activation complete. all your Base are belong to us."
+    @inline function Base.getindex(r::AbstractUnitRange, s::AbstractUnitRange{<:Integer})
+        @boundscheck checkbounds(r, s)
+        f = first(r)
+        st = oftype(f, f + first(s)-1)
+        Base._range(st, nothing, nothing, length(s)) #gotta use this version of range instead of const-propping through the kwarg version.
+    end
+
+    @info "BaseHacks is online. all your Base are belong to us."
 end
