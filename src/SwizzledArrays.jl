@@ -69,7 +69,7 @@ end
     return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
 end
 
-@inline function SwizzledArray{nothing, N, Op, mask}(op::Op, arg::Arg, init::Init) where {N, Op, mask, Arg, Init}
+@inline function SwizzledArray{nothing, N, Op, mask, Arg, Init}(op::Op, arg::Arg, init::Init) where {N, Op, mask, Arg, Init}
     arr = SwizzledArray{Any, N, Op, mask, Arg, Init}(op, arg, init)
     return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
 end
