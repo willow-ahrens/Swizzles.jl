@@ -43,6 +43,8 @@ Base.getindex(arr::ShallowArray, inds...) = getindex(parent(arr), inds...)
 
 Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
 
+Base.eachindex(arr::ShallowArray) = eachindex(parent(arr))
+
 @inline childstyle(::Type{<:ShallowArray}, S) = S
 
 @inline function Broadcast.BroadcastStyle(Arr::Type{<:ShallowArray{<:Any, <:Any, Arg}}) where {Arg}

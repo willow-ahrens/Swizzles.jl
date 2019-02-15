@@ -25,7 +25,7 @@ module ExtrudedArrays
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
-    WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray(arg)
+    WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), keeps(arr)}(arg)
 
     #keeps is a complicated function. It returns a tuple where each element of
     #the tuple specifies whether the corresponding dimension is intended to have
