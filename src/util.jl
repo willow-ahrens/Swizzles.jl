@@ -1,4 +1,5 @@
 using StaticArrays: SVector, setindex
+using AbstractTrees
 
 struct Drop end
 
@@ -84,3 +85,23 @@ Base.Broadcast.materialize(uw::Delay) = uw.value
 abstract type Intercept end
 
 @inline Base.Broadcast.broadcasted(style::BroadcastStyle, intr::Intercept, args...) = intr(args...)
+
+
+
+export dump_type_tree
+
+struct _TypeTreeDumper
+    t
+end
+
+_isleaf(d::_TypeTreeDumper) = length("$(d.t)") < 70
+
+AbstractTrees.children(d::_TypeTreeDumper) = _isleaf(d) ? [] : map(_TypeTreeDumper, d.t.parameters)
+
+AbstractTrees.printnode(io::IO, d::_TypeTreeDumper) = _isleaf(d) ? print(io, d.t) : print(io,d.t.name)
+
+function dump_type_tree(io::IO, t::DataType)
+    print_tree(io, _TypeTreeDumper(t))
+end
+
+dump_type_tree(t::DataType) = dump_type_tree(stdout, t)
