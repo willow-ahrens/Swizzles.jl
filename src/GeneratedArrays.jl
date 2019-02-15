@@ -57,6 +57,34 @@ end
 #=
 #do overrides for wierd copyto!s, map, foreach, etc...
 
+struct ScaledPower{T, S, E}
+    value::T
+    scale::S
+    exponent::E
+end
+
+function Base.:^(x::ScaledPower, y)
+    return x.scale^y * x.value^(y + x.exponent)
+end
+
+function incbypow(x::ScaledPower{T, S, E}, y::S)
+    if y != zero(y)
+        ay = abs(y)
+        if x.scale < ay
+            value = one(T) + x.value * (x.scale/ay)^x.exponent
+            scale = ay
+        else
+            value = value + (ay/x.scale)^x.exponent
+            scale = x.scale
+        end
+    end
+    return ScaledPower(value, scale, x.exponent)
+end
+
+Base.LinearAlgebra.norm(x::GeneratedArray, p) = Reduce(incbypow).(x, ScaledPower(zero(eltype(x)), zero(eltype(x)), p))^(-p)
+
+distance(x, y) = Reduce(incbypow).(x .- y, ScaledPower(zero(eltype(x)), zero(eltype(x)), 2))^(-2)
+
 struct NullArray{N} <: AbstractArray{<:Any, N}
     axes::NTuple{N}
 end
