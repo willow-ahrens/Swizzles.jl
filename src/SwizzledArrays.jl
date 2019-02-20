@@ -352,12 +352,12 @@ end
 
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
-    imasktuple(d->false, d->arg_keeps[d], Val(mask(arr)))
+    imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
 end
 
-function Swizzles.ExtrudedArrays.keeps(Arr::Type{<:SwizzledArray})
-    arg_keeps = keeps(parent(Arr))
-    imasktuple(d->false, d->arg_keeps[d], Val(mask(Arr)))
+function Swizzles.ExtrudedArrays.inferkeeps(Arr::Type{<:SwizzledArray})
+    arg_keeps = inferkeeps(parent(Arr))
+    imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(Arr)))
 end
 
 function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray)

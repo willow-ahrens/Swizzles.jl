@@ -70,6 +70,17 @@ end
     end
 end
 
+@inline jointuple(x) = x
+@inline jointuple(x, y) = (x..., y...)
+@inline jointuple(x, y, z...) = (x..., jointuple(y, z...)...)
+
+
+@inline combinetuple(f, arg) = arg
+@inline combinetuple(f::F, arg, tail...) where {F} = _combinetuple(f, arg, combinetuple(f, tail...))
+@inline _combinetuple(f, ::Tuple{}, ::Tuple{}) = ()
+@inline _combinetuple(f, ::Tuple{}, b::Tuple) = b
+@inline _combinetuple(f, a::Tuple, ::Tuple{}) = a
+@inline _combinetuple(f::F, a::Tuple, b::Tuple) where {F} = (f(first(a), first(b)), _combinetuple(f, Base.tail(a), Base.tail(b))...)
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
 
 struct Delay
