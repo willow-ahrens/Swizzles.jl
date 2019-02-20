@@ -6,10 +6,11 @@ module ExtrudedArrays
     using Swizzles.WrapperArrays
     using Swizzles.ArrayifiedArrays
     using Swizzles.ShallowArrays
+    using Swizzles.Properties
     using Swizzles: combinetuple
 
     export ExtrudedArray
-    export inferkeeps, keeps, kept, lift_keeps
+    export keeps, kept, lift_keeps
     export StableKeep, ShakyKeep, Extrude, Dynamic
 
     struct StableKeep end
@@ -84,9 +85,10 @@ module ExtrudedArrays
     keeps(ext::Extruded) = ext.keeps
     keeps(bc::Broadcasted) = combinetuple(|, map(keeps, bc.args)...)
 
-    inferkeeps(T::Type) = throw(MethodError(inferkeeps, (T,)))
-    function inferkeeps(::Type{<:StaticArray{S}}) where S <: Tuple
-        return map(S.parameters) do s
+    #=
+    Properties.return_type(typeof(keeps), T::Type) = Tuple{Vararg{Union{Bool, Extrude, StableKeep, ShakyKeep}}}
+    function Properties.return_type(typeof(keeps), ::Type{<:StaticArray{S}}) where S <: Tuple
+        results = map(S.parameters) do s
             if s isa Integer
                 if s == 1
                     return Extrude()
@@ -94,17 +96,21 @@ module ExtrudedArrays
                     return StableKeep()
                 end
             else
-                return Dynamic()
+                return Bool
             end
         end
     end
-    inferkeeps(::Type{<:ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
-    inferkeeps(::Type{<:Tuple}) = (true,)
-    inferkeeps(::Type{<:Tuple{<:Any}}) = (false,)
-    inferkeeps(::Type{<:Number}) = ()
-    inferkeeps(::Type{<:RefValue}) = ()
-    inferkeeps(Arr::Type{<:ArrayifiedArray{<:Any, <:Any, Arg}}) where {Arg} = inferkeeps(Arg)
-    inferkeeps(::Type{<:Broadcasted{<:Any, <:Any, <:Any, Args}}) where {Args<:Tuple} = combinetuple(|, map(inferkeeps, Args.parameters)...)
+    Properties.return_type(::typeof(keeps), ::Type{<:ExtrudedArray{<:Any, <:Any, <:Any, _keeps}}) where {_keeps} = _keeps
+    Properties.return_type(::typeof(keeps), ::Type{<:Tuple{Vararg{Any, N}}) where {N} = N == 1 ? Tuple{Extrude} : Tuple{StableKeep}
+    Properties.return_type(::typeof(keeps), ::Type{<:Tuple}) = Tuple{Union{Extrude, StableKeep}}
+    Properties.return_type(::typeof(keeps), ::Type{<:Number}) = Tuple{}
+    Properties.return_type(::typeof(keeps), ::Type{<:RefValue}) = Tuple{}
+    Properties.return_type(::typeof(keeps), ::Type{<:ArrayifiedArray{<:Any, <:Any, Arg}}) where {Arg} = return_type(keeps, Arg)
+    function Properties.return_type(::typeof(keeps), ::Type{<:Broadcasted{<:Any, <:Any, <:Any, Args}}) where {Args<:Tuple}
+
+        combinetuple((x, y) -> return_type(|, x, y), map(inferkeeps, Args.parameters)...)
+    end
+    =#
 
     lift_keeps(x) = ExtrudedArray(x)
     lift_keeps(x::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_keeps(x.arg))

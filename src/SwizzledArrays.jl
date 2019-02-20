@@ -355,10 +355,12 @@ end
     imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
 end
 
+#=
 function Swizzles.ExtrudedArrays.inferkeeps(Arr::Type{<:SwizzledArray})
     arg_keeps = inferkeeps(parent(Arr))
     imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(Arr)))
 end
+=#
 
 function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray)
     return adopt(arrayify(lift_keeps(parent(arr))), arr)
