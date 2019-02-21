@@ -1,7 +1,10 @@
 using Swizzles
 using Test
 
-include("Swizzle.jl")
-include("util.jl")
-include("ShallowArrays.jl")
-include("ExtrudedArrays.jl")
+@testset "Swizzles" begin
+    include("Swizzles.jl")
+    include("ShallowArrays.jl")
+    include("ExtrudedArrays.jl")
+    include("ArrayifiedArrays.jl")
+    include("util.jl")
+end

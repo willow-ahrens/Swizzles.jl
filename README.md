@@ -9,7 +9,7 @@
 [![pipeline status](https://gitlab.com/peterahrens/Swizzles.jl/badges/master/pipeline.svg)](https://gitlab.com/peterahrens/Swizzles.jl/commits/master)
 [![coverage report](https://gitlab.com/peterahrens/Swizzles.jl/badges/master/coverage.svg)](https://gitlab.com/peterahrens/Swizzles.jl/commits/master)
 
-Swizzles are Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzles are lazily evaluated together with broadcast expressions, and provide a familar interface for reducing and permuting.
+Swizzles are super cool Julia datatypes that allow the user to fuse reduction and transposition operations into broadcast expressions. Swizzles are lazily evaluated together with broadcast expressions, and provide a familiar interface for reduction and permutation. Swizzles.jl works only on Julia 1.1.0.
 
 ## Syntax
 

@@ -32,12 +32,11 @@ Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
 
-totallynotidentity(x) = x
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        copyto!(reshape(dst, axes(src)), instantiate(broadcasted(totallynotidentity, src)))
+        reshape(dst, axes(src)) .= src
     else
-        copyto!(dst, instantiate(broadcasted(totallynotidentity, src)))
+        dst .= src
     end
 end
 
@@ -58,6 +57,34 @@ end
 #=
 #do overrides for wierd copyto!s, map, foreach, etc...
 
+struct ScaledPower{T, S, E}
+    value::T
+    scale::S
+    exponent::E
+end
+
+function Base.:^(x::ScaledPower, y)
+    return x.scale^y * x.value^(y + x.exponent)
+end
+
+function incbypow(x::ScaledPower{T, S, E}, y::S)
+    if y != zero(y)
+        ay = abs(y)
+        if x.scale < ay
+            value = one(T) + x.value * (x.scale/ay)^x.exponent
+            scale = ay
+        else
+            value = value + (ay/x.scale)^x.exponent
+            scale = x.scale
+        end
+    end
+    return ScaledPower(value, scale, x.exponent)
+end
+
+Base.LinearAlgebra.norm(x::GeneratedArray, p) = Reduce(incbypow).(x, ScaledPower(zero(eltype(x)), zero(eltype(x)), p))^(-p)
+
+distance(x, y) = Reduce(incbypow).(x .- y, ScaledPower(zero(eltype(x)), zero(eltype(x)), 2))^(-2)
+
 struct NullArray{N} <: AbstractArray{<:Any, N}
     axes::NTuple{N}
 end
@@ -66,7 +93,7 @@ Base.axes(arr::NullArray) = arr.axes
 Base.setindex!(arr, val, inds...) = val
 
 Base.foreach(f, a::GeneratedArray) = assign!(NullArray(axes(a)), a)
-function BroadcastedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
+function ArrayifiedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
 =#
 
 
