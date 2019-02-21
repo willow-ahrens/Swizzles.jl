@@ -2,7 +2,7 @@ module MatchedArrays
 
 using Swizzles.WrapperArrays
 using Swizzles.ShallowArrays
-using Swizzles.BroadcastedArrays
+using Swizzles.ArrayifiedArrays
 
 using Base.Broadcast: Broadcasted, BroadcastStyle, AbstractArrayStyle
 using Base.Broadcast: result_style
@@ -31,9 +31,9 @@ function mark_destination(dst, src::AbstractArray)
         src
     end
 end
-function mark_destination(dst, src::BroadcastedArray{T, N}) where {T, N}
+function mark_destination(dst, src::ArrayifiedArray{T, N}) where {T, N}
     arg = mark_destination(dst, src.arg)
-    x = BroadcastedArray{T, N, typeof(arg)}(arg)
+    x = ArrayifiedArray{T, N, typeof(arg)}(arg)
 end
 
 unmatch(src) = src
@@ -47,9 +47,9 @@ function unmatch(src::AbstractArray)
         src
     end
 end
-function unmatch(src::BroadcastedArray{T, N}) where {T, N}
+function unmatch(src::ArrayifiedArray{T, N}) where {T, N}
     arg = unmatch(src.arg)
-    x = BroadcastedArray{T, N, typeof(arg)}(arg)
+    x = ArrayifiedArray{T, N, typeof(arg)}(arg)
 end
 unmatch(src::MatchedArray) = parent(src)
 
