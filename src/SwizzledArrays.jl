@@ -6,7 +6,7 @@ using Swizzles.ExtrudedArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes
+using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, broadcast_shape
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 using StaticArrays
 
@@ -52,12 +52,14 @@ end
 end
 
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg, init) where {T, N, Op, mask, Arg}
-    axes′ = imasktuple(d->Base.OneTo(1), d->axes(arg, d), Val(mask))
+    axes′ = imasktuple(d -> Base.OneTo(1), d -> axes(arg, d), Val(mask))
     init′ = arrayify(init)
     if axes(init′) == axes′
         init′′ = init′
-    else
+    elseif axes′ == broadcast_shape(axes′, axes(init′))
         init′′ = ArrayifiedArray(Broadcasted(identity, (broadcastable(init′),), axes′))
+    else
+        error("TODO")
     end
     return SwizzledArray{T, N, Op, mask, Arg, typeof(init′′)}(op, arg, init′′)
 end

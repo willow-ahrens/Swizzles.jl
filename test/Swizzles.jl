@@ -2,6 +2,8 @@
 
   A = [1 2 3; 4 5 6; 7 8 9]
 
+  @test_throws DimensionMismatch Swizzle(max, (1, drop)).(A, [1, 2, 3, 4]) == [3; 6; 9]
+
   @test Swizzle(max, (1, drop)).(A) == [3; 6; 9]
   @test Swizzle(min, (1, drop)).(A) == [1; 4; 7]
   @test Swizzle(max, (1,)).(A) == [3; 6; 9]
