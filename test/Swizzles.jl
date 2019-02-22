@@ -4,6 +4,12 @@
 
   @test_throws DimensionMismatch Swizzle(max, (1, drop)).(A, [1, 2, 3, 4]) == [3; 6; 9]
 
+  @test Sum().([]) == nothing
+  @test Beam(2, 3).([]) == Array{Any}(undef,1,0)
+  @test Beam(drop, 3).([]) == nothing
+  @test Beam(1, drop, drop).(Array{Any}(undef,1,0)) == [nothing]
+  @test Sum(2).(Array{Any}(undef,1,0)) == [nothing]
+
   @test Swizzle(max, (1, drop)).(A) == [3; 6; 9]
   @test Swizzle(min, (1, drop)).(A) == [1; 4; 7]
   @test Swizzle(max, (1,)).(A) == [3; 6; 9]

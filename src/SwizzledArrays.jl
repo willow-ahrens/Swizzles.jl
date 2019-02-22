@@ -209,8 +209,12 @@ end
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     arg = arr.arg
-    if mask(arr) isa Tuple{Vararg{Int}}
-        return arg[]
+    if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
+        if length(arg) > 0
+            return arg[]
+        else
+            return identity.(arr.init)
+        end
     else
         dst = arr.init[]
         arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
@@ -235,10 +239,14 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arr = src.args[1]
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
-    if mask(arr) isa Tuple{Vararg{Int}}
-        @inbounds for i in eachindex(arg)
-            i′ = childindex(dst, arr, i)
-            dst[i′...] = arg[i]
+    if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
+        if length(arg) == 0
+            dst .= arr.init
+        else
+            @inbounds for i in eachindex(arg)
+                i′ = childindex(dst, arr, i)
+                dst[i′...] = arg[i]
+            end
         end
     else
         dst .= arr.init
