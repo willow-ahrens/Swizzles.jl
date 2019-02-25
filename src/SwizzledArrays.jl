@@ -213,7 +213,7 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
         if length(arg) > 0
             return arg[]
         else
-            return identity.(arr.init)
+            return arr.init[]
         end
     else
         dst = arr.init[]
