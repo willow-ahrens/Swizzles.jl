@@ -2,51 +2,52 @@ module Properties
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
 """
-    initial(f, T, S)
+    initial(op, T)
 
-Return the value `i` such that `something(i)::T`, `f(something(i), x)::T`, and
-`f(something(i), x) == x` for all values `x` of type `S`. Return `nothing` if
-you cannot reasonably return such a value.
+Return the default initial value for the reduction operator `op` on the type
+`T`. Return `nothing` if you such a value does not exist.
 
 See also: [`zero`](@ref), [`oneunit`](@ref).
 
 # Examples
 ```jldoctest
-julia> initial(+, Int, Int)
+julia> initial(+, Int)
 0
-julia> initial(+, Real, Real)
+julia> initial(+, Real)
 false
-julia> initial(+, Int, Real)
-nothing
 ```
 """
 
-@inline initial(f, T, S) = nothing
+@inline initial(f, T) = nothing
 
-@inline initial(::typeof(+), T, S::Type{<:Number}) =
-    S <: T                                  ? Some(zero(S)) :
-    return_type(+, typeof(zero(T)), S) <: T ? Some(zero(T)) :
-                                              nothing
-@inline initial(::typeof(add_fast), T, S::Type{<:Number}) =
-    S <: T                                         ? Some(zero(S)) :
-    return_type(add_fast, typeof(zero(T)), S) <: T ? Some(zero(T)) :
-                                                     nothing
-@inline initial(::typeof(*), T, S::Type{<:Number}) =
-    S <: T                                                ? Some(oneunit(S)) :
-    one(S) <: T && return_type(*, typeof(one(S)), S) <: T ? Some(one(S))     :
-                                                            nothing
-@inline initial(::typeof(mul_fast), T, S::Type{<:Number}) =
-    S <: T                                                       ? Some(oneunit(S)) :
-    one(S) <: T && return_type(mul_fast, typeof(one(S)), S) <: T ? Some(one(S))     :
-                                                                   nothing
-@inline initial(::typeof(max), T::Type{<:Number}, S::Type{<:Number}) =
-    Some(typemin(T))
-@inline initial(::typeof(max_fast), T::Type{<:Number}, S::Type{<:Number}) =
-    Some(typemin(T))
-@inline initial(::typeof(min), T::Type{<:Number}, S::Type{<:Number}) =
-    Some(typemax(T))
-@inline initial(::typeof(min_fast), T::Type{<:Number}, S::Type{<:Number}) =
-    Some(typemax(T))
+@inline initial(::typeof(+), T::Type{<:Number}) = Some(zero(T))
+@inline initial(::typeof(add_fast), T::Type{<:Number}) = Some(zero(T))
+@inline initial(::typeof(*), T::Type{<:Number}) = Some(oneunit(T))
+@inline initial(::typeof(mul_fast), T::Type{<:Number}) = Some(oneunit(T))
+@inline initial(::typeof(max), T::Type{<:Number}) = Some(typemin(T))
+@inline initial(::typeof(max_fast), T::Type{<:Number}) = Some(typemin(T))
+@inline initial(::typeof(min), T::Type{<:Number}) = Some(typemax(T))
+@inline initial(::typeof(min_fast), T::Type{<:Number}) = Some(typemax(T))
+
+"""
+    initial_value(op, x)
+
+Return the default initial value for the reduction operator `op` on the value
+`x`. Return `nothing` if you such a value does not exist.
+
+See also: [`zero`](@ref), [`oneunit`](@ref).
+
+# Examples
+```jldoctest
+julia> initial_value(+, 1)
+0
+julia> initial_value(+, 1.0)
+-0.0
+```
+"""
+@inline initial_value(f::F, x) where {F} = initial(f, typeof(x))
+
+
 
 """
     return_type(f, args...)

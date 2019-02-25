@@ -10,24 +10,9 @@ using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, pre
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 using StaticArrays
 
-struct Guard{Op}
-    op::Op
-end
 
-(op::Guard)(x::Nothing, y) = y
-(op::Guard)(x, y) = op.op(x, y)
-@inline Properties.return_type(g::Guard, T, S) = Properties.return_type(g.op, T, S)
-@inline Properties.return_type(g::Guard, ::Type{Union{Nothing, T}}, S) where {T} = Properties.return_type(g.op, T, S)
-@inline Properties.return_type(g::Guard, ::Type{Nothing}, S) = S
 
-@inline Properties.initial(::Guard, ::Any, ::Any) = Some(nothing)
 
-"""
-    `nooperator(a, b)`
-
-An operator which does not expect to be called. It startles easily.
-"""
-nooperator(a, b) = throw(ArgumentError("unspecified operator"))
 
 struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray, Init<:AbstractArray} <: GeneratedArray{T, N}
     op::Op
@@ -54,20 +39,13 @@ end
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg, init) where {T, N, Op, mask, Arg}
     axes′ = imasktuple(d -> Base.OneTo(1), d -> axes(arg, d), Val(mask))
     init′ = arrayify(init)
-    if axes(init′) == axes′
-        init′′ = init′
-    elseif axes′ == broadcast_shape(axes′, axes(init′))
-        init′′ = ArrayifiedArray(Broadcasted(identity, (broadcastable(init′),), axes′))
-    else
-        error("TODO")
-    end
-    return SwizzledArray{T, N, Op, mask, Arg, typeof(init′′)}(op, arg, init′′)
+    return SwizzledArray{T, N, Op, mask, Arg, typeof(init′)}(op, arg, init′)
 end
 
 #adding initial value constructor
 
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
-    init = Properties.initial(op, T, eltype(arg))
+    init = Properties.initial(op, eltype(arg))
     if init === nothing
         init = nothing
         op = Guard(op)
@@ -165,7 +143,9 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     else
         mask′ = _convert_remask(inds, mask(arr)...)
     end
-    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, SubArray(arg, parentindex(arr, inds...)), SubArray(init, inds))
+    init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds′[n]), Val(ndims(init))))
+    arg′ = SubArray(arg, parentindex(arr, inds...))
+    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, arg′, init′)
 end
 
 @inline _convert_dropmask(::Drop, mask...) = (drop, _convert_dropmask(mask...)...)
