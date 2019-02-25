@@ -224,19 +224,19 @@ See also: [`SwizzleTo`](@ref).
 @inline function(ctr::SwizzleTo{T, Op, _imask})(arg::Arg) where {T, Op, _imask, Arg <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(Arg, imasktuple(d->drop, identity, _imask))
-        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, Arg}(ctr.op, arg))
+        return :(return Swizzle{T, Op, $mask}(ctr.op)(arg))
     else
         mask = parse_swizzle_mask(arg, imasktuple(d->drop, identity, _imask))
-        return SwizzledArray{T, max(0, mask...), Op, mask, Arg}(ctr.op, arg)
+        return Swizzle{T}(ctr.op, mask)(arg)
     end
 end
 @inline function(ctr::SwizzleTo{T, Op, _imask})(arg::Arg, init::Init) where {T, Op, _imask, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(Arg, imasktuple(d->drop, identity, _imask))
-        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, Arg, Init}(ctr.op, arg, init))
+        return :(return Swizzle{T, Op, $mask}(ctr.op)(arg, init))
     else
         mask = parse_swizzle_mask(arg, imasktuple(d->drop, identity, _imask))
-        return SwizzledArray{T, max(0, mask...), Op, mask, Arg, Init}(ctr.op, arg, init)
+        return Swizzle{T}(ctr.op, mask)(arg, init)
     end
 end
 
@@ -346,19 +346,19 @@ end
 @inline function(ctr::Reduce{T, Op, dims})(arg::Arg) where {T, Op, dims, Arg <: AbstractArray}
     if @generated
         mask = parse_reduce_mask(Arg, dims)
-        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, typeof(arg)}(ctr.op, arg))
+        return :(return Swizzle{T, Op, $mask}(ctr.op)(arg))
     else
         mask = parse_reduce_mask(arg, dims)
-        return SwizzledArray{T, max(0, mask...), Op, mask, typeof(arg)}(ctr.op, arg)
+        return Swizzle{T}(ctr.op, mask)(arg)
     end
 end
 @inline function(ctr::Reduce{T, Op, dims})(arg::Arg, init::Init) where {T, Op, dims, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
         mask = parse_reduce_mask(Arg, dims)
-        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, typeof(arg)}(ctr.op, arg, init))
+        return :(return Swizzle{T, Op, $mask}(ctr.op)(arg, init))
     else
         mask = parse_reduce_mask(arg, dims)
-        return SwizzledArray{T, max(0, mask...), Op, mask, typeof(arg)}(ctr.op, arg, init)
+        return Swizzle{T}(ctr.op, mask)(arg, init)
     end
 end
 
