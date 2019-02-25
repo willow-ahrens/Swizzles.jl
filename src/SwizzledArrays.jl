@@ -64,18 +64,6 @@ end
     return SwizzledArray{T, N, Op, mask, Arg, typeof(init′′)}(op, arg, init′′)
 end
 
-#nothing constructors
-
-@inline function SwizzledArray{nothing, N, Op, mask, Arg}(op::Op, arg::Arg) where {N, Op, mask, Arg}
-    arr = SwizzledArray{Any, N, Op, mask, Arg}(op, arg)
-    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
-end
-
-@inline function SwizzledArray{nothing, N, Op, mask, Arg, Init}(op::Op, arg::Arg, init::Init) where {N, Op, mask, Arg, Init}
-    arr = SwizzledArray{Any, N, Op, mask, Arg, Init}(op, arg, init)
-    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
-end
-
 #adding initial value constructor
 
 @inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
