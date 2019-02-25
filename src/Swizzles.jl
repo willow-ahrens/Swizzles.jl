@@ -102,6 +102,14 @@ See also: [`Swizzle`](@ref).
 @inline function parse_swizzle_mask(arr, _mask::Tuple{Vararg{Union{Int, Drop}, M}}) where {M}
     return ntuple(d -> d <= M ? _mask[d] : drop, Val(ndims(arr)))
 end
+@inline function(ctr::Swizzle{nothing, Op, _mask})(arg::AbstractArray) where {Op, _mask}
+    arr = Swizzle{Any, Op, _mask}(ctr.op)(arg)
+    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
+end
+@inline function(ctr::Swizzle{nothing, Op, _mask})(arg::AbstractArray, init::AbstractArray) where {Op, _mask}
+    arr = Swizzle{Any, Op, _mask}(ctr.op)(arg, init)
+    return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
+end
 @inline function(ctr::Swizzle{T, Op, _mask})(arg::Arg) where {T, Op, _mask, Arg <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(Arg, _mask)
