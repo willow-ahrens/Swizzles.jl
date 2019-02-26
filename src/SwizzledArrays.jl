@@ -37,6 +37,7 @@ end
 #eltype bound
 
 @inline function Properties.eltype_bound(arr::SwizzledArray)
+    #FIXME not strictly correct
     T = eltype(arr.init)
     S = Properties.eltype_bound(arr.arg)
     if eltype(mask(arr)) <: Int
@@ -152,6 +153,7 @@ end
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     arg = arr.arg
+    #FIXME we need a Property here
     if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
         if length(arg) > 0
             return arg[]
@@ -182,6 +184,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arr = src.args[1]
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
+    #FIXME we need a Property here
     if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
         if length(arg) == 0
             dst .= arr.init
