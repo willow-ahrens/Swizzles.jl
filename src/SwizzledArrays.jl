@@ -30,8 +30,8 @@ end
 
 #eltype converter
 
-@inline function Base.convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Arg, Init}) where {T, S, N, Op, mask, Arg, Init}
-    return SwizzledArray{T, N, Op, mask, Arg, Init}(arr.op, arr.arg, arr.init)
+@inline function Base.convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Init, Arg}) where {T, S, N, Op, mask, Init, Arg}
+    return SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arr.arg)
 end
 
 #eltype bound
