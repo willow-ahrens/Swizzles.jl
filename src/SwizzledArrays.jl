@@ -12,8 +12,6 @@ using StaticArrays
 
 
 
-
-
 struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: GeneratedArray{T, N}
     op::Op
     init::Init
@@ -282,30 +280,6 @@ is applied by overriding the `childstyle` method.
 @inline function Broadcast.BroadcastStyle(Arr::Type{<:SwizzledArray})
     childstyle(Arr, BroadcastStyle(parent(Arr)))
 end
-
-#=
-@inline function Broadcast.broadcastable(arr::SwizzledArray{T, N, <:Any, <:Any, Arg}) where {T, N, Arg, A <: }
-    if @generated
-        if mask(arr) == ((1:length(ndims(Arg)))...)
-            return quote
-                Base.@_inline_meta()
-                return arr.arg
-            end
-        else
-            return quote
-                Base.@_inline_meta()
-                return arr
-            end
-        end
-    else
-        if mask(arr) == ((1:length(ndims(Arg)))...)
-            return arr.arg
-        else
-            return arr
-        end
-    end
-end
-=#
 
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
