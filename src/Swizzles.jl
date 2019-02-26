@@ -12,7 +12,6 @@ export Delay, Intercept
 include("base.jl")
 include("util.jl")
 include("properties.jl")
-include("Antennae.jl")
 
 include("WrapperArrays.jl")
 include("GeneratedArrays.jl")
@@ -148,10 +147,10 @@ end
 @inline function(ctr::Swizzle{T, Op, _mask})(init::Init, arg::Arg) where {T, Op, _mask, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
         mask = parse_swizzle_mask(Arg, _mask)
-        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, Arg, Init}(ctr.op, arg, init))
+        return :(return SwizzledArray{T, $(max(0, mask...)), Op, $mask, Init, Arg}(ctr.op, init, arg))
     else
         mask = parse_swizzle_mask(arg, _mask)
-        return SwizzledArray{T, max(0, mask...), Op, mask, Arg, Init}(ctr.op, arg, init)
+        return SwizzledArray{T, max(0, mask...), Op, mask, Init, Arg}(ctr.op, init, arg)
     end
 end
 

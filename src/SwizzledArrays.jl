@@ -14,45 +14,20 @@ using StaticArrays
 
 
 
-struct SwizzledArray{T, N, Op, mask, Arg<:AbstractArray, Init<:AbstractArray} <: GeneratedArray{T, N}
+struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: GeneratedArray{T, N}
     op::Op
-    arg::Arg
     init::Init
-    function SwizzledArray{T, N, Op, mask, Arg, Init}(op::Op, arg::Arg, init::Init) where {T, N, Op, mask, Arg, Init}
+    arg::Arg
+    function SwizzledArray{T, N, Op, mask, Init, Arg}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
         #FIXME check swizzles. also check noop axes!
         @assert T !== nothing
         @assert N == max(0, mask...)
-        new(op, arg, init)
+        new(op, init, arg)
     end
 end
 
-#typeof() constructors
-
-@inline function SwizzledArray{T, N, Op, mask}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
-    SwizzledArray{T, N, Op, mask, Arg}(op, arg)
-end
-
-@inline function SwizzledArray{T, N, Op, mask}(op::Op, arg::Arg, init) where {T, N, Op, mask, Arg}
-    SwizzledArray{T, N, Op, mask, Arg}(op, arg, init)
-end
-
-@inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg, init) where {T, N, Op, mask, Arg}
-    axes′ = imasktuple(d -> Base.OneTo(1), d -> axes(arg, d), Val(mask))
-    init′ = arrayify(init)
-    return SwizzledArray{T, N, Op, mask, Arg, typeof(init′)}(op, arg, init′)
-end
-
-#adding initial value constructor
-
-@inline function SwizzledArray{T, N, Op, mask, Arg}(op::Op, arg::Arg) where {T, N, Op, mask, Arg}
-    init = Properties.initial(op, eltype(arg))
-    if init === nothing
-        init = nothing
-        op = Guard(op)
-    else
-        init = something(init)
-    end
-    return SwizzledArray{T, N, typeof(op), mask, Arg}(op, arg, init)
+@inline function SwizzledArray{T, N, Op, mask}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
+    SwizzledArray{T, N, Op, mask, Init, Arg}(op, init, arg)
 end
 
 #eltype converter
@@ -90,37 +65,39 @@ end
 
 function Base.show(io::IO, arr::SwizzledArray)
     print(io, SwizzledArray)
-    print(io, '(', arr.op, ", ", mask(arr), ", ", arr.arg, ", ", arr.init, ')')
+    print(io, '(', arr.op, ", ", mask(arr), ", ", arr.init, ", ", arr.arg, ')')
     nothing
 end
 
 Base.parent(arr::SwizzledArray) = arr.arg
-Base.parent(::Type{<:SwizzledArray{T, N, Op, mask, Arg}}) where {T, N, Op, mask, Arg} = Arg
+Base.parent(::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg} = Arg
 WrapperArrays.iswrapper(arr::SwizzledArray) = true
-function WrapperArrays.adopt(arg, arr::SwizzledArray{T, N, Op, mask, <:Any, Init}) where {T, N, Op, mask, Init}
-    SwizzledArray{T, N, Op, mask, typeof(arg), Init}(arr.op, arg, arr.init)
+function WrapperArrays.adopt(arg::Arg, arr::SwizzledArray{T, N, Op, mask, Init}) where {T, N, Op, mask, Init, Arg}
+    SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arg)
 end
 
-Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.arg), dataids(arr.init))
+Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.init), dataids(arr.arg))
 function Base.unaliascopy(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     op = unaliascopy(arr.op)
-    arg = unaliascopy(arr.arg)
     init = unaliascopy(arr.init)
-    SwizzledArray{T, N, typeof(op), mask, typeof(arg), typeof(init)}(op, arg, init)
+    arg = unaliascopy(arr.arg)
+    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
 end
 function Base.unalias(dst, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     op = unalias(dst, arr.op)
-    arg = unalias(dst, arr.arg)
     init = unalias(dst, arr.init)
-    SwizzledArray{T, N, typeof(op), mask, typeof(arg), typeof(init)}(op, arg, init)
+    arg = unalias(dst, arr.arg)
+    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
 end
 
 @inline function Base.size(arr::SwizzledArray)
-    imasktuple(d->1, d->size(arr.arg, d), Val(mask(arr)))
+    arg_size = size(arr.arg)
+    imasktuple(d->1, d->arg_size[d], Val(mask(arr)))
 end
 
 @inline function Base.axes(arr::SwizzledArray)
-    imasktuple(d->Base.OneTo(1), d->axes(arr.arg, d), Val(mask(arr)))
+    arg_axes = axes(arr.arg)
+    imasktuple(d->Base.OneTo(1), d->arg_axes[d], Val(mask(arr)))
 end
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
@@ -133,7 +110,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
-Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op, <:Any}}
+Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
     inds = parentindices(src)
     arg = arr.arg
@@ -145,7 +122,7 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     end
     init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds′[n]), Val(ndims(init))))
     arg′ = SubArray(arg, parentindex(arr, inds...))
-    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, arg′, init′)
+    return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, init′, arg′)
 end
 
 @inline _convert_dropmask(::Drop, mask...) = (drop, _convert_dropmask(mask...)...)
@@ -243,7 +220,8 @@ Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, 1}, i::I
 end
 
 Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, N}, i::Vararg{Any, N}) where {N}
-    masktuple(d->Base.Slice(axes(arr.arg, d)), d->i[d], Val(mask(arr)))
+    arg_axes = axes(arr.arg)
+    masktuple(d->Base.Slice(arg_axes[d]), d->i[d], Val(mask(arr)))
 end
 
 
@@ -265,8 +243,9 @@ Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::
     return childindex(dst, arr, Tuple(i)...)
 end
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    imasktuple(d->firstindex(axes(dst, d)), d->i[d], Val(mask(arr)))
+Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+    dst_axes = axes(dst)
+    imasktuple(d->firstindex(dst_axes[d]), d->i[d], Val(mask(arr)))
 end
 
 """
