@@ -3,6 +3,7 @@ using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
+using Swizzles.BoxArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -99,6 +100,8 @@ end
     imasktuple(d->Base.OneTo(1), d->arg_axes[d], Val(mask(arr)))
 end
 
+
+
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
 end
@@ -139,16 +142,17 @@ end
 end
 @inline _convert_remask(indices) = ()
 
+Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = BoxArray{T}()
+
 #Ideally, we would have written this.
-#=
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
-    dst = Array{eltype(arr), 0}(undef)
+    dst = similar(src)
     copyto!(dst, Broadcasted{Nothing}(identity, (arr,))) #TRACE
     return dst[]
 end
-=#
 
+#=
 #Instead, we write this:
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
@@ -164,11 +168,12 @@ Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0
         dst = arr.init[]
         arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
         @inbounds for i in eachindex(arg)
-            dst = arr.op(dst, arg[i])
+            dst[] = arr.op(dst, arg[i])
         end
     end
     return dst
 end
+=#
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
     #This method gets called when the destination eltype is unsuitable for
