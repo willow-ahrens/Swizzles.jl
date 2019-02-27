@@ -144,36 +144,12 @@ end
 
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = BoxArray{T}()
 
-#Ideally, we would have written this.
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     dst = similar(src)
-    copyto!(dst, Broadcasted{Nothing}(identity, (arr,))) #TRACE
+    copyto!(dst, Broadcasted{Nothing}(identity, (arr,)))
     return dst[]
 end
-
-#=
-#Instead, we write this:
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
-    arr = src.args[1]
-    arg = arr.arg
-    #FIXME we need a Property here
-    if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
-        if length(arg) > 0
-            return arg[]
-        else
-            return arr.init[]
-        end
-    else
-        dst = arr.init[]
-        arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
-        @inbounds for i in eachindex(arg)
-            dst[] = arr.op(dst, arg[i])
-        end
-    end
-    return dst
-end
-=#
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
     #This method gets called when the destination eltype is unsuitable for
