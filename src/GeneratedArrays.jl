@@ -50,7 +50,7 @@ Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = _getin
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = _getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
-Base.@propagate_inbounds function _getindex(arr, I...)
+Base.@propagate_inbounds function _getindex(arr, I...)::eltype(arr)
     identity.(view(arr, I...))
 end
 
