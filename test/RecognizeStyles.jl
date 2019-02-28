@@ -7,7 +7,8 @@ using Base.Broadcast: broadcasted
 
     @generated function test_eval_reprexpr_is_id(val)
         return quote
-            oVal = eval(reprexpr(val, $val))
+            expr = reprexpr(val, $val)
+            oVal = eval(expr)
 
             @test typeof(val) === typeof(oVal)
             @test val == oVal

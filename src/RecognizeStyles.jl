@@ -1,6 +1,8 @@
 module RecognizeStyles
 
 using Swizzles
+using Swizzles.Antennae
+
 using LinearAlgebra
 using Base.Broadcast: Broadcasted, broadcasted 
 
@@ -43,7 +45,7 @@ function reprexpr(root, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr where
     f′ = :($root.f)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
-    :($broadcasted($f′, $(arg_exprs...)))
+    :($Antenna($f′)($(arg_exprs...)))
 end
 
 function tuple_reprexpr(root, ::Type{TType})::Array{Expr, 1} where TType<:Tuple

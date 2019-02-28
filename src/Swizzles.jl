@@ -13,6 +13,7 @@ include("base.jl")
 include("util.jl")
 include("properties.jl")
 
+include("Antennae.jl")
 include("BoxArrays.jl")
 include("WrapperArrays.jl")
 include("GeneratedArrays.jl")
