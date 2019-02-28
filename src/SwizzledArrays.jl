@@ -35,18 +35,19 @@ end
     return SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arr.arg)
 end
 
-#eltype bound
-
 @inline function Properties.eltype_bound(arr::SwizzledArray)
-    #FIXME not strictly correct
-    T = eltype(arr.init)
+    T = Properties.eltype_bound(arr.init)
     S = Properties.eltype_bound(arr.arg)
-    if eltype(mask(arr)) <: Int
-        return S
-    end
     T! = Union{T, Properties.return_type(arr.op, T, S)}
     if T! <: T
         return T!
+    end
+    arr_keeps = Properties.return_type(keeps, typeof(arr))
+    if arr_keeps isa Tuple{Vararg{Any, ndims(arr)}}
+        arr_mask = mask(arr)
+        if all(ntuple(n->arr_mask[n] isa Int || arr_keeps.parameters[n] isa Extrude, ndims(arr)))
+            return T!
+        end
     end
     T = T!
     T! = Union{T, Properties.return_type(arr.op, T, S)}
