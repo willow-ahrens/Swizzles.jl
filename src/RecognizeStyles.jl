@@ -2,6 +2,7 @@ module RecognizeStyles
 
 using Swizzles
 using LinearAlgebra
+using Base.Broadcast: Broadcasted
 
 """
     reprexpr(root::Union{Symbol, Expr}, T::Type)
@@ -23,21 +24,32 @@ julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root, T) = :($root::$T)
+reprexpr(root, T) = :($root::$T) :: Expr
 
-function reprexpr(root, ::Type{Adjoint{T, Arg}}) where {T, Arg}
+function reprexpr(root, ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg} 
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Adjoint)($arg′))
 end
 
-function reprexpr(root, ::Type{Transpose{T, Arg}}) where {T, Arg}
+function reprexpr(root, ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg} 
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Transpose)($arg′))
 end
 
-# TODO(Tony): get reprexpr working for Broadcasts
+function reprexpr(root, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr
+                                    where {Style, Axes, F, Args<:Tuple}
+    f' = :($root.f)
+    arg_exprs = tuple_reprexpr(:($root.args), Args)
+
+    :($broadcasted($f', $(arg_exprs...)))
+end
+
+function tuple_reprexpr(root, ::Type{TType})::Array{Expr, 1} where TType<:Tuple
+    [reprexpr(:($root[$idx]), EType)
+         for (idx, EType) in enumerate(TType.parameters)]
+end
 
 #=
 """
