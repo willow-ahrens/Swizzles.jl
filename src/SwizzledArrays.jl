@@ -42,11 +42,15 @@ end
     if T! <: T
         return T!
     end
-    arr_keeps = Properties.return_type(keeps, typeof(arr))
-    if arr_keeps isa Tuple{Vararg{Any, ndims(arr)}}
-        arr_mask = mask(arr)
-        if all(ntuple(n->arr_mask[n] isa Int || arr_keeps.parameters[n] isa Extrude, ndims(arr)))
-            return T!
+    if mask(arr) isa Tuple{Vararg{Int}}
+        return T!
+    else
+        arg_keeps = Properties.return_type(keeps, typeof(arr.arg))
+        if arg_keeps <: Tuple{Vararg{Any, ndims(arr.arg)}}
+            arr_mask = mask(arr)
+            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] isa Extrude, ndims(arr.arg)))
+                return T!
+            end
         end
     end
     T = T!
