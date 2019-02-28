@@ -3,6 +3,7 @@ using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
+using Swizzles.BoxArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -34,18 +35,19 @@ end
     return SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arr.arg)
 end
 
-#eltype bound
-
 @inline function Properties.eltype_bound(arr::SwizzledArray)
-    #FIXME not strictly correct
-    T = eltype(arr.init)
+    T = Properties.eltype_bound(arr.init)
     S = Properties.eltype_bound(arr.arg)
-    if eltype(mask(arr)) <: Int
-        return S
-    end
     T! = Union{T, Properties.return_type(arr.op, T, S)}
     if T! <: T
         return T!
+    end
+    arr_keeps = Properties.return_type(keeps, typeof(arr))
+    if arr_keeps isa Tuple{Vararg{Any, ndims(arr)}}
+        arr_mask = mask(arr)
+        if all(ntuple(n->arr_mask[n] isa Int || arr_keeps.parameters[n] isa Extrude, ndims(arr)))
+            return T!
+        end
     end
     T = T!
     T! = Union{T, Properties.return_type(arr.op, T, S)}
@@ -99,6 +101,8 @@ end
     imasktuple(d->Base.OneTo(1), d->arg_axes[d], Val(mask(arr)))
 end
 
+
+
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
 end
@@ -139,35 +143,13 @@ end
 end
 @inline _convert_remask(indices) = ()
 
-#Ideally, we would have written this.
-#=
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
-    arr = src.args[1]
-    dst = Array{eltype(arr), 0}(undef)
-    copyto!(dst, Broadcasted{Nothing}(identity, (arr,))) #TRACE
-    return dst[]
-end
-=#
+Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = BoxArray{T}()
 
-#Instead, we write this:
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
-    arg = arr.arg
-    #FIXME we need a Property here
-    if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
-        if length(arg) > 0
-            return arg[]
-        else
-            return arr.init[]
-        end
-    else
-        dst = arr.init[]
-        arg = ArrayifiedArrays.preprocess(dst, arr.arg) #FIXME if dst isn't an array, does this even make sense?
-        @inbounds for i in eachindex(arg)
-            dst = arr.op(dst, arg[i])
-        end
-    end
-    return dst
+    dst = similar(src)
+    copyto!(dst, Broadcasted{Nothing}(identity, (arr,)))
+    return dst[]
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
