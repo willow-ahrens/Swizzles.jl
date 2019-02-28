@@ -6,5 +6,6 @@ using Test
     include("ShallowArrays.jl")
     include("ExtrudedArrays.jl")
     include("ArrayifiedArrays.jl")
+    include("RecognizeStyles.jl")
     include("util.jl")
 end

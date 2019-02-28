@@ -4,7 +4,7 @@ using Swizzles
 using LinearAlgebra
 
 """
-    reprexpr(root::Expr, T::Type)
+    reprexpr(root::Union{Symbol, Expr}, T::Type)
 
 Given a root expression of type T, produce the most detailed constructor
 expression you can to create a new object that should be equal to root.
@@ -21,16 +21,23 @@ julia> r = reprexpr(:A, typeof(A))
 :(LinearAlgebra.Adjoint(parent(A)::Array{Int64,2}))
 julia> eval(Main, r) == A
 true
+```
 """
 reprexpr(root, T) = :($root::$T)
 
-function reprexpr(root, ::Adjoint{T, Arg}) where {T, Arg}
-    root′ = :(parent($root))
+function reprexpr(root, ::Type{Adjoint{T, Arg}}) where {T, Arg}
+    root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Adjoint)($arg′))
 end
 
+function reprexpr(root, ::Type{Transpose{T, Arg}}) where {T, Arg}
+    root′ = :($root.parent)
+    arg′ = reprexpr(root′, Arg)
+    :($(Transpose)($arg′))
+end
 
+# TODO(Tony): get reprexpr working for Broadcasts
 
 #=
 """
@@ -79,3 +86,4 @@ function lookup(arr::Broadcasted{+, Tuple{Array{Int}, Array{Int}}})
     end
 end
 =#
+end
