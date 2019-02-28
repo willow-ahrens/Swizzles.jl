@@ -27,28 +27,28 @@ julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root, T) = :($root::$T) :: Expr
+reprexpr(root::Union{Symbol, Expr}, T) :: Expr = :($root::$T) 
 
-function reprexpr(root, ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg} 
+function reprexpr(root::Union{Symbol, Expr}, ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg} 
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Adjoint)($arg′))
 end
 
-function reprexpr(root, ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg} 
+function reprexpr(root::Union{Symbol, Expr}, ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg} 
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Transpose)($arg′))
 end
 
-function reprexpr(root, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr where {Style, Axes, F, Args<:Tuple}
+function reprexpr(root::Union{Symbol, Expr}, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr where {Style, Axes, F, Args<:Tuple}
     f′ = :($root.f)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
     :($Antenna($f′)($(arg_exprs...)))
 end
 
-function tuple_reprexpr(root, ::Type{TType})::Array{Expr, 1} where TType<:Tuple
+function tuple_reprexpr(root::Union{Symbol, Expr}, ::Type{TType})::Array{Expr, 1} where TType<:Tuple
     [reprexpr(:($root[$idx]), EType)
          for (idx, EType) in enumerate(TType.parameters)]
 end

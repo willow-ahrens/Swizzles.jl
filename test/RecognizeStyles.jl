@@ -6,10 +6,9 @@ using Base.Broadcast: broadcasted
 @testset "reprexpr" begin
 
     @generated function test_eval_reprexpr_is_id(val)
+        expr = reprexpr(:val, val)
         return quote
-            expr = reprexpr(val, $val)
-            oVal = eval(expr)
-
+            oVal = $expr
             @test typeof(val) === typeof(oVal)
             @test val == oVal
         end
