@@ -2,7 +2,8 @@ module RecognizeStyles
 
 using Swizzles
 using LinearAlgebra
-using Base.Broadcast: Broadcasted
+using Base.Broadcast: Broadcasted, broadcasted 
+
 
 """
     reprexpr(root::Union{Symbol, Expr}, T::Type)
@@ -38,12 +39,11 @@ function reprexpr(root, ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg}
     :($(Transpose)($arg′))
 end
 
-function reprexpr(root, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr
-                                    where {Style, Axes, F, Args<:Tuple}
-    f' = :($root.f)
+function reprexpr(root, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr where {Style, Axes, F, Args<:Tuple}
+    f′ = :($root.f)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
-    :($broadcasted($f', $(arg_exprs...)))
+    :($broadcasted($f′, $(arg_exprs...)))
 end
 
 function tuple_reprexpr(root, ::Type{TType})::Array{Expr, 1} where TType<:Tuple
