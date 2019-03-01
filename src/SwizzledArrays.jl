@@ -177,7 +177,9 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
         @boundscheck begin
             arg_keeps = keeps(arr.arg)
             arr_mask = mask(arr)
-            @assert all(ntuple(n->arr_mask[n] === drop || kept(arg_keeps[n]), ndims(arr.arg)))
+            if any(ntuple(n->arr_mask[n] === drop && kept(arg_keeps[n]), ndims(arr.arg)))
+                throw(DimensionMismatch("TODO"))
+            end
         end
         @inbounds for i in eachindex(arg)
             i′ = childindex(dst, arr, i)

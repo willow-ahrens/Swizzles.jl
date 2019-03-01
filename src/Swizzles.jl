@@ -100,13 +100,6 @@ See also: [`Swizzle`](@ref).
 
 
 
-"""
-    `nooperator(a, b)`
-
-An operator which does not expect to be called. It startles easily.
-"""
-nooperator(a, b) = throw(ArgumentError("unspecified operator"))
-
 struct Guard{Op}
     op::Op
 end
@@ -157,6 +150,8 @@ end
 
 
 
+@inline Properties.initial(::Nothing, ::Any) = Some(nothing)
+
 struct Beam{T}
 """
     `Beam{T}(mask...)`
@@ -166,7 +161,7 @@ Similar to [`Beam`](@ref), but the eltype is declared to be `T`.
 
 See also: [`Beam`](@ref).
 """
-    @inline Beam{T}(_mask...) where {T} = Swizzle{T}(Guard(nooperator), _mask...)
+    @inline Beam{T}(_mask...) where {T} = Swizzle{T}(nothing, _mask...)
 end
 
 """
@@ -285,7 +280,7 @@ Similar to [`BeamTo`](@ref), but the eltype is declared to be `T`.
 
 See also: [`BeamTo`](@ref).
 """
-    @inline BeamTo{T}(_imask...) where {T} = SwizzleTo{T}(Guard(nooperator), _imask...)
+    @inline BeamTo{T}(_imask...) where {T} = SwizzleTo{T}(nothing, _imask...)
 end
 
 """

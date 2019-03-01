@@ -10,8 +10,8 @@
   @test Reduce(+, :).(A) == 45
   @test Sum().([]) == nothing
   @test Beam(2, 3).([]) == Array{Any}(undef,1,0)
-  @test Beam(drop, 3).([]) == nothing
-  @test Beam(1, drop, drop).(Array{Any}(undef,1,0)) == [nothing]
+  @test_throws DimensionMismatch Beam(drop, 3).([])
+  @test_throws DimensionMismatch Beam(1, drop, drop).(Array{Any}(undef,1,0))
   @test Sum(2).(Array{Any}(undef,1,0)) == [nothing]
 
   @test Swizzle(max, (1, drop)).(A) == [3; 6; 9]
@@ -62,8 +62,8 @@
   @test (R .= Swizzle(min, (drop, 1, 2)).(A)) == [1; 2; 3]
 
   R = [0; 0; 0;]
-  @test_throws ArgumentError R .= Beam((drop, 1, 2)).(A)
-  @test_throws ArgumentError R .= Beam((1, drop, 2)).(A)
+  @test_throws DimensionMismatch R .= Beam((drop, 1, 2)).(A)
+  @test_throws DimensionMismatch R .= Beam((1, drop, 2)).(A)
 
   @test Beam((2, 1)).(A) == transpose(A)
 
@@ -89,9 +89,9 @@
   @test Swizzle(+, (2,1)).(A) == transpose(A)
   @test Swizzle(+, (2,1,3)).(A) == transpose(A)
 
-  @test_throws ArgumentError Beam().(A)
-  @test_throws ArgumentError Beam(2).(A)
-  @test_throws ArgumentError Beam(1).(A)
+  @test_throws DimensionMismatch Beam().(A)
+  @test_throws DimensionMismatch Beam(2).(A)
+  @test_throws DimensionMismatch Beam(1).(A)
   @test Beam(1,2).(A) == A
   @test Beam(1,2,3).(A) == A
   @test Beam(2,1).(A) == transpose(A)
@@ -133,9 +133,9 @@
   @test Swizzle(+, (2,1)).(A.+A) == transpose(A.+A)
   @test Swizzle(+, (2,1,3)).(A.+A) == transpose(A.+A)
 
-  @test_throws ArgumentError Beam().(A.+A)
-  @test_throws ArgumentError Beam(2).(A.+A)
-  @test_throws ArgumentError Beam(1).(A.+A)
+  @test_throws DimensionMismatch Beam().(A.+A)
+  @test_throws DimensionMismatch Beam(2).(A.+A)
+  @test_throws DimensionMismatch Beam(1).(A.+A)
   @test Beam(1,2).(A.+A) == A.+A
   @test Beam(1,2,3).(A.+A) == A.+A
   @test Beam(2,1).(A.+A) == transpose(A.+A)
@@ -177,9 +177,9 @@
   @test SwizzleTo(+, (2,1)).(A) == transpose(A)
   @test SwizzleTo(+, (2,1,3)).(A) == transpose(A)
 
-  @test_throws ArgumentError BeamTo().(A.+A)
-  @test_throws ArgumentError BeamTo(2).(A.+A)
-  @test_throws ArgumentError BeamTo(1).(A.+A)
+  @test_throws DimensionMismatch BeamTo().(A.+A)
+  @test_throws DimensionMismatch BeamTo(2).(A.+A)
+  @test_throws DimensionMismatch BeamTo(1).(A.+A)
   @test BeamTo(1,2).(A.+A) == A.+A
   @test BeamTo(1,2,3).(A.+A) == A.+A
   @test BeamTo(2,1).(A.+A) == transpose(A.+A)
