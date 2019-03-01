@@ -366,6 +366,8 @@ reduction results) is declared to be `T`.
 See also: [`Reduce`](@ref).
 """
 @inline Reduce{T}(op::Op, dims...) where {T, Op} = Reduce{T, Op, dims}(op)
+@inline Reduce{T}(op) where {T} = Reduce{T}(op, Colon())
+@inline Reduce{T}(op::Op, dims::Colon) where {T, Op} = Reduce{T, Op, dims}(op)
 @inline Reduce{T}(op::Op, dims::Tuple) where {T, Op} = Reduce{T, Op, dims}(op)
 @inline Reduce{T}(op::Op, ::Val{dims}) where {T, Op, dims} = Reduce{T, Op, dims}(op)
 
@@ -374,7 +376,7 @@ See also: [`Reduce`](@ref).
     c = 0
     return ntuple(d -> d in dims ? drop : c += 1, Val(ndims(arr)))
 end
-@inline function parse_reduce_mask(arr, dims::Tuple{}) where {M, N}
+@inline function parse_reduce_mask(arr, ::Colon) where {M, N}
     return ntuple(d -> drop, Val(ndims(arr)))
 end
 @inline function(ctr::Reduce{T, Op, dims})(arg::Arg) where {T, Op, dims, Arg <: AbstractArray}
