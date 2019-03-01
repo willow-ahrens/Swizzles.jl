@@ -51,7 +51,7 @@ end
         arg_keeps = Properties.return_type(keeps, typeof(arr.arg))
         if arg_keeps <: Tuple{Vararg{Any, ndims(arr.arg)}}
             arr_mask = mask(arr)
-            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] <: Extrude, ndims(arr.arg)))
+            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] <: Extrude, Val(ndims(arr.arg))))
                 return T!
             end
         end
