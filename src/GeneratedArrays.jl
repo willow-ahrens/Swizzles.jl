@@ -4,6 +4,7 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
 using Base.Broadcast: Broadcasted
 using Base.Broadcast: instantiate, broadcasted
+using LinearAlgebra
 
 export GeneratedArray
 
@@ -74,7 +75,7 @@ end
 
 Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
     if :init in keys(kwargs...)
-        return Reduce(op, dims).(kwargs.init, arr)
+        return Reduce(op, dims).(Ref(kwargs.init), arr)
     else
         return Reduce(op, dims).(arr)
     end
@@ -82,7 +83,7 @@ end
 
 Base.@propagate_inbounds function Base.sum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
     if :init in keys(kwargs...)
-        return Sum(dims).(kwargs.init, arr)
+        return Sum(dims).(Ref(kwargs.init), arr)
     else
         return Sum(dims).(arr)
     end
@@ -90,7 +91,7 @@ end
 
 Base.@propagate_inbounds function Base.maximum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
     if :init in keys(kwargs...)
-        return Max(dims).(kwargs.init, arr)
+        return Max(dims).(Ref(kwargs.init), arr)
     else
         return Max(dims).(arr)
     end
@@ -98,53 +99,21 @@ end
 
 Base.@propagate_inbounds function Base.minimum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
     if :init in keys(kwargs...)
-        return Min(dims).(kwargs.init, arr)
+        return Min(dims).(Ref(kwargs.init), arr)
     else
         return Min(dims).(arr)
     end
 end
 
-#=
-#do overrides for wierd copyto!s, map, foreach, etc...
-
-struct ScaledPower{T, S, E}
-    value::T
-    scale::S
-    exponent::E
+Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::AbstractArray)
+    return Sum().(x .* y)
 end
 
-function Base.:^(x::ScaledPower, y)
-    return x.scale^y * x.value^(y + x.exponent)
+Base.@propagate_inbounds function LinearAlgebra.dot(x::AbstractArray, y::GeneratedArray)
+    return Sum().(x .* y)
 end
 
-function incbypow(x::ScaledPower{T, S, E}, y::S)
-    if y != zero(y)
-        ay = abs(y)
-        if x.scale < ay
-            value = one(T) + x.value * (x.scale/ay)^x.exponent
-            scale = ay
-        else
-            value = value + (ay/x.scale)^x.exponent
-            scale = x.scale
-        end
-    end
-    return ScaledPower(value, scale, x.exponent)
+Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::GeneratedArray)
+    return Sum().(x .* y)
 end
-
-Base.LinearAlgebra.norm(x::GeneratedArray, p) = Reduce(incbypow).(x, ScaledPower(zero(eltype(x)), zero(eltype(x)), p))^(-p)
-
-distance(x, y) = Reduce(incbypow).(x .- y, ScaledPower(zero(eltype(x)), zero(eltype(x)), 2))^(-2)
-
-struct NullArray{N} <: AbstractArray{<:Any, N}
-    axes::NTuple{N}
-end
-
-Base.axes(arr::NullArray) = arr.axes
-Base.setindex!(arr, val, inds...) = val
-
-Base.foreach(f, a::GeneratedArray) = assign!(NullArray(axes(a)), a)
-function ArrayifiedArrays.assign!(dst::NullArray, MetaArray(op, arg)) #foreach
-=#
-
-
 end
