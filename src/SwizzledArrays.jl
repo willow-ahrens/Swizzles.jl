@@ -36,8 +36,11 @@ end
 end
 
 @inline function Properties.eltype_bound(arr::SwizzledArray)
-    T = Properties.eltype_bound(arr.init)
     S = Properties.eltype_bound(arr.arg)
+    if arr.op === nothing
+        return S
+    end
+    T = Properties.eltype_bound(arr.init)
     T! = Union{T, Properties.return_type(arr.op, T, S)}
     if T! <: T
         return T!
@@ -48,7 +51,7 @@ end
         arg_keeps = Properties.return_type(keeps, typeof(arr.arg))
         if arg_keeps <: Tuple{Vararg{Any, ndims(arr.arg)}}
             arr_mask = mask(arr)
-            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] isa Extrude, ndims(arr.arg)))
+            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] <: Extrude, ndims(arr.arg)))
                 return T!
             end
         end
@@ -170,15 +173,15 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arr = src.args[1]
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
-    #FIXME we need a Property here
-    if mask(arr) isa Tuple{Vararg{Int}} && eltype(arr.init) <: Nothing && arr.op isa Guard
-        if length(arg) == 0
-            dst .= arr.init
-        else
-            @inbounds for i in eachindex(arg)
-                i′ = childindex(dst, arr, i)
-                dst[i′...] = arg[i]
-            end
+    if arr.op === nothing
+        @boundscheck begin
+            arg_keeps = keeps(arr.arg)
+            arr_mask = mask(arr)
+            @assert all(ntuple(n->arr_mask[n] === drop || kept(arg_keeps[n]), ndims(arr.arg)))
+        end
+        @inbounds for i in eachindex(arg)
+            i′ = childindex(dst, arr, i)
+            dst[i′...] = arg[i]
         end
     else
         dst .= arr.init
