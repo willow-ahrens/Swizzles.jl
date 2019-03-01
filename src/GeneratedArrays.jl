@@ -54,6 +54,56 @@ Base.@propagate_inbounds function _getindex(arr, I...)::eltype(arr)
     identity.(view(arr, I...))
 end
 
+#The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
+Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _setindex!(arr, v, I)
+Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::CartesianIndex) = _setindex!(arr, v, I)
+Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I...) = _setindex!(arr, v, I...)
+
+Base.@propagate_inbounds function _setindex!(arr, v, I...)
+    view(arr, I...) .= v
+end
+
+Base.@propagate_inbounds function Base.map(f::F, arr::GeneratedArray, tail...) where {F}
+    f.(arr, tail...)
+end
+
+Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
+    NullArray(axes(arr)) .= f.(arr, tail...)
+    return nothing
+end
+
+Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+    if :init in keys(kwargs...)
+        return Reduce(op, dims).(kwargs.init, arr)
+    else
+        return Reduce(op, dims).(arr)
+    end
+end
+
+Base.@propagate_inbounds function Base.sum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+    if :init in keys(kwargs...)
+        return Sum(dims).(kwargs.init, arr)
+    else
+        return Sum(dims).(arr)
+    end
+end
+
+Base.@propagate_inbounds function Base.maximum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+    if :init in keys(kwargs...)
+        return Max(dims).(kwargs.init, arr)
+    else
+        return Max(dims).(arr)
+    end
+end
+
+Base.@propagate_inbounds function Base.minimum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+    if :init in keys(kwargs...)
+        return Min(dims).(kwargs.init, arr)
+    else
+        return Min(dims).(arr)
+    end
+end
+
 #=
 #do overrides for wierd copyto!s, map, foreach, etc...
 
