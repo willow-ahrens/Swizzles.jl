@@ -72,9 +72,9 @@ end
         (x, y) = (y, x)
     end
     if iszero(y.scale)
-        arg = y.arg + zero(y.arg) * (x.scale/one(y.scale))^x.exponent
+        arg = x.arg + zero(y.arg) * (x.scale/one(y.scale))^x.exponent
     else
-        arg = y.arg + y.arg * (x.scale/y.scale)^x.exponent
+        arg = x.arg + y.arg * (x.scale/y.scale)^x.exponent
     end
 
     return ScaledPower(arg, x.scale, x.exponent)
