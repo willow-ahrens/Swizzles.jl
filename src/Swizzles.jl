@@ -12,7 +12,6 @@ export Delay, Intercept
 include("base.jl")
 include("util.jl")
 include("properties.jl")
-include("Powers.jl")
 
 include("BoxArrays.jl")
 include("WrapperArrays.jl")
