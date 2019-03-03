@@ -202,6 +202,7 @@ end
 
 @inline function Base.:+(x::T, y::T) where {T <: Power}
     x.exponent == y.exponent || ArgumentError("Cannot accurately add Powers with different exponents")
+    #TODO handle negative exponent
     if x.scale < y.scale
         (x, y) = (y, x)
     end
