@@ -1,8 +1,8 @@
 module Powers
 
 using LinearAlgebra
-export Power
-export power, root
+export Power, Square
+export power, root, square
 
 struct Power{T, S, E} <: Number
     arg::T
@@ -35,6 +35,39 @@ end
         end
     else
         return Power(x.arg + y.arg * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+    end
+end
+
+struct Square{T, S} <: Number
+    arg::T
+    scale::S
+end
+
+@inline square(x) = Square(sign(x)^2, norm(x))
+
+@inline root(x::Square) = sqrt(x.arg) * x.scale
+@inline Base.sqrt(x::Square) = root(x)
+
+function Base.promote_type(::Type{Square{T1, S1}}, ::Type{Square{T2, S2}}) where {T1, S1, T2, S2}
+    return Square{promote_type(T1, T2), promote_type(S1, S2)}
+end
+
+function Base.convert(::Type{Square{T, S}}, x::Square) where {T, S, E}
+    return Square(convert(T, x.arg), convert(S, x.scale))
+end
+
+@inline function Base.:+(x::T, y::T) where {T <: Square}
+    if x.scale < y.scale
+        (x, y) = (y, x)
+    end
+    if x.scale > y.scale
+        if iszero(y.scale)
+            return Square(x.arg + zero(y.arg) * (one(x.scale)/one(y.scale))^1, x.scale)
+        else
+            return Square(x.arg + y.arg * (x.scale/y.scale)^2, x.scale)
+        end
+    else
+        return Square(x.arg + y.arg * (one(x.scale)/one(y.scale))^1, x.scale)
     end
 end
 
