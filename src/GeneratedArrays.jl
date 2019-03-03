@@ -75,31 +75,31 @@ end
 
 Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
     if :init in keys(kwargs...)
-        return Reduce(op, dims).(Ref(kwargs.init), arr)
+        return Reduce(op, dims).(kwargs.init, arr)
     else
         return Reduce(op, dims).(arr)
     end
 end
 
-Base.@propagate_inbounds function Base.sum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+Base.@propagate_inbounds function Base.sum(arr::GeneratedArray; dims=:, kwargs...)
     if :init in keys(kwargs...)
-        return Sum(dims).(Ref(kwargs.init), arr)
+        return Sum(dims).(kwargs.init, arr)
     else
         return Sum(dims).(arr)
     end
 end
 
-Base.@propagate_inbounds function Base.maximum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+Base.@propagate_inbounds function Base.maximum(arr::GeneratedArray; dims=:, kwargs...)
     if :init in keys(kwargs...)
-        return Max(dims).(Ref(kwargs.init), arr)
+        return Max(dims).(kwargs.init, arr)
     else
         return Max(dims).(arr)
     end
 end
 
-Base.@propagate_inbounds function Base.minimum(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwargs...)
     if :init in keys(kwargs...)
-        return Min(dims).(Ref(kwargs.init), arr)
+        return Min(dims).(kwargs.init, arr)
     else
         return Min(dims).(arr)
     end
@@ -182,6 +182,50 @@ end
         end
     else
         return Power(x.arg + y.arg * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+    end
+end
+
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray; dims=:, kwargs...)
+    norm(arr, 2; dims=dims, kwargs...)
+end
+
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real; dims=:, kwargs...)
+    if p == 2
+        if :init in keys(kwargs...)
+            return root.(Sum(dims).(square.(kwargs.init), square.(arr)))
+        else
+            return root.(Sum(dims).(square.(arr)))
+        end
+    elseif p == 1
+        if :init in keys(kwargs...)
+            return Sum(dims).(norm.(kwargs.init), norm.(arr))
+        else
+            return Sum(dims).(norm.(arr))
+        end
+    elseif p == Inf
+        if :init in keys(kwargs...)
+            return Max(dims).(norm.(kwargs.init), norm.(arr))
+        else
+            return Max(dims).(norm.(arr))
+        end
+    elseif p == 0
+        if :init in keys(kwargs...)
+            return Sum(dims).(norm.(norm.(kwargs.init), 0), norm.(norm.(arr), 0))
+        else
+            return Sum(dims).(norm.(norm.(arr), 0))
+        end
+    elseif p == -Inf
+        if :init in keys(kwargs...)
+            return Min(dims).(norm.(kwargs.init), norm.(arr))
+        else
+            return Min(dims).(norm.(arr))
+        end
+    else
+        if :init in keys(kwargs...)
+            return root.(Sum(dims).(power.(kwargs.init, p), power.(arr, p)))
+        else
+            return root.(Sum(dims).(power.(arr, p)))
+        end
     end
 end
 
