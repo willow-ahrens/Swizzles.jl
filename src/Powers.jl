@@ -4,30 +4,15 @@ using LinearAlgebra
 export Power
 export power, root
 
-struct Power{T, S, E::Real} <: Number
+struct Power{T, S, E} <: Number
     arg::T
     scale::S
     exponent::E
 end
 
-@inline power(x, p) = Power(sign(x), norm(x), p)
-
-@inline power(x::Power, p)
-    if iszero(x.arg)
-        Power(zero(x.arg) ^ one(p), zero(x.scale), x.exponent * p)
-    end
-    Power(x.arg ^ p, x.scale, x.exponent * p)
-end
+@inline power(x, p) = Power(sign(x)^p, norm(x), p)
 
 @inline root(x::Power) = x.arg ^ inv(x.exponent) * x.scale
-
-@inline function rescale(x::Power, s)
-    if iszero(s)
-        return Power(zero(y.arg) * (one(s)/one(x.scale))^one(x.exponent), s, x.exponent)
-    else
-        return Power(x.arg * (s/x.scale)^x.exponent, s, x.exponent)
-    end
-end
 
 function Base.promote_type(::Type{Power{T1, S1, E1}}, ::Type{Power{T2, S2, E2}}) where {T1, S1, E1, T2, S2, E2}
     return Power{promote_type(T1, T2), promote_type(S1, S2), promote_type(E1, E2)}
@@ -39,13 +24,18 @@ end
 
 @inline function Base.:+(x::T, y::T) where {T <: Power}
     x.exponent == y.exponent || ArgumentError("Cannot accurately add Powers with different exponents")
-    p = x.exponent
     if x.scale < y.scale
         (x, y) = (y, x)
     end
-    s = x.scale
-    y = rescale(y, s)
-    return Power(x.arg + y.arg, s, p)
+    if x.scale > y.scale
+        if iszero(y.scale)
+            return Power(x.arg + zero(y.arg) * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+        else
+            return Power(x.arg + y.arg * (x.scale/y.scale)^y.exponent, x.scale, x.exponent)
+        end
+    else
+        return Power(x.arg + y.arg * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+    end
 end
 
 end
