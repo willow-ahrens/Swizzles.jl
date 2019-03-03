@@ -5,6 +5,7 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 using Base.Broadcast: Broadcasted
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
+using Swizzles
 
 export GeneratedArray
 
@@ -41,10 +42,12 @@ function _copyto!(dst::AbstractArray, src)
     end
 end
 
-#OVERRIDE ALL THE THINGS!
+
 
 @inline Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
 @inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
+
+
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = _getindex(arr, I)
@@ -55,6 +58,8 @@ Base.@propagate_inbounds function _getindex(arr, I...)::eltype(arr)
     identity.(view(arr, I...))
 end
 
+
+
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _setindex!(arr, v, I)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::CartesianIndex) = _setindex!(arr, v, I)
@@ -64,46 +69,72 @@ Base.@propagate_inbounds function _setindex!(arr, v, I...)
     view(arr, I...) .= v
 end
 
+
+
 Base.@propagate_inbounds function Base.map(f::F, arr::GeneratedArray, tail...) where {F}
     f.(arr, tail...)
 end
+
+
 
 Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
     NullArray(axes(arr)) .= f.(arr, tail...)
     return nothing
 end
 
+
+
 Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
-    if :init in keys(kwargs...)
-        return Reduce(op, dims).(kwargs.init, arr)
-    else
-        return Reduce(op, dims).(arr)
-    end
+    return _reduce(op, arr, dims, kwargs.data)
 end
+
+Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {Op}
+    return Reduce(op, dims).(arr)
+end
+Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {Op}
+    return Reduce(op, dims).(nt.init, arr)
+end
+
+
 
 Base.@propagate_inbounds function Base.sum(arr::GeneratedArray; dims=:, kwargs...)
-    if :init in keys(kwargs...)
-        return Sum(dims).(kwargs.init, arr)
-    else
-        return Sum(dims).(arr)
-    end
+    return _sum(arr, dims, kwargs.data)
 end
+
+Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{()})
+    return Sum(dims).(arr)
+end
+Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+    return Sum(dims).(nt.init, arr)
+end
+
+
 
 Base.@propagate_inbounds function Base.maximum(arr::GeneratedArray; dims=:, kwargs...)
-    if :init in keys(kwargs...)
-        return Max(dims).(kwargs.init, arr)
-    else
-        return Max(dims).(arr)
-    end
+    return _max(arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwargs...)
-    if :init in keys(kwargs...)
-        return Min(dims).(kwargs.init, arr)
-    else
-        return Min(dims).(arr)
-    end
+Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{()})
+    return Max(dims).(arr)
 end
+Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+    return Max(dims).(nt.init, arr)
+end
+
+
+
+Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwargs...)
+    return _min(arr, dims, kwargs.data)
+end
+
+Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{()})
+    return Min(dims).(arr)
+end
+Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+    return Min(dims).(nt.init, arr)
+end
+
+
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::AbstractArray)
     return Sum().(x .* y)
@@ -185,48 +216,54 @@ end
     end
 end
 
-Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray; dims=:, kwargs...)
-    norm(arr, 2; dims=dims, kwargs...)
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray; kwargs...)
+    norm(arr, 2; kwargs...)
 end
 
 Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real; dims=:, kwargs...)
+    return _norm(arr, p, dims, kwargs.data)
+end
+
+Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::NamedTuple{()})
     if p == 2
-        if :init in keys(kwargs...)
-            return root.(Sum(dims).(square.(kwargs.init), square.(arr)))
-        else
-            return root.(Sum(dims).(square.(arr)))
-        end
+        return root.(Sum(dims).(square.(arr)))
     elseif p == 1
-        if :init in keys(kwargs...)
-            return Sum(dims).(norm.(kwargs.init), norm.(arr))
-        else
-            return Sum(dims).(norm.(arr))
-        end
+        return Sum(dims).(norm.(arr))
     elseif p == Inf
-        if :init in keys(kwargs...)
-            return Max(dims).(norm.(kwargs.init), norm.(arr))
-        else
-            return Max(dims).(norm.(arr))
-        end
+        return Max(dims).(norm.(arr))
     elseif p == 0
-        if :init in keys(kwargs...)
-            return Sum(dims).(norm.(norm.(kwargs.init), 0), norm.(norm.(arr), 0))
-        else
-            return Sum(dims).(norm.(norm.(arr), 0))
-        end
+        return Sum(dims).(norm.(norm.(arr), 0))
     elseif p == -Inf
-        if :init in keys(kwargs...)
-            return Min(dims).(norm.(kwargs.init), norm.(arr))
-        else
-            return Min(dims).(norm.(arr))
-        end
+        return Min(dims).(norm.(arr))
     else
-        if :init in keys(kwargs...)
-            return root.(Sum(dims).(power.(kwargs.init, p), power.(arr, p)))
-        else
-            return root.(Sum(dims).(power.(arr, p)))
-        end
+        return root.(Sum(dims).(power.(arr, p)))
     end
+end
+Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::NamedTuple{(:init,)})
+    init = nt.init
+    if p == 2
+        return root.(Sum(dims).(square.(init), square.(arr)))
+    elseif p == 1
+        return Sum(dims).(norm.(init), norm.(arr))
+    elseif p == Inf
+        return Max(dims).(norm.(init), norm.(arr))
+    elseif p == 0
+        return Sum(dims).(norm.(norm.(init), 0), norm.(norm.(arr), 0))
+    elseif p == -Inf
+        return Min(dims).(norm.(init), norm.(arr))
+    else
+        return root.(Sum(dims).(power.(init, p), power.(arr, p)))
+    end
+end
+
+Base.@propagate_inbounds function distance(x, y; dims=:, kwargs...)
+    return _distance(x, y, dims, kwargs.data)
+end
+Base.@propagate_inbounds function _distance(x, y, dims, nt::NamedTuple{()})
+    return root.(Sum(dims).(square.(x.-y)))
+end
+Base.@propagate_inbounds function _distance(x, y, dims, nt::NamedTuple{(:init)})
+    return root.(Sum(dims).(square.(kwargs.init), square.(x.-y)))
 end
 
 end
