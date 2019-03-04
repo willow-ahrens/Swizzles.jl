@@ -257,14 +257,11 @@ Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::
     end
 end
 
-Base.@propagate_inbounds function distance(x, y; dims=:, kwargs...)
-    return _distance(x, y, dims, kwargs.data)
+Base.@propagate_inbounds function distance(x, y; kwargs...)
+    return distance(x, y, 2; kwargs...)
 end
-Base.@propagate_inbounds function _distance(x, y, dims, nt::NamedTuple{()})
-    return root.(Sum(dims).(square.(x.-y)))
-end
-Base.@propagate_inbounds function _distance(x, y, dims, nt::NamedTuple{(:init)})
-    return root.(Sum(dims).(square.(kwargs.init), square.(x.-y)))
+Base.@propagate_inbounds function distance(x, y, p; kwargs...)
+    return norm(arrayify(broadcasted(-, x, y)), p; kwargs...)
 end
 
 end
