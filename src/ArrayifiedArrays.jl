@@ -116,6 +116,12 @@ Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::CartesianIndex) 
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::Int...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray) = getindex(arr.arg)
 
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I...) = setindex(arr.arg, x, I...)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int) = setindex(arr.arg, x, I)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::CartesianIndex) = setindex(arr.arg, x, I)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int...) = setindex(arr.arg, x, I...)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.arg, x)
+
 @inline myidentity(x) = x
 
 @inline Base.Broadcast.broadcastable(arr::ArrayifiedArray) = broadcastable(arr.arg)

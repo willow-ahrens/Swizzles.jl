@@ -6,6 +6,7 @@ using Base.Broadcast: Broadcasted
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
+using Swizzles.NullArrays
 
 export GeneratedArray
 
@@ -93,6 +94,19 @@ Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt:
 end
 Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {Op}
     return Reduce(op, dims).(nt.init, arr)
+end
+
+
+
+Base.@propagate_inbounds function Base.mapreduce(f::F, op::Op, arr::GeneratedArray; dims=:, kwargs...) where {F, Op}
+    return _mapreduce(f, op, arr, dims, kwargs.data)
+end
+
+Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {F, Op}
+    return Reduce(op, dims).(f.(arr))
+end
+Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {F, Op}
+    return Reduce(op, dims).(nt.init, f.(arr))
 end
 
 

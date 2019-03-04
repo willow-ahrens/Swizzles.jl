@@ -15,6 +15,7 @@ include("properties.jl")
 
 include("BoxArrays.jl")
 include("WrapperArrays.jl")
+include("NullArrays.jl")
 include("GeneratedArrays.jl")
 include("ArrayifiedArrays.jl")
 include("ShallowArrays.jl")
@@ -383,6 +384,7 @@ end
         return Swizzle{T}(ctr.op, mask)(arg)
     end
 end
+@inline (ctr::Reduce)(init, arg) = ctr(arrayify(init), arrayify(arg))
 @inline function(ctr::Reduce{T, Op, dims})(init::Init, arg::Arg) where {T, Op, dims, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
         mask = parse_reduce_mask(Arg, dims)
