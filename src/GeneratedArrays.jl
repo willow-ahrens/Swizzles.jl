@@ -27,6 +27,8 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
 #Beware infinite recursion!
 
+Base.copy(src::GeneratedArray) = copyto!(similar(src), src)
+
 Base.copyto!(dst, src::GeneratedArray) = copyto!(dst, Array(src))
 
 Base.copyto!(dst::GeneratedArray, src) = _copyto!(dst, broadcastable(src))

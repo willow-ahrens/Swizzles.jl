@@ -18,9 +18,10 @@ struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <:
     init::Init
     arg::Arg
     function SwizzledArray{T, N, Op, mask, Init, Arg}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
-        #FIXME check swizzles. also check noop axes!
-        @assert T !== nothing
-        @assert N == max(0, mask...)
+        @assert T isa Type
+        @assert max(mask...) <= ndims(arg)
+        @assert length(mask) == N
+        #TODO assert mask is unique
         new(op, init, arg)
     end
 end
@@ -28,8 +29,6 @@ end
 @inline function SwizzledArray{T, N, Op, mask}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
     SwizzledArray{T, N, Op, mask, Init, Arg}(op, init, arg)
 end
-
-#eltype converter
 
 @inline function Base.convert(::Type{SwizzledArray{T}}, arr::SwizzledArray{S, N, Op, mask, Init, Arg}) where {T, S, N, Op, mask, Init, Arg}
     return SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arr.arg)
@@ -45,16 +44,10 @@ end
     if T! <: T
         return T!
     end
-    if mask(arr) isa Tuple{Vararg{Int}}
+    arg_keeps = keeps(arr.arg)
+    arr_mask = mask(arr)
+    if all(imasktuple(d->arg_keeps[d] isa Extrude, d->true, Val(mask(arr)), Val(ndims(arr.arg)))
         return T!
-    else
-        arg_keeps = Properties.return_type(keeps, typeof(arr.arg))
-        if arg_keeps <: Tuple{Vararg{Any, ndims(arr.arg)}}
-            arr_mask = mask(arr)
-            if all(ntuple(n->arr_mask[n] isa Int || arg_keeps.parameters[n] <: Extrude, Val(ndims(arr.arg))))
-                return T!
-            end
-        end
     end
     T = T!
     T! = Union{T, Properties.return_type(arr.op, T, S)}
@@ -64,16 +57,14 @@ end
     return Any
 end
 
-
-
 @inline mask(::Type{<:SwizzledArray{<:Any, <:Any, <:Any, _mask}}) where {_mask} = _mask
 @inline mask(::SwizzledArray{<:Any, <:Any, <:Any, _mask}) where {_mask} = _mask
 
 
 
-function Base.show(io::IO, arr::SwizzledArray)
+function Base.show(io::IO, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     print(io, SwizzledArray)
-    print(io, '(', arr.op, ", ", mask(arr), ", ", arr.init, ", ", arr.arg, ')')
+    print(io, "{$T, $N, $Op, $mask}($(arr.op), $(arr.init), $(arr.arg))")
     nothing
 end
 
@@ -100,12 +91,12 @@ end
 
 @inline function Base.size(arr::SwizzledArray)
     arg_size = size(arr.arg)
-    imasktuple(d->1, d->arg_size[d], Val(mask(arr)))
+    masktuple(d->1, d->arg_size[d], Val(mask(arr)))
 end
 
 @inline function Base.axes(arr::SwizzledArray)
     arg_axes = axes(arr.arg)
-    imasktuple(d->Base.OneTo(1), d->arg_axes[d], Val(mask(arr)))
+    masktuple(d->Base.OneTo(1), d->arg_axes[d], Val(mask(arr)))
 end
 
 
@@ -116,7 +107,7 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of dropping view indices). Therefore, we convert first.
+    #complexity of nilping view indices). Therefore, we convert first.
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
@@ -125,30 +116,19 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     inds = parentindices(src)
     arg = arr.arg
     init = arr.init
-    if M == 0
-        mask′ = _convert_dropmask(mask(arr)...)
-    else
-        mask′ = _convert_remask(inds, mask(arr)...)
+    function remask(inds::Tuple{Vararg{Any, N}}, mask::Tuple{Vararg{Any, N}}) where {N}
+        if Base.index_dimsum(first(inds)) isa Tuple{}
+            return remask(Base.tail(inds), Base.tail(mask))
+        else
+            return (first(mask), remask(Base.tail(inds), Base.tail(mask))...)
+        end
     end
+    remask(::Tuple{}, ::Tuple{}) = ()
+    mask′ = remask(inds, mask(arr))
     init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds′[n]), Val(ndims(init))))
     arg′ = SubArray(arg, parentindex(arr, inds...))
     return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, init′, arg′)
 end
-
-@inline _convert_dropmask(::Drop, mask...) = (drop, _convert_dropmask(mask...)...)
-@inline _convert_dropmask(::Any, mask...) = _convert_dropmask(mask...)
-@inline _convert_dropmask() = ()
-
-@inline function _convert_remask(indices, d, mask...)
-    if d isa Drop
-        (drop, _convert_remask(indices, mask...)...)
-    elseif Base.index_dimsum(indices[d]) isa Tuple{}
-        _convert_remask(indices, mask...)
-    else
-        (length(Base.index_dimsum(indices[1:d])), _convert_remask(indices, mask...)...)
-    end
-end
-@inline _convert_remask(indices) = ()
 
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = BoxArray{T}()
 
@@ -177,7 +157,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
         @boundscheck begin
             arg_keeps = keeps(arr.arg)
             arr_mask = mask(arr)
-            if any(ntuple(n->arr_mask[n] === drop && kept(arg_keeps[n]), ndims(arr.arg)))
+            if any(ntuple(n->arr_mask[n] === nil && kept(arg_keeps[n]), ndims(arr.arg)))
                 throw(DimensionMismatch("TODO"))
             end
         end
@@ -213,7 +193,7 @@ end
 
 Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, N}, i::Vararg{Any, N}) where {N}
     arg_axes = axes(arr.arg)
-    masktuple(d->Base.Slice(arg_axes[d]), d->i[d], Val(mask(arr)))
+    imasktuple(d->Base.Slice(arg_axes[d]), d->i[d], Val(mask(arr)), Val(ndims(arr.arg)))
 end
 
 
@@ -237,7 +217,7 @@ end
 
 Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
     dst_axes = axes(dst)
-    imasktuple(d->firstindex(dst_axes[d]), d->i[d], Val(mask(arr)))
+    masktuple(d->firstindex(dst_axes[d]), d->i[d], Val(mask(arr)))
 end
 
 """
@@ -277,13 +257,13 @@ end
 
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
-    imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
+    masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
 end
 
 #=
 function Swizzles.ExtrudedArrays.inferkeeps(Arr::Type{<:SwizzledArray})
     arg_keeps = inferkeeps(parent(Arr))
-    imasktuple(d->Extrude(), d->arg_keeps[d], Val(mask(Arr)))
+    masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(Arr)))
 end
 =#
 

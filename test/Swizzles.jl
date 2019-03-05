@@ -2,7 +2,7 @@
 
   A = [1 2 3; 4 5 6; 7 8 9]
 
-  @test_throws DimensionMismatch Swizzle(max, (1, drop)).(A, [1, 2, 3, 4]) == [3; 6; 9]
+  @test_throws DimensionMismatch Swizzle(max, (1, nil)).(A, [1, 2, 3, 4]) == [3; 6; 9]
 
   @test Sum(()).(A) == A
   @test Sum(:).(A) == 45
@@ -10,60 +10,60 @@
   @test Reduce(+, :).(A) == 45
   @test Sum().([]) == nothing
   @test Beam(2, 3).([]) == Array{Any}(undef,1,0)
-  @test_throws DimensionMismatch Beam(drop, 3).([])
-  @test_throws DimensionMismatch Beam(1, drop, drop).(Array{Any}(undef,1,0))
+  @test_throws DimensionMismatch Beam(nil, 3).([])
+  @test_throws DimensionMismatch Beam(1, nil, nil).(Array{Any}(undef,1,0))
   @test Sum(2).(Array{Any}(undef,1,0)) == [nothing]
 
-  @test Swizzle(max, (1, drop)).(A) == [3; 6; 9]
-  @test Swizzle(min, (1, drop)).(A) == [1; 4; 7]
+  @test Swizzle(max, (1, nil)).(A) == [3; 6; 9]
+  @test Swizzle(min, (1, nil)).(A) == [1; 4; 7]
   @test Swizzle(max, (1,)).(A) == [3; 6; 9]
   @test Swizzle(min, (1,)).(A) == [1; 4; 7]
-  @test Swizzle(max, (drop, 1)).(A) == [7; 8; 9]
-  @test Swizzle(min, (drop, 1)).(A) == [1; 2; 3]
-  @test Swizzle(max, (2, drop)).(A) == [3  6  9]
-  @test Swizzle(min, (2, drop)).(A) == [1  4  7]
-  @test Swizzle(max, (drop, 2)).(A) == [7  8  9]
-  @test Swizzle(min, (drop, 2)).(A) == [1  2  3]
+  @test Swizzle(max, (nil, 1)).(A) == [7; 8; 9]
+  @test Swizzle(min, (nil, 1)).(A) == [1; 2; 3]
+  @test Swizzle(max, (2, nil)).(A) == [3  6  9]
+  @test Swizzle(min, (2, nil)).(A) == [1  4  7]
+  @test Swizzle(max, (nil, 2)).(A) == [7  8  9]
+  @test Swizzle(min, (nil, 2)).(A) == [1  2  3]
 
   R = [0; 0; 0;]
-  @test (R .= Swizzle(max, (1, drop)).(A)) == [3; 6; 9]
+  @test (R .= Swizzle(max, (1, nil)).(A)) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test (R .= Swizzle(min, (1, drop)).(A)) == [1; 4; 7]
+  @test (R .= Swizzle(min, (1, nil)).(A)) == [1; 4; 7]
   R = [0; 0; 0;]
   @test (R .= Swizzle(max, (1,)).(A)) == [3; 6; 9]
   R = [0; 0; 0;]
   @test (R .= Swizzle(min, (1,)).(A)) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test (R .= Swizzle(max, (drop, 1)).(A)) == [7; 8; 9]
+  @test (R .= Swizzle(max, (nil, 1)).(A)) == [7; 8; 9]
   R = [0; 0; 0;]
-  @test (R .= Swizzle(min, (drop, 1)).(A)) == [1; 2; 3]
+  @test (R .= Swizzle(min, (nil, 1)).(A)) == [1; 2; 3]
 
   R = [0 0 0]
-  @test (R .= Swizzle(max, (2, drop)).(A)) == [3  6  9]
+  @test (R .= Swizzle(max, (2, nil)).(A)) == [3  6  9]
   R = [0 0 0]
-  @test (R .= Swizzle(min, (2, drop)).(A)) == [1  4  7]
+  @test (R .= Swizzle(min, (2, nil)).(A)) == [1  4  7]
   R = [0 0 0]
-  @test (R .= Swizzle(max, (drop, 2)).(A)) == [7  8  9]
+  @test (R .= Swizzle(max, (nil, 2)).(A)) == [7  8  9]
   R = [0 0 0]
-  @test (R .= Swizzle(min, (drop, 2)).(A)) == [1  2  3]
+  @test (R .= Swizzle(min, (nil, 2)).(A)) == [1  2  3]
 
-  @test Swizzle(max, (1, drop, 2)).(A) == [3; 6; 9]
-  @test Swizzle(min, (1, drop, 2)).(A) == [1; 4; 7]
-  @test Swizzle(max, (drop, 1, 2)).(A) == [7; 8; 9]
-  @test Swizzle(min, (drop, 1, 2)).(A) == [1; 2; 3]
-
-  R = [0; 0; 0;]
-  @test (R .= Swizzle(max, (1, drop, 2)).(A)) == [3; 6; 9]
-  R = [0; 0; 0;]
-  @test (R .= Swizzle(min, (1, drop, 2)).(A)) == [1; 4; 7]
-  R = [0; 0; 0;]
-  @test (R .= Swizzle(max, (drop, 1, 2)).(A)) == [7; 8; 9]
-  R = [0; 0; 0;]
-  @test (R .= Swizzle(min, (drop, 1, 2)).(A)) == [1; 2; 3]
+  @test Swizzle(max, (1, nil, 2)).(A) == [3; 6; 9]
+  @test Swizzle(min, (1, nil, 2)).(A) == [1; 4; 7]
+  @test Swizzle(max, (nil, 1, 2)).(A) == [7; 8; 9]
+  @test Swizzle(min, (nil, 1, 2)).(A) == [1; 2; 3]
 
   R = [0; 0; 0;]
-  @test_throws DimensionMismatch R .= Beam((drop, 1, 2)).(A)
-  @test_throws DimensionMismatch R .= Beam((1, drop, 2)).(A)
+  @test (R .= Swizzle(max, (1, nil, 2)).(A)) == [3; 6; 9]
+  R = [0; 0; 0;]
+  @test (R .= Swizzle(min, (1, nil, 2)).(A)) == [1; 4; 7]
+  R = [0; 0; 0;]
+  @test (R .= Swizzle(max, (nil, 1, 2)).(A)) == [7; 8; 9]
+  R = [0; 0; 0;]
+  @test (R .= Swizzle(min, (nil, 1, 2)).(A)) == [1; 2; 3]
+
+  R = [0; 0; 0;]
+  @test_throws DimensionMismatch R .= Beam((nil, 1, 2)).(A)
+  @test_throws DimensionMismatch R .= Beam((1, nil, 2)).(A)
 
   @test Beam((2, 1)).(A) == transpose(A)
 
@@ -236,6 +236,6 @@
   @test Beam(3).(z) == 13
 
   A = [1 2 3 4 5]
-  BeamTo(drop, drop, 2).(A) == Beam(drop, 3).(A)
+  BeamTo(nil, nil, 2).(A) == Beam(nil, 3).(A)
 
 end
