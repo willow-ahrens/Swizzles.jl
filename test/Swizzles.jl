@@ -138,7 +138,7 @@
   @test Swizzle(+, 2).(A) == [12; 15; 18]
   @test Swizzle(+, 1,2).(A) == A
   @test Swizzle(+, 1,2,3).(A) == reshape(A, 3, 3, 1)
-  @test Swizzle(+, 2,1).(A) == A
+  @test Swizzle(+, 2,1).(A) == transpose(A)
   @test Swizzle(+, 2,1,3).(A) == reshape(transpose(A), 3, 3, 1)
 
   @test Yeet(1).((1, 2)) isa Tuple
