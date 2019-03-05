@@ -5,8 +5,8 @@ export arrayify
 export Guard
 export Swizzle, Yoink
 export Beam, Yeet
-export Reduce, Sum, Maximum, Minimum
-export Drop, DropSum, DropMaximum, DropMinimum
+export Reduce, Sum
+export Drop, SumOut
 export Delay, Intercept
 
 include("base.jl")
@@ -387,78 +387,28 @@ end
     end
 end
 
-struct DropSum{T}
+struct SumOut{T}
 """
-    `DropSum{T}(dims...)`
-    `DropSum{T}(dims)`
+    `SumOut{T}(dims...)`
+    `SumOut{T}(dims)`
 
-Similar to [`DropSum`](@ref), but the eltype of the result (and all intermediate
+Similar to [`SumOut`](@ref), but the eltype of the result (and all intermediate
 reduction results) is declared to be `T`.
 
-See also: [`DropSum`](@ref).
+See also: [`SumOut`](@ref).
 """
-    @inline DropSum{T}(dims...) where {T} = Drop{T}(Base.FastMath.add_fast, dims...)
+    @inline SumOut{T}(dims...) where {T} = Drop{T}(Base.FastMath.add_fast, dims...)
 end
 
 """
-    `DropSum(dims...)`
-    `DropSum(dims)`
+    `SumOut(dims...)`
+    `SumOut(dims)`
 
 Similar to [`Drop`](@ref), but `op` is set to `+`.
 
-See also: [`Drop`](@ref), [`DropSum{T}`](@ref).
+See also: [`Drop`](@ref), [`SumOut{T}`](@ref).
 """
-@inline DropSum(dims...) = DropSum{nothing}(dims...)
-
-
-
-struct DropMinimum{T}
-"""
-    `DropMinimum{T}(dims...)`
-    `DropMinimum{T}(dims)`
-
-Similar to [`DropMinimum`](@ref), but the eltype of the result (and all intermediate
-reduction results) is declared to be `T`.
-
-See also: [`DropMinimum`](@ref).
-"""
-    @inline DropMinimum{T}(dims...) where {T} = Drop{T}(min, dims...)
-end
-
-"""
-    `DropMinimum(dims...)`
-    `DropMinimum(dims)`
-
-Similar to [`Drop`](@ref), but `op` is set to `min`.
-
-See also: [`Drop`](@ref), [`DropMinimum{T}`](@ref).
-"""
-@inline DropMinimum(dims...) = DropMinimum{nothing}(dims...)
-
-
-
-struct DropMaximum{T}
-"""
-    `DropMaximum{T}(dims...)`
-    `DropMaximum{T}(dims)`
-
-Similar to [`DropMaximum`](@ref), but the eltype of the result (and all intermediate
-reduction results) is declared to be `T`.
-
-See also: [`DropMaximum`](@ref).
-"""
-    @inline DropMaximum{T}(dims...) where {T} = Drop{T}(max, dims...)
-end
-
-"""
-    `DropMaximum(dims...)`
-    `DropMaximum(dims)`
-
-Similar to [`Drop`](@ref), but `op` is set to `max`.
-
-See also: [`Drop`](@ref), [`DropMaximum{T}`](@ref).
-"""
-@inline DropMaximum(dims...) = DropMaximum{nothing}(dims...)
+@inline SumOut(dims...) = SumOut{nothing}(dims...)
 
 
 
@@ -560,56 +510,6 @@ Similar to [`Reduce`](@ref), but `op` is set to `+`.
 See also: [`Reduce`](@ref), [`Sum{T}`](@ref).
 """
 @inline Sum(dims...) = Sum{nothing}(dims...)
-
-
-
-struct Minimum{T}
-"""
-    `Minimum{T}(dims...)`
-    `Minimum{T}(dims)`
-
-Similar to [`Minimum`](@ref), but the eltype of the result (and all intermediate
-reduction results) is declared to be `T`.
-
-See also: [`Minimum`](@ref).
-"""
-    @inline Minimum{T}(dims...) where {T} = Reduce{T}(min, dims...)
-end
-
-"""
-    `Minimum(dims...)`
-    `Minimum(dims)`
-
-Similar to [`Reduce`](@ref), but `op` is set to `min`.
-
-See also: [`Reduce`](@ref), [`Minimum{T}`](@ref).
-"""
-@inline Minimum(dims...) = Minimum{nothing}(dims...)
-
-
-
-struct Maximum{T}
-"""
-    `Maximum{T}(dims...)`
-    `Maximum{T}(dims)`
-
-Similar to [`Maximum`](@ref), but the eltype of the result (and all intermediate
-reduction results) is declared to be `T`.
-
-See also: [`Maximum`](@ref).
-"""
-    @inline Maximum{T}(dims...) where {T} = Reduce{T}(max, dims...)
-end
-
-"""
-    `Maximum(dims...)`
-    `Maximum(dims)`
-
-Similar to [`Reduce`](@ref), but `op` is set to `max`.
-
-See also: [`Reduce`](@ref), [`Maximum{T}`](@ref).
-"""
-@inline Maximum(dims...) = Maximum{nothing}(dims...)
 
 
 

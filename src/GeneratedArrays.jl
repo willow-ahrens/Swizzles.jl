@@ -127,27 +127,27 @@ end
 
 
 Base.@propagate_inbounds function Base.maximum(arr::GeneratedArray; dims=:, kwargs...)
-    return _max(arr, dims, kwargs.data)
+    return _maximum(arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Maximum(dims).(arr)
+Base.@propagate_inbounds function _maximum(arr::GeneratedArray, dims, nt::NamedTuple{()})
+    return Reduce(max, dims).(arr)
 end
-Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Maximum(dims).(nt.init, arr)
+Base.@propagate_inbounds function _maximum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+    return Reduce(max, dims).(nt.init, arr)
 end
 
 
 
 Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwargs...)
-    return _min(arr, dims, kwargs.data)
+    return _minimum(arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Minimum(dims).(arr)
+Base.@propagate_inbounds function _minimum(arr::GeneratedArray, dims, nt::NamedTuple{()})
+    return Reduce(min, dims).(arr)
 end
-Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Minimum(dims).(nt.init, arr)
+Base.@propagate_inbounds function _minimum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+    return Reduce(min, dims).(nt.init, arr)
 end
 
 

@@ -118,12 +118,12 @@
   @test Drop(+, 2, 1).(A) == 45
   @test Drop(+, 2, 1, 3).(A) == 45
 
-  @test DropSum().(A) == 45
-  @test DropSum(1).(A) == [12; 15; 18]
-  @test DropSum(2).(A) == [6; 15; 24]
-  @test DropSum(1, 2).(A) == 45
-  @test DropSum(2, 1).(A) == 45
-  @test DropSum(2, 1, 3).(A) == 45
+  @test SumOut().(A) == 45
+  @test SumOut(1).(A) == [12; 15; 18]
+  @test SumOut(2).(A) == [6; 15; 24]
+  @test SumOut(1, 2).(A) == 45
+  @test SumOut(2, 1).(A) == 45
+  @test SumOut(2, 1, 3).(A) == 45
 
   @test_throws DimensionMismatch Yoink().(A)
   @test_throws DimensionMismatch Yoink(2).(A)
@@ -143,19 +143,19 @@
 
   @test Yeet(1).((1, 2)) isa Tuple
   @test Beam(+, (1,)).((1, 2)) isa Tuple
-  @test DropSum(1).((1.0, 2)) isa Float64
+  @test SumOut(1).((1.0, 2)) isa Float64
 
   A = rand(1,1)
   B = rand(1,1)
 
-  @test DropSum(2).(A.*Yeet(2,3).(B)) isa Matrix
+  @test SumOut(2).(A.*Yeet(2,3).(B)) isa Matrix
   @test Sum().(A.*Yeet(2,3).(B)) isa Float64
-  @test DropSum(2).(A.*Yeet(2,3).(B)) == A * B
+  @test SumOut(2).(A.*Yeet(2,3).(B)) == A * B
 
   A = rand(5,7)
   B = rand(7,6)
 
-  @test DropSum(2).(A.*Yeet(2,3).(B)) ≈ A * B
+  @test SumOut(2).(A.*Yeet(2,3).(B)) ≈ A * B
 
   @test reshape(Yeet(2, 4).(A).*Yeet(1, 3).(B), size(A, 1) * size(B, 1), :) == kron(A, B)
 
