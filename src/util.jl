@@ -81,6 +81,7 @@ end
 @inline _combinetuple(f, ::Tuple{}, b::Tuple) = b
 @inline _combinetuple(f, a::Tuple, ::Tuple{}) = a
 @inline _combinetuple(f::F, a::Tuple, b::Tuple) where {F} = (f(first(a), first(b)), _combinetuple(f, Base.tail(a), Base.tail(b))...)
+
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
 
 struct Delay

@@ -361,7 +361,6 @@ See also: [`Drop`](@ref).
 @inline (ctr::Drop)(arg) = ctr(arrayify(arg))
 @inline function parse_drop_mask(arr, dims::Tuple{Vararg{Int}})
     return (setdiff(1:ndims(arr), dims)...,)
-    return ntuple(d -> d in dims ? nil : d, Val(ndims(arr)))
 end
 @inline parse_drop_mask(arr, ::Colon) = ()
 @inline function(ctr::Drop{T, Op, dims})(arg::Arg) where {T, Op, dims, Arg <: AbstractArray}
