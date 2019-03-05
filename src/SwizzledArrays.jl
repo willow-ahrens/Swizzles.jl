@@ -116,18 +116,20 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     inds = parentindices(src)
     arg = arr.arg
     init = arr.init
-    function remask(inds::Tuple{Vararg{Any, N}}, mask::Tuple{Vararg{Any, N}}) where {N}
-        if Base.index_dimsum(first(inds)) isa Tuple{}
-            return remask(Base.tail(inds), Base.tail(mask))
-        else
-            return (first(mask), remask(Base.tail(inds), Base.tail(mask))...)
-        end
-    end
-    remask(::Tuple{}, ::Tuple{}) = ()
-    mask′ = remask(inds, mask(arr))
+    mask′ = _remask(inds, mask(arr))
     init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds′[n]), Val(ndims(init))))
     arg′ = SubArray(arg, parentindex(arr, inds...))
     return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, init′, arg′)
+end
+@inline function _remask(inds::Tuple{Vararg{Any, N}}, mask::Tuple{Vararg{Any, N}}) where {N}
+    if Base.index_dimsum(first(inds)) isa Tuple{}
+        return _remask(Base.tail(inds), Base.tail(mask))
+    else
+        return (first(mask), _remask(Base.tail(inds), Base.tail(mask))...)
+    end
+end
+@inline function _remask(::Tuple{}, ::Tuple{})
+    return ()
 end
 
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = BoxArray{T}()
