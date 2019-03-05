@@ -114,7 +114,6 @@ using LinearAlgebra
         @test sum(Test1(A), dims=:) == sum(A, dims=:)
         @test sum(Test1(A), dims=()) == sum(A, dims=())
         @test sum(Test1(A), init=10) == reduce(+, A, init=10)
-        #TODO test max min etc.
     end
 
     #=
