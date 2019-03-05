@@ -5,8 +5,8 @@ export arrayify
 export Guard
 export Swizzle, Yoink
 export Beam, Yeet
-export Reduce, Sum, Max, Min
-export Drop, DropSum, DropMax, DropMin
+export Reduce, Sum, Maximum, Minimum
+export Drop, DropSum, DropMaximum, DropMinimum
 export Delay, Intercept
 
 include("base.jl")
@@ -105,8 +105,8 @@ reduction results) is asserted to be `T`.
 
 See also: [`Swizzle`](@ref), [`eltype`](@ref).
 """
-@inline Swizzle{T}(op, _mask...) where {T, Op} = Swizzle{T, Op, _mask}(op)
-@inline Swizzle{T}(op, _mask::Tuple) where {T, Op} = Swizzle{T, Op, _mask}(op)
+@inline Swizzle{T}(op::Op, _mask...) where {T, Op} = Swizzle{T, Op, _mask}(op)
+@inline Swizzle{T}(op::Op, _mask::Tuple) where {T, Op} = Swizzle{T, Op, _mask}(op)
 @inline Swizzle{T}(op::Op, ::Val{_mask}) where {T, Op, _mask} = Swizzle{T, Op, _mask}(op)
 
 @inline function Properties.initial(ctr::Swizzle{<:Any, Op}, arg) where {Op}
@@ -240,23 +240,27 @@ See also: [`Beam`](@ref).
 @inline Beam{T}(op::Op, _imask::Tuple) where {T, Op} = Beam{T, Op, _imask}(op)
 @inline Beam{T}(op::Op, ::Val{_imask}) where {T, Op, _imask} = Beam{T, Op, _imask}(op)
 
+@inline function parse_beam_mask(arr, _imask::Tuple{Vararg{Union{Int, Nil}}})
+    N = max(0, _imask[1:min(ndims(arr), length(_imask))]...)
+    return imasktuple(d->nil, identity, _imask, N)
+end
 @inline (ctr::Beam)(arg) = ctr(arrayify(arg))
 @inline (ctr::Beam)(init, arg) = ctr(arrayify(init), arrayify(arg))
 @inline function(ctr::Beam{T, Op, _imask})(arg::Arg) where {T, Op, _imask, Arg <: AbstractArray}
     if @generated
-        mask = imasktuple(d->nil, identity, _imask, max(0, _imask...))
+        mask = parse_beam_mask(Arg, _imask)
         return :(return Swizzle{T, Op, $mask}(ctr.op)(arg))
     else
-        mask = imasktuple(d->nil, identity, Val(_imask), Val(max(0, _imask...)))
+        mask = parse_beam_mask(arg, _imask)
         return Swizzle{T}(ctr.op, mask)(arg)
     end
 end
 @inline function(ctr::Beam{T, Op, _imask})(init::Init, arg::Arg) where {T, Op, _imask, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
-        mask = imasktuple(d->nil, identity, _imask, max(0, _imask...))
+        mask = parse_beam_mask(Arg, _imask)
         return :(return Swizzle{T, Op, $mask}(ctr.op)(init, arg))
     else
-        mask = imasktuple(d->nil, identity, Val(_imask), Val(max(0, _imask...)))
+        mask = parse_beam_mask(arg, _imask)
         return Swizzle{T}(ctr.op, mask)(init, arg)
     end
 end
@@ -383,6 +387,79 @@ end
     end
 end
 
+struct DropSum{T}
+"""
+    `DropSum{T}(dims...)`
+    `DropSum{T}(dims)`
+
+Similar to [`DropSum`](@ref), but the eltype of the result (and all intermediate
+reduction results) is declared to be `T`.
+
+See also: [`DropSum`](@ref).
+"""
+    @inline DropSum{T}(dims...) where {T} = Drop{T}(Base.FastMath.add_fast, dims...)
+end
+
+"""
+    `DropSum(dims...)`
+    `DropSum(dims)`
+
+Similar to [`Drop`](@ref), but `op` is set to `+`.
+
+See also: [`Drop`](@ref), [`DropSum{T}`](@ref).
+"""
+@inline DropSum(dims...) = DropSum{nothing}(dims...)
+
+
+
+struct DropMinimum{T}
+"""
+    `DropMinimum{T}(dims...)`
+    `DropMinimum{T}(dims)`
+
+Similar to [`DropMinimum`](@ref), but the eltype of the result (and all intermediate
+reduction results) is declared to be `T`.
+
+See also: [`DropMinimum`](@ref).
+"""
+    @inline DropMinimum{T}(dims...) where {T} = Drop{T}(min, dims...)
+end
+
+"""
+    `DropMinimum(dims...)`
+    `DropMinimum(dims)`
+
+Similar to [`Drop`](@ref), but `op` is set to `min`.
+
+See also: [`Drop`](@ref), [`DropMinimum{T}`](@ref).
+"""
+@inline DropMinimum(dims...) = DropMinimum{nothing}(dims...)
+
+
+
+struct DropMaximum{T}
+"""
+    `DropMaximum{T}(dims...)`
+    `DropMaximum{T}(dims)`
+
+Similar to [`DropMaximum`](@ref), but the eltype of the result (and all intermediate
+reduction results) is declared to be `T`.
+
+See also: [`DropMaximum`](@ref).
+"""
+    @inline DropMaximum{T}(dims...) where {T} = Drop{T}(max, dims...)
+end
+
+"""
+    `DropMaximum(dims...)`
+    `DropMaximum(dims)`
+
+Similar to [`Drop`](@ref), but `op` is set to `max`.
+
+See also: [`Drop`](@ref), [`DropMaximum{T}`](@ref).
+"""
+@inline DropMaximum(dims...) = DropMaximum{nothing}(dims...)
+
 
 
 struct Reduce{T, Op, dims} <: Swizzles.Intercept
@@ -486,52 +563,54 @@ See also: [`Reduce`](@ref), [`Sum{T}`](@ref).
 
 
 
-struct Max{T}
+struct Minimum{T}
 """
-    `Max{T}(dims...)`
-    `Max{T}(dims)`
+    `Minimum{T}(dims...)`
+    `Minimum{T}(dims)`
 
-Similar to [`Max`](@ref), but the eltype of the result (and all intermediate
+Similar to [`Minimum`](@ref), but the eltype of the result (and all intermediate
 reduction results) is declared to be `T`.
 
-See also: [`Max`](@ref).
+See also: [`Minimum`](@ref).
 """
-    @inline Max{T}(dims...) where {T} = Reduce{T}(max, dims...)
+    @inline Minimum{T}(dims...) where {T} = Reduce{T}(min, dims...)
 end
 
 """
-    `Max(dims...)`
-    `Max(dims)`
-
-Similar to [`Reduce`](@ref), but `op` is set to `max`.
-
-See also: [`Reduce`](@ref), [`Max{T}`](@ref).
-"""
-@inline Max(dims...) = Max{nothing}(dims...)
-
-
-
-struct Min{T}
-"""
-    `Min{T}(dims...)`
-    `Min{T}(dims)`
-
-Similar to [`Min`](@ref), but the eltype of the result (and all intermediate
-reduction results) is declared to be `T`.
-
-See also: [`Min`](@ref).
-"""
-    @inline Min{T}(dims...) where {T} = Reduce{T}(min, dims...)
-end
-
-"""
-    `Min(dims...)`
-    `Min(dims)`
+    `Minimum(dims...)`
+    `Minimum(dims)`
 
 Similar to [`Reduce`](@ref), but `op` is set to `min`.
 
-See also: [`Reduce`](@ref), [`Min{T}`](@ref).
+See also: [`Reduce`](@ref), [`Minimum{T}`](@ref).
 """
-@inline Min(dims...) = Min{nothing}(dims...)
+@inline Minimum(dims...) = Minimum{nothing}(dims...)
+
+
+
+struct Maximum{T}
+"""
+    `Maximum{T}(dims...)`
+    `Maximum{T}(dims)`
+
+Similar to [`Maximum`](@ref), but the eltype of the result (and all intermediate
+reduction results) is declared to be `T`.
+
+See also: [`Maximum`](@ref).
+"""
+    @inline Maximum{T}(dims...) where {T} = Reduce{T}(max, dims...)
+end
+
+"""
+    `Maximum(dims...)`
+    `Maximum(dims)`
+
+Similar to [`Reduce`](@ref), but `op` is set to `max`.
+
+See also: [`Reduce`](@ref), [`Maximum{T}`](@ref).
+"""
+@inline Maximum(dims...) = Maximum{nothing}(dims...)
+
+
 
 end

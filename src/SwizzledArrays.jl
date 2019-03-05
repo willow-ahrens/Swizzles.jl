@@ -19,7 +19,7 @@ struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <:
     arg::Arg
     function SwizzledArray{T, N, Op, mask, Init, Arg}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
         @assert T isa Type
-        @assert max(mask...) <= ndims(arg)
+        @assert max(0, mask...) <= ndims(arg)
         @assert length(mask) == N
         #TODO assert mask is unique
         new(op, init, arg)
@@ -46,7 +46,7 @@ end
     end
     arg_keeps = keeps(arr.arg)
     arr_mask = mask(arr)
-    if all(imasktuple(d->arg_keeps[d] isa Extrude, d->true, Val(mask(arr)), Val(ndims(arr.arg)))
+    if all(imasktuple(d->arg_keeps[d] isa Extrude, d->true, Val(mask(arr)), Val(ndims(arr.arg))))
         return T!
     end
     T = T!
@@ -157,7 +157,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
         @boundscheck begin
             arg_keeps = keeps(arr.arg)
             arr_mask = mask(arr)
-            if any(ntuple(n->arr_mask[n] === nil && kept(arg_keeps[n]), ndims(arr.arg)))
+            if any(imasktuple(d->kept(arg_keeps[d]), d->false, Val(mask(arr)), Val(ndims(arg))))
                 throw(DimensionMismatch("TODO"))
             end
         end

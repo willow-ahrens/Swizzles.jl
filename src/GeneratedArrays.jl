@@ -131,10 +131,10 @@ Base.@propagate_inbounds function Base.maximum(arr::GeneratedArray; dims=:, kwar
 end
 
 Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Max(dims).(arr)
+    return Maximum(dims).(arr)
 end
 Base.@propagate_inbounds function _max(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Max(dims).(nt.init, arr)
+    return Maximum(dims).(nt.init, arr)
 end
 
 
@@ -144,10 +144,10 @@ Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwar
 end
 
 Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Min(dims).(arr)
+    return Minimum(dims).(arr)
 end
 Base.@propagate_inbounds function _min(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Min(dims).(nt.init, arr)
+    return Minimum(dims).(nt.init, arr)
 end
 
 
@@ -247,11 +247,11 @@ Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::
     elseif p == 1
         return Sum(dims).(norm.(arr))
     elseif p == Inf
-        return Max(dims).(norm.(arr))
+        return Maximum(dims).(norm.(arr))
     elseif p == 0
         return Sum(dims).(norm.(norm.(arr), 0))
     elseif p == -Inf
-        return Min(dims).(norm.(arr))
+        return Minimum(dims).(norm.(arr))
     else
         return root.(Sum(dims).(power.(arr, p)))
     end
@@ -263,11 +263,11 @@ Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::
     elseif p == 1
         return Sum(dims).(norm.(init), norm.(arr))
     elseif p == Inf
-        return Max(dims).(norm.(init), norm.(arr))
+        return Maximum(dims).(norm.(init), norm.(arr))
     elseif p == 0
         return Sum(dims).(norm.(norm.(init), 0), norm.(norm.(arr), 0))
     elseif p == -Inf
-        return Min(dims).(norm.(init), norm.(arr))
+        return Minimum(dims).(norm.(init), norm.(arr))
     else
         return root.(Sum(dims).(power.(init, p), power.(arr, p)))
     end

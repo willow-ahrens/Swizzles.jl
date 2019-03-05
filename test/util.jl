@@ -1,4 +1,5 @@
 @testset "util" begin
+    using Swizzles: masktuple, imasktuple
     Is = [(),
           (1,),
           (nil,),
@@ -18,16 +19,18 @@
                @test(masktuple(+, -, I)[j] == -I[j])
             end
         end
-        @test imasktuple(+, -, I) isa Tuple{Vararg{Int}}
-        @test length(imasktuple(+, -, I)) == max(0, I...)
+        @test imasktuple(+, -, I, max(0, I...)) isa Tuple{Vararg{Int}}
+        @test length(imasktuple(+, -, I, 0)) == 0
+        @test length(imasktuple(+, -, I, 1)) == 1
+        @test length(imasktuple(+, -, I, 2)) == 2
         for j in 1:length(I)
             if !(I[j] isa Nil)
-                @test(imasktuple(+, -, I)[I[j]] == -j)
+                @test(imasktuple(+, -, I, max(0, I...))[I[j]] == -j)
             end
         end
         for j in 1:max(0, I...)
             if !(j in I)
-                @test(imasktuple(+, -, I)[j] == j)
+                @test(imasktuple(+, -, I, max(0, I...))[j] == j)
             end
         end
     end
