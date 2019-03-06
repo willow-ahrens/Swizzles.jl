@@ -1,7 +1,7 @@
 name = "Swizzles"
 uuid = "6997b572-c796-11e8-2991-b59c2857380c"
 authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
