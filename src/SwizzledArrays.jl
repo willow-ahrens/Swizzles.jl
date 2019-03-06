@@ -246,7 +246,7 @@ To customize the broadcasting behavior of a wrapper array, one can first declare
 how the broadcast style should behave under broadcasting after the wrapper array
 is applied by overriding the `childstyle` method.
 """
-@inline childstyle(Arr::Type{<:AbstractArray}, ::Any) = BroadcastStyle(Arr)
+@inline childstyle(Arr::Type{<:AbstractArray}, ::BroadcastStyle) = BroadcastStyle(Arr)
 
 @inline childstyle(Arr::Type{<:SwizzledArray}, ::DefaultArrayStyle) = DefaultArrayStyle{ndims(Arr)}()
 @inline childstyle(Arr::Type{<:SwizzledArray}, ::BroadcastStyle) = DefaultArrayStyle{ndims(Arr)}()
@@ -259,7 +259,9 @@ end
 
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
-    masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
+    arr_keeps = masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
+    init_keeps = keeps(arr.init)
+    return combinetuple(|, arr_keeps, init_keeps)
 end
 
 #=
