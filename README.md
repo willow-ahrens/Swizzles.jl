@@ -18,23 +18,28 @@ Let's start with a few examples!
 ```julia-repl
 julia> using Swizzles, LinearAlgebra
 
-julia> A = rand(5, 7); B = rand(7, 8);
-
-julia> Sum(2).(A.*Beam(2, 3).(B)) ≈ A * B
-true
-
-julia> Beam(2, 1).(A) ≈ transpose(A)
-true
-
 julia> x = rand(7); y = rand(7);
 
-julia> Sum().(x .* y) ≈ dot(x, y)
+julia> Swizzle(+).(x .* y) ≈ dot(x, y)
 true
 
-julia> sqrt.(Sum().(x.^2)) ≈ norm(x, 2)
+julia> Swizzle(+).(abs.(x)) ≈ norm(x, 1)
 true
 
-julia> Sum().(abs.(x)) ≈ norm(x, 1)
+julia> A = rand(5, 7); B = rand(7, 8);
+
+julia> Swizzle(+, nil, 2).(A) ≈ sum(A, dims=1)
 true
 
+julia> Swizzle(+, 2).(A) ≈ sum(A, dims=1)[1,:]
+true
+
+julia> Yeet(2, 1).(A) ≈ transpose(A)
+true
+
+julia> Yeet(1, 4).(A) ≈ reshape(A, 5, 1, 1, 7)
+true
+
+julia> Swizzle(+, 1, 3).(A.*Yeet(2, 3).(B)) ≈ A * B
+true
 ```
