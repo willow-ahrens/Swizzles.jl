@@ -33,12 +33,12 @@ end
     `Swizzle(op, mask...)`
     `Swizzle(op, mask)`
 
-Create a function, `S`, which creates lazily reduced arrays. `S(A)` should
-produce an object which represents the reduction of `A` into a result array `R`.
-`S(Z, A)` represents the reduction of `A` into a result array `R` which has been
-initialized as `R .= Z`. Dimension `i` of `R` corresponds to dimension `mask[i]`
-of `A` (if it exists). Dimensions of `A` which do not appear in `mask` are
-reduced out. If `Z` is unspecified, the `initial` function is used
+Create a function, `S`, which creates lazily reduced arrays using the operator
+op. `S(A)` should produce an object which represents the reduction of `A` into a
+result array `R`. `S(Z, A)` represents the reduction of `A` into a result array
+`R` which has been initialized as `R .= Z`. Dimension `i` of `R` corresponds to
+dimension `mask[i]` of `A` (if it exists). Dimensions of `A` which do not appear
+in `mask` are reduced out. If `Z` is unspecified, the `initial` function is used
 to create a suitable initial value. If no such initial value is found, the
 initial value is `nothing` and `op` is wrapped in a `Guard`.
 
