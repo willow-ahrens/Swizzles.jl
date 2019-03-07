@@ -1,6 +1,9 @@
 module Properties
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
+export return_type, initial
+export Guard, Assume
+
 """
     initial(op, T)
 
@@ -91,5 +94,38 @@ See also: [`eltype`](@ref).
 @inline eltype_bound(arg) = eltype(arg)
 
 #declare opposite
+
+
+
+
+struct Guard{Op}
+    op::Op
+end
+
+(op::Guard)(x::Nothing, y) = y
+(op::Guard)(x, y) = op.op(x, y)
+@inline return_type(op::Guard, T, S) = return_type(op.op, T, S)
+@inline return_type(op::Guard, ::Type{Union{Nothing, T}}, S) where {T} = return_type(op.op, T, S)
+@inline return_type(op::Guard, ::Type{Nothing}, S) = S
+
+@inline initial(::Guard, ::Any) = Some(nothing)
+
+
+
+struct Assume{T, Op}
+    op::Op
+end
+
+@inline ((op::Assume{T})(x, y)::T) where {T} = op.op(x, y)
+@inline function return_type(op::Assume{T}, S, R)::T where {T}
+    Q = Properties.return_type(op.op, S, R)
+    if Q <: T
+        return Q
+    else
+        return T
+    end
+end
+
+@inline initial(op::Assume, T) = initial(op.op, T)
 
 end
