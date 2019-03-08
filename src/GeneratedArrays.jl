@@ -175,11 +175,13 @@ end
 
 @inline root(x::Square) = sqrt(x.arg) * x.scale
 
-function Base.promote_type(::Type{Square{T1, S1}}, ::Type{Square{T2, S2}}) where {T1, S1, T2, S2}
+@inline Base.zero(::Type{Square{T, S}}) where {T, S} = Square{T, S}(zero(T), zero(S))
+
+function Base.promote_rule(::Type{Square{T1, S1}}, ::Type{Square{T2, S2}}) where {T1, S1, T2, S2}
     return Square{promote_type(T1, T2), promote_type(S1, S2)}
 end
 
-function Base.convert(::Type{Square{T, S}}, x::Square) where {T, S, E}
+function Base.convert(::Type{Square{T, S}}, x::Square) where {T, S}
     return Square(convert(T, x.arg), convert(S, x.scale))
 end
 
@@ -189,12 +191,12 @@ end
     end
     if x.scale > y.scale
         if iszero(y.scale)
-            return Square(x.arg + zero(y.arg) * (one(x.scale)/one(y.scale))^1, x.scale)
+            return Square(x.arg + zero(y.arg) * (one(y.scale)/one(x.scale))^1, x.scale)
         else
-            return Square(x.arg + y.arg * (x.scale/y.scale)^2, x.scale)
+            return Square(x.arg + y.arg * (y.scale/x.scale)^2, x.scale)
         end
     else
-        return Square(x.arg + y.arg * (one(x.scale)/one(y.scale))^1, x.scale)
+        return Square(x.arg + y.arg * (one(y.scale)/one(x.scale))^1, x.scale)
     end
 end
 
@@ -208,7 +210,10 @@ end
 
 @inline root(x::Power) = x.arg ^ inv(x.exponent) * x.scale
 
-function Base.promote_type(::Type{Power{T1, S1, E1}}, ::Type{Power{T2, S2, E2}}) where {T1, S1, E1, T2, S2, E2}
+@inline Base.zero(::Type{Power{T, S, E}}) where {T, S, E} = Power{T, S, E}(zero(T), zero(S), one(E))
+@inline Base.zero(x::Power) = Power(zero(x.arg), zero(x.scale), x.exponent)
+
+function Base.promote_rule(::Type{Power{T1, S1, E1}}, ::Type{Power{T2, S2, E2}}) where {T1, S1, E1, T2, S2, E2}
     return Power{promote_type(T1, T2), promote_type(S1, S2), promote_type(E1, E2)}
 end
 
@@ -217,19 +222,28 @@ function Base.convert(::Type{Power{T, S, E}}, x::Power) where {T, S, E}
 end
 
 @inline function Base.:+(x::T, y::T) where {T <: Power}
-    x.exponent == y.exponent || ArgumentError("Cannot accurately add Powers with different exponents")
+    if x.exponent != y.exponent
+        if iszero(x.arg) && iszero(x.scale)
+            (x, y) = (y, x)
+        end
+        if iszero(y.arg) && iszero(y.scale)
+            y = Power(y.arg, y.scale, x.exponent)
+        else
+            ArgumentError("Cannot accurately add Powers with different exponents")
+        end
+    end
     #TODO handle negative exponent
     if x.scale < y.scale
         (x, y) = (y, x)
     end
     if x.scale > y.scale
         if iszero(y.scale)
-            return Power(x.arg + zero(y.arg) * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+            return Power(x.arg + zero(y.arg) * (one(y.scale)/one(x.scale))^one(y.exponent), x.scale, x.exponent)
         else
-            return Power(x.arg + y.arg * (x.scale/y.scale)^y.exponent, x.scale, x.exponent)
+            return Power(x.arg + y.arg * (y.scale/x.scale)^y.exponent, x.scale, x.exponent)
         end
     else
-        return Power(x.arg + y.arg * (one(x.scale)/one(y.scale))^one(y.exponent), x.scale, x.exponent)
+        return Power(x.arg + y.arg * (one(y.scale)/one(x.scale))^one(y.exponent), x.scale, x.exponent)
     end
 end
 
@@ -237,47 +251,27 @@ Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray; kwargs
     norm(arr, 2; kwargs...)
 end
 
-Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real; dims=:, kwargs...)
-    return _norm(arr, p, dims, kwargs.data)
-end
-
-Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::NamedTuple{()})
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real)
     if p == 2
-        return root.(Sum(dims).(square.(arr)))
+        return root.(Sum().(square.(arr)))
     elseif p == 1
-        return Sum(dims).(norm.(arr))
+        return Sum().(norm.(arr))
     elseif p == Inf
-        return Maximum(dims).(norm.(arr))
+        return Reduce(max).(norm.(arr))
     elseif p == 0
-        return Sum(dims).(norm.(norm.(arr), 0))
+        return Sum().(norm.(norm.(arr), 0))
     elseif p == -Inf
-        return Minimum(dims).(norm.(arr))
+        return Reduce(min).(norm.(arr))
     else
-        return root.(Sum(dims).(power.(arr, p)))
-    end
-end
-Base.@propagate_inbounds function _norm(arr::GeneratedArray, p::Real, dims, nt::NamedTuple{(:init,)})
-    init = nt.init
-    if p == 2
-        return root.(Sum(dims).(square.(init), square.(arr)))
-    elseif p == 1
-        return Sum(dims).(norm.(init), norm.(arr))
-    elseif p == Inf
-        return Maximum(dims).(norm.(init), norm.(arr))
-    elseif p == 0
-        return Sum(dims).(norm.(norm.(init), 0), norm.(norm.(arr), 0))
-    elseif p == -Inf
-        return Minimum(dims).(norm.(init), norm.(arr))
-    else
-        return root.(Sum(dims).(power.(init, p), power.(arr, p)))
+        return root.(Sum().(power.(arr, p)))
     end
 end
 
-Base.@propagate_inbounds function distance(x, y; kwargs...)
-    return distance(x, y, 2; kwargs...)
+Base.@propagate_inbounds function distance(x, y)
+    return distance(x, y, 2)
 end
-Base.@propagate_inbounds function distance(x, y, p; kwargs...)
-    return norm(arrayify(broadcasted(-, x, y)), p; kwargs...)
+Base.@propagate_inbounds function distance(x, y, p)
+    return norm(arrayify(broadcasted(-, x, y)), p)
 end
 
 end

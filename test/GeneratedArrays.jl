@@ -116,7 +116,6 @@ using LinearAlgebra
         @test sum(Test1(A), init=10) == reduce(+, A, init=10)
     end
 
-    #=
     @testset "LinearAlgebra" begin
         for (X, Y) in ((rand(3, 4), rand(3,4)), (rand(3), rand(3)))
             @test dot(Test1(X), Test1(Y)) ≈ dot(X, Y)
@@ -125,18 +124,10 @@ using LinearAlgebra
         big = prevfloat(typemax(Float64))/16
         small = nextfloat(zero(Float64))
 
-        for X in ([big, big], [small, small], rand(3, 3), rand(3))
-            for ps in ((-Inf,), (-3.0,), (-1,), (-0.5,), (0,), (0.5,), (1,), (2,), (3.0,), (Inf), ())
+        for ps in ((-Inf,), (-3.0,), (-1,), (-0.5,), (0,), (0.5,), (1,), (2,), (3.0,), (Inf), ())
+            for X in ([1, 2], [big, big], [small, small], rand(3, 3), rand(3))
                 @test norm(Test1(X), ps...) ≈ norm(X, ps...)
-                if ndims(X) > 1
-                    @test norm(Test1(X), ps..., dims=2) ≈ mapslices(x -> norm(x, ps...), X, dims=2)
-                    @test norm(Test1(X), ps..., dims=(1, 2)) ≈ mapslices(x -> norm(x, ps...), X, dims=(1, 2))
-                end
-                @test norm(Test1(X), dims=:) ≈ norm(X, dims=:)
-                @test norm(Test1(X), dims=()) ≈ X
-                @test norm(Test1(X), init=10) ≈ norm([10, X...])
             end
         end
     end
-    =#
 end

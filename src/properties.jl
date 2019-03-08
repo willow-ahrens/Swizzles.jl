@@ -50,6 +50,15 @@ julia> initial_value(+, 1.0)
 """
 @inline initial_value(f::F, x) where {F} = initial(f, typeof(x))
 
+@inline initial_value(::typeof(+), x::Number) = Some(zero(x))
+@inline initial_value(::typeof(add_fast), x::Number) = Some(zero(x))
+@inline initial_value(::typeof(*), x::Number) = Some(oneunit(x))
+@inline initial_value(::typeof(mul_fast), x::Number) = Some(oneunit(x))
+@inline initial_value(::typeof(max), x::Number) = Some(typemin(x))
+@inline initial_value(::typeof(max_fast), x::Number) = Some(typemin(x))
+@inline initial_value(::typeof(min), x::Number) = Some(typemax(x))
+@inline initial_value(::typeof(min_fast), x::Number) = Some(typemax(x))
+
 
 
 """
@@ -72,10 +81,32 @@ Any
 @inline function return_type(f, args...)
     return Core.Compiler.return_type(f, args)
 end
-@inline return_type(::typeof(+), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline return_type(::typeof(add_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline return_type(::typeof(*), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
-@inline return_type(::typeof(mul_fast), a::Type{<:Number}, b::Type{<:Number}) = promote_type(a, b)
+
+Rational, Complex
+
+const AtomNumber = Union{BigFloat,
+                           Float16,
+                           Float32,
+                           Float64,
+                           Bool,
+                           BigInt,
+                           Int128,
+                           Int16,
+                           Int32,
+                           Int64,
+                           Int8,
+                           UInt128,
+                           UInt16,
+                           UInt32,
+                           UInt64,
+                           UInt8}
+
+const MoleculeNumber = Union{AtomNumber, Complex{<:AtomNumber}, Rational{<:AtomNumber}}
+
+@inline return_type(::typeof(+), a::Type{<:MoleculeNumber}, b::Type{<:MoleculeNumber}) = promote_type(a, b)
+@inline return_type(::typeof(add_fast), a, b) = return_type(+, a, b)
+@inline return_type(::typeof(*), a::Type{<:MoleculeNumber}, b::Type{<:MoleculeNumber}) = promote_type(a, b)
+@inline return_type(::typeof(mul_fast), a, b) = return_type(*, a, b)
 @inline return_type(::typeof(max), a, b) = Union{a, b}
 @inline return_type(::typeof(max_fast), a, b) = Union{a, b}
 @inline return_type(::typeof(min), a, b) = Union{a, b}
