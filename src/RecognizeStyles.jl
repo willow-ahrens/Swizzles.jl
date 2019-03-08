@@ -8,7 +8,7 @@ using Base.Broadcast: Broadcasted, broadcasted
 
 
 """
-    reprexpr(root::Union{Symbol, Expr}, T::Type)
+    reprexpr(root::Union{Symbol, Expr}, T::Type) :: Expr
 
 Given a root expression of type T, produce the most detailed constructor
 expression you can to create a new object that should be equal to root.
@@ -29,26 +29,30 @@ true
 """
 reprexpr(root::Union{Symbol, Expr}, T) :: Expr = :($root::$T) 
 
-function reprexpr(root::Union{Symbol, Expr}, ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg} 
+function reprexpr(root::Union{Symbol, Expr},
+                  ::Type{Adjoint{<:Any, Arg}}) :: Expr where Arg 
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Adjoint)($arg′))
 end
 
-function reprexpr(root::Union{Symbol, Expr}, ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg} 
+function reprexpr(root::Union{Symbol, Expr},
+                  ::Type{Transpose{<:Any, Arg}}) :: Expr where Arg
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Transpose)($arg′))
 end
 
-function reprexpr(root::Union{Symbol, Expr}, ::Type{Broadcasted{Style, Axes, F, Args}}) :: Expr where {Style, Axes, F, Args<:Tuple}
+function reprexpr(root::Union{Symbol, Expr},
+                  ::Type{Broadcasted{<:Any, <:Any, <:Any, Args}}) :: Expr where Args<:Tuple
     f′ = :($root.f)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
     :($Antenna($f′)($(arg_exprs...)))
 end
 
-function tuple_reprexpr(root::Union{Symbol, Expr}, ::Type{TType})::Array{Expr, 1} where TType<:Tuple
+function tuple_reprexpr(root::Union{Symbol, Expr},
+                        ::Type{TType}) :: Array{Expr, 1} where TType<:Tuple
     [reprexpr(:($root[$idx]), EType)
          for (idx, EType) in enumerate(TType.parameters)]
 end
