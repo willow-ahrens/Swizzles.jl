@@ -100,7 +100,7 @@ end
     end
     return ctr(init, arg)
 end
-@inline function (ctr::Swizzle{Nothing, _mask})(arg::AbstractArray) where {Op, _mask}
+@inline function (ctr::Swizzle{Nothing, _mask})(arg::AbstractArray) where {_mask}
     return Swizzle{Nothing, _mask}(nothing)(Ref(nothing), arg)
 end
 @inline (ctr::Swizzle)(init, arg) = ctr(arrayify(init), arrayify(arg))
