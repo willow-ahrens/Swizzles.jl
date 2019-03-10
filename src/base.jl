@@ -30,5 +30,16 @@ module BaseHacks
         Base._range(st, nothing, nothing, length(s)) #gotta use this version of range instead of const-propping through the kwarg version.
     end
 
+    Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,<:NTuple{N,Base.OneTo}}, I::Vararg{Int, N}) where {N}
+        @boundscheck checkbounds(iter, I...)
+        CartesianIndex(I)
+    end
+
+    Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,R}, I::Vararg{Int, N}) where {N,R}
+        @boundscheck checkbounds(iter, I...)
+        CartesianIndex(I .- first.(Base.axes1.(iter.indices)) .+ first.(iter.indices))
+    end
+
+
     @info "BaseHacks is online. all your Base are belong to us."
 end
