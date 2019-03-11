@@ -1,0 +1,3 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Swizzles = "6997b572-c796-11e8-2991-b59c2857380c"

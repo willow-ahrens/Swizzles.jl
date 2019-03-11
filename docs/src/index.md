@@ -1,3 +1,3 @@
-# SwizzledDimsArrays.jl
+# Swizzles.jl
 
-Documentation for SwizzledDimsArrays.jl
+Documentation for Swizzles.jl
