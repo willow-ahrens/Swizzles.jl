@@ -4,8 +4,9 @@ using Swizzles
 using Swizzles.Antennae
 
 using LinearAlgebra
-using Base.Broadcast: Broadcasted, broadcasted 
+using Base.Broadcast: Broadcasted, broadcasted
 
+include("simplify.jl")
 
 """
     reprexpr(root::Union{Symbol, Expr}, T::Type) :: Expr
@@ -27,24 +28,24 @@ julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root::Union{Symbol, Expr}, T) :: Expr = :($root::$T) 
+reprexpr(root::Union{Symbol, Expr}, T) :: Expr = :($root::$T)
 
 function reprexpr(root::Union{Symbol, Expr},
-                  ::Type{Adjoint{<:Any, Arg}}) :: Expr where Arg 
+                  ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg}
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Adjoint)($arg′))
 end
 
 function reprexpr(root::Union{Symbol, Expr},
-                  ::Type{Transpose{<:Any, Arg}}) :: Expr where Arg
+                  ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg}
     root′ = :($root.parent)
     arg′ = reprexpr(root′, Arg)
     :($(Transpose)($arg′))
 end
 
 function reprexpr(root::Union{Symbol, Expr},
-                  ::Type{Broadcasted{<:Any, <:Any, <:Any, Args}}) :: Expr where Args<:Tuple
+                  ::Type{Broadcasted{T1, T2, T3, Args}}) :: Expr where {T1, T2, T3, Args<:Tuple}
     f′ = :($root.f)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
@@ -58,20 +59,6 @@ function tuple_reprexpr(root::Union{Symbol, Expr},
 end
 
 #=
-"""
-    simplify(arr)
-
-Apply global rules to simplify the array expression `arr`.
-"""
-@generated function simplify(arr)
-    simple_expr = Rewrite.with_context(RecognizeStyles.CONTEXT)) do
-        normalize(@term(reprexpr(:arr, arr)), RecognizeStyles.RULES)
-    end
-    return quote
-        $simple_expr
-    end
-end
-
 """
     match(arr)
 

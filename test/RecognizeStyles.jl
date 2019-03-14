@@ -1,10 +1,11 @@
 using Swizzles.RecognizeStyles: reprexpr
 using LinearAlgebra
-using Base.Broadcast: broadcasted 
+using Base.Broadcast: broadcasted
 
 
 @testset "reprexpr" begin
 
+    # Checks faithfulness, i.e. (reprexpr |> eval) == eval
     @generated function test_eval_reprexpr_is_id(val)
         expr = reprexpr(:val, val)
         return quote
@@ -38,4 +39,8 @@ using Base.Broadcast: broadcasted
             broadcasted(^, A, B),
         )
     )
+
+    # Check that Antennae are being used.
+    bd = broadcasted(+, A, B)
+    @test reprexpr(:bd, typeof(bd)).args[1].args[1] == Swizzles.Antennae.Antenna
 end
