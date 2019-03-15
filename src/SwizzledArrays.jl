@@ -17,11 +17,19 @@ struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <:
     op::Op
     init::Init
     arg::Arg
-    function SwizzledArray{T, N, Op, mask, Init, Arg}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
+    Base.@propagate_inbounds function SwizzledArray{T, N, Op, mask, Init, Arg}(op::Op, init::Init, arg::Arg) where {T, N, Op, mask, Init, Arg}
         @assert T isa Type
         @assert max(0, mask...) <= ndims(arg)
         @assert length(mask) == N
         #TODO assert mask is unique
+        if op === nothing
+            @boundscheck begin
+                arg_keeps = keeps(arg)
+                if any(imasktuple(d->kept(arg_keeps[d]), d->false, Val(mask), Val(ndims(arg))))
+                    throw(DimensionMismatch("TODO"))
+                end
+            end
+        end
         new(op, init, arg)
     end
 end
@@ -156,13 +164,6 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     if arr.op === nothing
-        @boundscheck begin
-            arg_keeps = keeps(arr.arg)
-            arr_mask = mask(arr)
-            if any(imasktuple(d->kept(arg_keeps[d]), d->false, Val(mask(arr)), Val(ndims(arg))))
-                throw(DimensionMismatch("TODO"))
-            end
-        end
         @inbounds for i in eachindex(arg)
             i′ = childindex(dst, arr, i)
             dst[i′...] = arg[i]
