@@ -2,100 +2,100 @@
 
   A = [1 2 3; 4 5 6; 7 8 9]
 
-  @test_throws DimensionMismatch Beam(max, (1, nil)).(A, [1, 2, 3, 4]) == [3; 6; 9]
+  @test_throws DimensionMismatch Pour(max, (1, nil)).(A, [1, 2, 3, 4]) == [3; 6; 9]
 
   @test Sum(()).(A) == A
   @test Sum(:).(A) == 45
   @test Reduce(+, ()).(A) == A
   @test Reduce(+, :).(A) == 45
   @test Sum().([]) == nothing
-  @test Yeet(2, 3).([]) == Array{Any}(undef,1,0)
-  @test_throws DimensionMismatch Yeet(nil, 3).([])
-  @test_throws DimensionMismatch Yeet(1, nil, nil).(Array{Any}(undef,1,0))
+  @test Beam(2, 3).([]) == Array{Any}(undef,1,0)
+  @test_throws DimensionMismatch Beam(nil, 3).([])
+  @test_throws DimensionMismatch Beam(1, nil, nil).(Array{Any}(undef,1,0))
   @test Sum(2).(Array{Any}(undef,1,0)) == [nothing, nothing][1:1,1:1]
 
-  @test Beam(max, (1, nil)).(A) == [3; 6; 9]
-  @test Beam(min, (1, nil)).(A) == [1; 4; 7]
-  @test Beam(max, (1,)).(A) == [3; 6; 9]
-  @test Beam(min, (1,)).(A) == [1; 4; 7]
-  @test Beam(max, (nil, 1)).(A) == [7; 8; 9]
-  @test Beam(min, (nil, 1)).(A) == [1; 2; 3]
-  @test Beam(max, (2, nil)).(A) == [3  6  9]
-  @test Beam(min, (2, nil)).(A) == [1  4  7]
-  @test Beam(max, (nil, 2)).(A) == [7  8  9]
-  @test Beam(min, (nil, 2)).(A) == [1  2  3]
+  @test Pour(max, (1, nil)).(A) == [3; 6; 9]
+  @test Pour(min, (1, nil)).(A) == [1; 4; 7]
+  @test Pour(max, (1,)).(A) == [3; 6; 9]
+  @test Pour(min, (1,)).(A) == [1; 4; 7]
+  @test Pour(max, (nil, 1)).(A) == [7; 8; 9]
+  @test Pour(min, (nil, 1)).(A) == [1; 2; 3]
+  @test Pour(max, (2, nil)).(A) == [3  6  9]
+  @test Pour(min, (2, nil)).(A) == [1  4  7]
+  @test Pour(max, (nil, 2)).(A) == [7  8  9]
+  @test Pour(min, (nil, 2)).(A) == [1  2  3]
 
   R = [0; 0; 0;]
-  @test (R .= Beam(max, (1, nil)).(A)) == [3; 6; 9]
+  @test (R .= Pour(max, (1, nil)).(A)) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test (R .= Beam(min, (1, nil)).(A)) == [1; 4; 7]
+  @test (R .= Pour(min, (1, nil)).(A)) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test (R .= Beam(max, (1,)).(A)) == [3; 6; 9]
+  @test (R .= Pour(max, (1,)).(A)) == [3; 6; 9]
   R = [0; 0; 0;]
-  @test (R .= Beam(min, (1,)).(A)) == [1; 4; 7]
+  @test (R .= Pour(min, (1,)).(A)) == [1; 4; 7]
   R = [0; 0; 0;]
-  @test (R .= Beam(max, (nil, 1)).(A)) == [7; 8; 9]
+  @test (R .= Pour(max, (nil, 1)).(A)) == [7; 8; 9]
   R = [0; 0; 0;]
-  @test (R .= Beam(min, (nil, 1)).(A)) == [1; 2; 3]
+  @test (R .= Pour(min, (nil, 1)).(A)) == [1; 2; 3]
 
   R = [0 0 0]
-  @test (R .= Beam(max, (2, nil)).(A)) == [3  6  9]
+  @test (R .= Pour(max, (2, nil)).(A)) == [3  6  9]
   R = [0 0 0]
-  @test (R .= Beam(min, (2, nil)).(A)) == [1  4  7]
+  @test (R .= Pour(min, (2, nil)).(A)) == [1  4  7]
   R = [0 0 0]
-  @test (R .= Beam(max, (nil, 2)).(A)) == [7  8  9]
+  @test (R .= Pour(max, (nil, 2)).(A)) == [7  8  9]
   R = [0 0 0]
-  @test (R .= Beam(min, (nil, 2)).(A)) == [1  2  3]
+  @test (R .= Pour(min, (nil, 2)).(A)) == [1  2  3]
 
-  @test Beam(max, (1, nil, 2)).(A) == [3; 6; 9]
-  @test Beam(min, (1, nil, 2)).(A) == [1; 4; 7]
-  @test Beam(max, (nil, 1, 2)).(A) == [7; 8; 9]
-  @test Beam(min, (nil, 1, 2)).(A) == [1; 2; 3]
-
-  R = [0; 0; 0;]
-  @test (R .= Beam(max, (1, nil, 2)).(A)) == [3; 6; 9]
-  R = [0; 0; 0;]
-  @test (R .= Beam(min, (1, nil, 2)).(A)) == [1; 4; 7]
-  R = [0; 0; 0;]
-  @test (R .= Beam(max, (nil, 1, 2)).(A)) == [7; 8; 9]
-  R = [0; 0; 0;]
-  @test (R .= Beam(min, (nil, 1, 2)).(A)) == [1; 2; 3]
+  @test Pour(max, (1, nil, 2)).(A) == [3; 6; 9]
+  @test Pour(min, (1, nil, 2)).(A) == [1; 4; 7]
+  @test Pour(max, (nil, 1, 2)).(A) == [7; 8; 9]
+  @test Pour(min, (nil, 1, 2)).(A) == [1; 2; 3]
 
   R = [0; 0; 0;]
-  @test_throws DimensionMismatch R .= Yeet((nil, 1, 2)).(A)
-  @test_throws DimensionMismatch R .= Yeet((1, nil, 2)).(A)
+  @test (R .= Pour(max, (1, nil, 2)).(A)) == [3; 6; 9]
+  R = [0; 0; 0;]
+  @test (R .= Pour(min, (1, nil, 2)).(A)) == [1; 4; 7]
+  R = [0; 0; 0;]
+  @test (R .= Pour(max, (nil, 1, 2)).(A)) == [7; 8; 9]
+  R = [0; 0; 0;]
+  @test (R .= Pour(min, (nil, 1, 2)).(A)) == [1; 2; 3]
 
-  @test Yeet((2, 1)).(A) == transpose(A)
+  R = [0; 0; 0;]
+  @test_throws DimensionMismatch R .= Beam((nil, 1, 2)).(A)
+  @test_throws DimensionMismatch R .= Beam((1, nil, 2)).(A)
+
+  @test Beam((2, 1)).(A) == transpose(A)
 
   R = [0 0 0;
        0 0 0;
        0 0 0]
-  @test (R .= Beam(min, (2, 1)).(A)) == transpose(A)
+  @test (R .= Pour(min, (2, 1)).(A)) == transpose(A)
 
-  @test Yeet(2).([11; 12; 13]) == [11 12 13]
-  @test Beam(max, ()).([11; 12; 13]) == 13
-  @test Beam(max, ()).((11, 12, 13)) == 13
+  @test Beam(2).([11; 12; 13]) == [11 12 13]
+  @test Pour(max, ()).([11; 12; 13]) == 13
+  @test Pour(max, ()).((11, 12, 13)) == 13
 
   R = [0 0 0]
-  @test (R .= Yeet((2,)).([11; 12; 13])) == [11 12 13]
+  @test (R .= Beam((2,)).([11; 12; 13])) == [11 12 13]
   R = [0]
-  @test Beam(max, ()).((11, 12, 13)) == 13
+  @test Pour(max, ()).((11, 12, 13)) == 13
 
-  @test Beam(+).(A) == 45
-  @test Beam(+, 2).(A) == [6 15 24]
-  @test Beam(+, 1).(A) == [6; 15; 24]
-  @test Beam(+, 1,2).(A) == A
-  @test Beam(+, 1,2,3).(A) == A
-  @test Beam(+, 2,1).(A) == transpose(A)
-  @test Beam(+, 2,1,3).(A) == transpose(A)
+  @test Pour(+).(A) == 45
+  @test Pour(+, 2).(A) == [6 15 24]
+  @test Pour(+, 1).(A) == [6; 15; 24]
+  @test Pour(+, 1,2).(A) == A
+  @test Pour(+, 1,2,3).(A) == A
+  @test Pour(+, 2,1).(A) == transpose(A)
+  @test Pour(+, 2,1,3).(A) == transpose(A)
 
-  @test_throws DimensionMismatch Yeet().(A)
-  @test_throws DimensionMismatch Yeet(2).(A)
-  @test_throws DimensionMismatch Yeet(1).(A)
-  @test Yeet(1,2).(A) == A
-  @test Yeet(1,2,3).(A) == A
-  @test Yeet(2,1).(A) == transpose(A)
-  @test Yeet(2,1,3).(A) == transpose(A)
+  @test_throws DimensionMismatch Beam().(A)
+  @test_throws DimensionMismatch Beam(2).(A)
+  @test_throws DimensionMismatch Beam(1).(A)
+  @test Beam(1,2).(A) == A
+  @test Beam(1,2,3).(A) == A
+  @test Beam(2,1).(A) == transpose(A)
+  @test Beam(2,1,3).(A) == transpose(A)
 
   @test Reduce(+).(A) == 45
   @test Reduce(+, 1).(A) == [12 15 18]
@@ -125,13 +125,13 @@
   @test SumOut(2, 1).(A) == 45
   @test SumOut(2, 1, 3).(A) == 45
 
-  @test_throws DimensionMismatch Yoink().(A)
-  @test_throws DimensionMismatch Yoink(2).(A)
-  @test_throws DimensionMismatch Yoink(1).(A)
-  @test Yoink(1,2).(A) == A
-  @test Yoink(1,2,3).(A) == reshape(A, 3, 3, 1)
-  @test Yoink(2,1).(A) == transpose(A)
-  @test Yoink(2,1,3).(A) == reshape(transpose(A), 3, 3, 1)
+  @test_throws DimensionMismatch Focus().(A)
+  @test_throws DimensionMismatch Focus(2).(A)
+  @test_throws DimensionMismatch Focus(1).(A)
+  @test Focus(1,2).(A) == A
+  @test Focus(1,2,3).(A) == reshape(A, 3, 3, 1)
+  @test Focus(2,1).(A) == transpose(A)
+  @test Focus(2,1,3).(A) == reshape(transpose(A), 3, 3, 1)
 
   @test Swizzle(+).(A) == 45
   @test Swizzle(+, 1).(A) == [6; 15; 24]
@@ -141,36 +141,36 @@
   @test Swizzle(+, 2,1).(A) == transpose(A)
   @test Swizzle(+, 2,1,3).(A) == reshape(transpose(A), 3, 3, 1)
 
-  @test Yeet(1).((1, 2)) isa Tuple
-  @test Beam(+, (1,)).((1, 2)) isa Tuple
+  @test Beam(1).((1, 2)) isa Tuple
+  @test Pour(+, (1,)).((1, 2)) isa Tuple
   @test SumOut(1).((1.0, 2)) isa Float64
 
   A = rand(1,1)
   B = rand(1,1)
 
-  @test SumOut(2).(A.*Yeet(2,3).(B)) isa Matrix
-  @test Sum().(A.*Yeet(2,3).(B)) isa Float64
-  @test SumOut(2).(A.*Yeet(2,3).(B)) == A * B
+  @test SumOut(2).(A.*Beam(2,3).(B)) isa Matrix
+  @test Sum().(A.*Beam(2,3).(B)) isa Float64
+  @test SumOut(2).(A.*Beam(2,3).(B)) == A * B
 
   A = rand(5,7)
   B = rand(7,6)
 
-  @test SumOut(2).(A.*Yeet(2,3).(B)) ≈ A * B
+  @test SumOut(2).(A.*Beam(2,3).(B)) ≈ A * B
 
-  @test reshape(Yeet(2, 4).(A).*Yeet(1, 3).(B), size(A, 1) * size(B, 1), :) == kron(A, B)
+  @test reshape(Beam(2, 4).(A).*Beam(1, 3).(B), size(A, 1) * size(B, 1), :) == kron(A, B)
 
   x = rand(3)
   y = rand(4)
 
-  @test reshape(Yeet(2).(x).*y, :) == kron(x, y)
+  @test reshape(Beam(2).(x).*y, :) == kron(x, y)
 
   z = Array{Int64,0}(undef)
   z[] = 13
 
-  @test Yeet(3).(z) == 13
+  @test Beam(3).(z) == 13
 
   A = [1 2 3 4 5]
-  Yoink(nil, nil, 2).(A) == Yeet(nil, 3).(A)
+  Focus(nil, nil, 2).(A) == Beam(nil, 3).(A)
 
   @test Swizzle(+).(rand(3,3)) isa Float64
   @test copy(Swizzle(+)(rand(3,3))) isa Array{Float64, 0}
