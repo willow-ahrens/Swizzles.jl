@@ -165,13 +165,13 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     if arr.op === nothing
         @inbounds for i in eachindex(arg)
-            i′ = childindex(dst, arr, i)
+            i′ = childindex(arr, i)
             dst[i′...] = arg[i]
         end
     else
         dst .= arr.init
         @inbounds for i in eachindex(arg)
-            i′ = childindex(dst, arr, i)
+            i′ = childindex(arr, i)
             dst[i′...] = arr.op(dst[i′...], arg[i])
         end
     end
@@ -210,17 +210,16 @@ end
 """
 parentindex
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
-    return childindex(dst, arr, CartesianIndices(arr.arg)[i])
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+    return childindex(arr, CartesianIndices(arr.arg)[i])
 end
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
-    return childindex(dst, arr, Tuple(i)...)
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+    return childindex(arr, Tuple(i)...)
 end
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    dst_axes = axes(dst)
-    masktuple(d->firstindex(dst_axes[d]), d->i[d], Val(mask(arr)))
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+    masktuple(d->1, d->i[d], Val(mask(arr)))
 end
 
 """
