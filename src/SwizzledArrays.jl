@@ -159,20 +159,76 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     copyto!(dst, arr′)
 end
 
+is_identity_mask(mask) = mask == 1:length(mask)
+@generated function is_identity_mask(::Val{mask}) where {mask}
+    return is_identity_mask(mask)
+end
+
+is_scalar_mask(mask) = mask == ()
+@generated function is_scalar_mask(::Val{mask}) where {mask}
+    return is_scalar_mask(mask)
+end
+
+is_nil_mask(mask) = mask == ntuple(n->nil, length(mask))
+@generated function is_nil_mask(::Val{mask}) where {mask}
+    return is_nil_mask(mask)
+end
+
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
-    if arr.op === nothing
-        @inbounds for i in eachindex(arg)
-            i′ = childindex(dst, arr, i)
-            dst[i′...] = arg[i]
+    init = arr.init
+    op = arr.op
+    if is_scalar_mask(Val(mask(arr)))
+        if op === nothing
+            @inbounds for i in eachindex(arg)
+                dst[] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg)
+                i′ = childindex(arr, i)
+                dst[] = op(dst[], arg[i])
+            end
+        end
+    elseif is_nil_mask(Val(mask(arr)))
+        if op === nothing
+            i′ = eachindex(dst)[1]
+            @inbounds for i in eachindex(arg)
+                dst[i′] = arg[i]
+            end
+        else
+            dst .= init
+            i′ = eachindex(dst)[1]
+            @inbounds for i in eachindex(arg)
+                dst[i′] = op(dst[i′], arg[i])
+            end
+        end
+    elseif is_identity_mask(Val(mask(arr)))
+        if op === nothing
+            @inbounds for i in eachindex(arg, dst)
+                dst[i] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg, dst)
+                dst[i] = op(dst[i], arg[i])
+            end
         end
     else
-        dst .= arr.init
-        @inbounds for i in eachindex(arg)
-            i′ = childindex(dst, arr, i)
-            dst[i′...] = arr.op(dst[i′...], arg[i])
+        inds = CartesianIndices(arg)
+        if op === nothing
+            @inbounds for i in eachindex(arg, inds)
+                i′ = childindex(arr, inds[i])
+                dst[i′...] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg, inds)
+                i′ = childindex(arr, inds[i])
+                dst[i′...] = op(dst[i′...], arg[i])
+            end
         end
     end
     return dst
@@ -210,17 +266,16 @@ end
 """
 parentindex
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
-    return childindex(dst, arr, CartesianIndices(arr.arg)[i])
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+    return childindex(arr, CartesianIndices(arr.arg)[i])
 end
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
-    return childindex(dst, arr, Tuple(i)...)
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+    return childindex(arr, Tuple(i)...)
 end
 
-Base.@propagate_inbounds function childindex(dst::AbstractArray{<:Any, N}, arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    dst_axes = axes(dst)
-    masktuple(d->firstindex(dst_axes[d]), d->i[d], Val(mask(arr)))
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+    masktuple(d->1, d->i[d], Val(mask(arr)))
 end
 
 """
