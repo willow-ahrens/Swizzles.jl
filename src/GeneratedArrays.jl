@@ -6,6 +6,7 @@ using Base.Broadcast: Broadcasted
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
+using Swizzles: loop
 using Swizzles.NullArrays
 
 export GeneratedArray
@@ -82,6 +83,13 @@ end
 
 Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
     NullArray(axes(arr)) .= f.(arr, tail...)
+    return nothing
+end
+
+
+
+Base.@propagate_inbounds function Swizzles.loop(f::F, arr::GeneratedArray) where {F}
+    NullArray(axes(arr)) .= f.(arr)
     return nothing
 end
 

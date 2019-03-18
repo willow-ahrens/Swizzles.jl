@@ -1,5 +1,6 @@
 module Swizzles
 
+export loop
 export Nil, nil
 export arrayify
 export Guard
@@ -13,6 +14,7 @@ include("base.jl")
 include("util.jl")
 include("properties.jl")
 
+include("loop.jl")
 include("BoxArrays.jl")
 include("WrapperArrays.jl")
 include("NullArrays.jl")

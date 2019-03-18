@@ -4,6 +4,7 @@ using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Swizzles.BoxArrays
+
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
@@ -182,50 +183,57 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     op = arr.op
     if is_scalar_mask(Val(mask(arr)))
         if op === nothing
-            @inbounds for i in eachindex(arg)
+            @inbounds loop(eachindex(arg)) do i
+                Base.@_propagate_inbounds_meta
                 dst[] = arg[i]
             end
         else
             dst .= init
-            @inbounds for i in eachindex(arg)
-                i′ = childindex(arr, i)
+            @inbounds loop(eachindex(arg)) do i
+                Base.@_propagate_inbounds_meta
                 dst[] = op(dst[], arg[i])
             end
         end
     elseif is_nil_mask(Val(mask(arr)))
         if op === nothing
             i′ = eachindex(dst)[1]
-            @inbounds for i in eachindex(arg)
+            @inbounds loop(eachindex(arg)) do i
+                Base.@_propagate_inbounds_meta
                 dst[i′] = arg[i]
             end
         else
             dst .= init
             i′ = eachindex(dst)[1]
-            @inbounds for i in eachindex(arg)
+            @inbounds loop(eachindex(arg)) do i
+                Base.@_propagate_inbounds_meta
                 dst[i′] = op(dst[i′], arg[i])
             end
         end
     elseif is_identity_mask(Val(mask(arr)))
         if op === nothing
-            @inbounds for i in eachindex(arg, dst)
+            @inbounds loop(eachindex(arg, dst)) do i
+                Base.@_propagate_inbounds_meta
                 dst[i] = arg[i]
             end
         else
             dst .= init
-            @inbounds for i in eachindex(arg, dst)
+            @inbounds loop(eachindex(arg, dst)) do i
+                Base.@_propagate_inbounds_meta
                 dst[i] = op(dst[i], arg[i])
             end
         end
     else
         inds = CartesianIndices(arg)
         if op === nothing
-            @inbounds for i in eachindex(arg, inds)
+            @inbounds loop(eachindex(arg, inds)) do i
+                Base.@_propagate_inbounds_meta
                 i′ = childindex(arr, inds[i])
                 dst[i′...] = arg[i]
             end
         else
             dst .= init
-            @inbounds for i in eachindex(arg, inds)
+            @inbounds loop(eachindex(arg, inds)) do i
+                Base.@_propagate_inbounds_meta
                 i′ = childindex(arr, inds[i])
                 dst[i′...] = op(dst[i′...], arg[i])
             end
