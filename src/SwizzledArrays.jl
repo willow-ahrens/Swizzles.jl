@@ -177,7 +177,6 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
-    arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     init = arr.init
     op = arr.op
