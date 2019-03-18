@@ -159,20 +159,73 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     copyto!(dst, arr′)
 end
 
+@generated function has_identity_mask(arr::SwizzledArray)
+    return mask(arr) == 1:ndims(arr)
+end
+
+@generated function has_scalar_mask(arr::SwizzledArray)
+    return mask(arr) == ()
+end
+
+@generated function has_nil_mask(arr::SwizzledArray)
+    return mask(arr) == ntuple(n->nil, ndims(arr))
+end
+
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     arg = arr.arg
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
-    if arr.op === nothing
-        @inbounds for i in eachindex(arg)
-            i′ = childindex(arr, i)
-            dst[i′...] = arg[i]
+    init = arr.init
+    op = arr.op
+    if has_scalar_mask(arr)
+        if op === nothing
+            @inbounds for i in eachindex(arg)
+                dst[] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg)
+                i′ = childindex(arr, i)
+                dst[] = op(dst[], arg[i])
+            end
+        end
+    elseif has_nil_mask(arr)
+        if op === nothing
+            i′ = eachindex(dst)[1]
+            @inbounds for i in eachindex(arg)
+                dst[i′] = arg[i]
+            end
+        else
+            dst .= init
+            i′ = eachindex(dst)[1]
+            @inbounds for i in eachindex(arg)
+                dst[i′] = op(dst[i′], arg[i])
+            end
+        end
+    elseif has_identity_mask(arr)
+        if op === nothing
+            @inbounds for i in eachindex(arg, dst)
+                dst[i] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg, dst)
+                dst[i] = op(dst[i], arg[i])
+            end
         end
     else
-        dst .= arr.init
-        @inbounds for i in eachindex(arg)
-            i′ = childindex(arr, i)
-            dst[i′...] = arr.op(dst[i′...], arg[i])
+        inds = CartesianIndices(arg)
+        if op === nothing
+            @inbounds for i in eachindex(arg, inds)
+                i′ = childindex(arr, inds[i])
+                dst[i′...] = arg[i]
+            end
+        else
+            dst .= init
+            @inbounds for i in eachindex(arg, inds)
+                i′ = childindex(arr, inds[i])
+                dst[i′...] = op(dst[i′...], arg[i])
+            end
         end
     end
     return dst
