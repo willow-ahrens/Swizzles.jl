@@ -159,16 +159,19 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     copyto!(dst, arr′)
 end
 
-@generated function has_identity_mask(arr::SwizzledArray)
-    return mask(arr) == 1:ndims(arr)
+is_identity_mask(mask) = mask == 1:length(mask)
+@generated function is_identity_mask(::Val{mask}) where {mask}
+    return is_identity_mask(mask)
 end
 
-@generated function has_scalar_mask(arr::SwizzledArray)
-    return mask(arr) == ()
+is_scalar_mask(mask) = mask == ()
+@generated function is_scalar_mask(::Val{mask}) where {mask}
+    return is_scalar_mask(mask)
 end
 
-@generated function has_nil_mask(arr::SwizzledArray)
-    return mask(arr) == ntuple(n->nil, ndims(arr))
+is_nil_mask(mask) = mask == ntuple(n->nil, length(mask))
+@generated function is_nil_mask(::Val{mask}) where {mask}
+    return is_nil_mask(mask)
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
@@ -177,7 +180,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     init = arr.init
     op = arr.op
-    if has_scalar_mask(arr)
+    if is_scalar_mask(Val(mask(arr)))
         if op === nothing
             @inbounds for i in eachindex(arg)
                 dst[] = arg[i]
@@ -189,7 +192,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
                 dst[] = op(dst[], arg[i])
             end
         end
-    elseif has_nil_mask(arr)
+    elseif is_nil_mask(Val(mask(arr)))
         if op === nothing
             i′ = eachindex(dst)[1]
             @inbounds for i in eachindex(arg)
@@ -202,7 +205,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
                 dst[i′] = op(dst[i′], arg[i])
             end
         end
-    elseif has_identity_mask(arr)
+    elseif is_identity_mask(Val(mask(arr)))
         if op === nothing
             @inbounds for i in eachindex(arg, dst)
                 dst[i] = arg[i]
