@@ -42,5 +42,5 @@ using Base.Broadcast: broadcasted
 
     # Check that Antennae are being used.
     bd = broadcasted(+, A, B)
-    @test reprexpr(:bd, typeof(bd)).args[1].args[1] == Swizzles.Antennae.Antenna
+    @test reprexpr(:bd, typeof(bd)).args[1] isa Swizzles.Antennae.Antenna
 end

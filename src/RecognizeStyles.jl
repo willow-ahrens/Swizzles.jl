@@ -46,10 +46,10 @@ end
 
 function reprexpr(root::Union{Symbol, Expr},
                   ::Type{Broadcasted{T1, T2, F, Args}}) :: Expr where {T1, T2, F, Args<:Tuple}
-    f′ = :($(F.instance))
+    antenna = Antenna(F.instance)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
-    :($Antenna($f′)($(arg_exprs...)))
+    :($antenna($(arg_exprs...)))
 end
 
 function tuple_reprexpr(root::Union{Symbol, Expr},
