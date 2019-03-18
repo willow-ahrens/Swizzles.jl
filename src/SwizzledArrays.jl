@@ -177,69 +177,108 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
-    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
-    init = arr.init
     op = arr.op
     if is_scalar_mask(Val(mask(arr)))
         if op === nothing
-            @inbounds loop(eachindex(arg)) do i
-                Base.@_propagate_inbounds_meta
-                dst[] = arg[i]
-            end
+            _swizzle_copyto_scalarmask_noop!(dst, arr)
         else
-            dst .= init
-            @inbounds loop(eachindex(arg)) do i
-                Base.@_propagate_inbounds_meta
-                dst[] = op(dst[], arg[i])
-            end
+            _swizzle_copyto_scalarmask_op!(dst, arr)
         end
     elseif is_nil_mask(Val(mask(arr)))
         if op === nothing
-            i′ = eachindex(dst)[1]
-            @inbounds loop(eachindex(arg)) do i
-                Base.@_propagate_inbounds_meta
-                dst[i′] = arg[i]
-            end
+            _swizzle_copyto_nilmask_noop!(dst, arr)
         else
-            dst .= init
-            i′ = eachindex(dst)[1]
-            @inbounds loop(eachindex(arg)) do i
-                Base.@_propagate_inbounds_meta
-                dst[i′] = op(dst[i′], arg[i])
-            end
+            _swizzle_copyto_nilmask_op!(dst, arr)
         end
     elseif is_identity_mask(Val(mask(arr)))
         if op === nothing
-            @inbounds loop(eachindex(arg, dst)) do i
-                Base.@_propagate_inbounds_meta
-                dst[i] = arg[i]
-            end
+            _swizzle_copyto_identitymask_noop!(dst, arr)
         else
-            dst .= init
-            @inbounds loop(eachindex(arg, dst)) do i
-                Base.@_propagate_inbounds_meta
-                dst[i] = op(dst[i], arg[i])
-            end
+            _swizzle_copyto_identitymask_op!(dst, arr)
         end
     else
-        inds = CartesianIndices(arg)
         if op === nothing
-            @inbounds loop(eachindex(arg, inds)) do i
-                Base.@_propagate_inbounds_meta
-                i′ = childindex(arr, inds[i])
-                dst[i′...] = arg[i]
-            end
+            _swizzle_copyto_anymask_noop!(dst, arr)
         else
-            dst .= init
-            @inbounds loop(eachindex(arg, inds)) do i
-                Base.@_propagate_inbounds_meta
-                i′ = childindex(arr, inds[i])
-                dst[i′...] = op(dst[i′...], arg[i])
-            end
+            _swizzle_copyto_anymask_op!(dst, arr)
         end
     end
     return dst
 end
+
+Base.@propagate_inbounds function _swizzle_copyto_scalarmask_noop!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    @inbounds loop(eachindex(arg)) do i
+        Base.@_inline_meta
+        dst[] = arg[i]
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_scalarmask_op!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    dst .= src.init
+    @inbounds loop(eachindex(arg)) do i
+        Base.@_propagate_inbounds_meta
+        dst[] = src.op(dst[], arg[i])
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_nilmask_noop!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    @inbounds loop(eachindex(arg)) do i
+        Base.@_propagate_inbounds_meta
+        dst[1] = arg[i]
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_nilmask_op!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    dst .= src.init
+    @inbounds loop(eachindex(arg)) do i
+        Base.@_propagate_inbounds_meta
+        dst[1] = src.op(dst[1], arg[i])
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_identitymask_noop!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    @inbounds loop(eachindex(arg, dst)) do i
+        Base.@_propagate_inbounds_meta
+        dst[i] = arg[i]
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_identitymask_op!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    dst .= src.init
+    @inbounds loop(eachindex(arg, dst)) do i
+        Base.@_propagate_inbounds_meta
+        dst[i] = src.op(dst[i], arg[i])
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_anymask_noop!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    inds = CartesianIndices(arg)
+    @inbounds loop(eachindex(arg, inds)) do i
+        Base.@_propagate_inbounds_meta
+        i′ = childindex(src, inds[i])
+        dst[i′...] = arg[i]
+    end
+end
+
+Base.@propagate_inbounds function _swizzle_copyto_anymask_op!(dst, src)
+    arg = ArrayifiedArrays.preprocess(dst, src.arg)
+    dst .= src.init
+    inds = CartesianIndices(arg)
+    @inbounds loop(eachindex(arg, inds)) do i
+        Base.@_propagate_inbounds_meta
+        i′ = childindex(src, inds[i])
+        dst[i′...] = src.op(dst[i′...], arg[i])
+    end
+end
+
+
 
 Base.@propagate_inbounds function parentindex(arr::SubArray, i...)
     return Base.reindex(arr, Base.parentindices(arr), i)
