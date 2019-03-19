@@ -170,7 +170,6 @@ is_oneto_mask(mask) = mask == 1:length(mask)
     return is_oneto_mask(mask)
 end
 
-
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     op = arr.op
@@ -201,6 +200,7 @@ Base.@propagate_inbounds function _swizzle_copyto_nilmask_noop!(dst, src)
     @inbounds loop(eachindex(arg)) do i
         Base.@_propagate_inbounds_meta
         dst[1] = arg[i]
+        return nothing
     end
 end
 
@@ -210,6 +210,7 @@ Base.@propagate_inbounds function _swizzle_copyto_nilmask_op!(dst, src)
     @inbounds loop(eachindex(arg)) do i
         Base.@_propagate_inbounds_meta
         dst[1] = src.op(dst[1], arg[i])
+        return nothing
     end
 end
 
@@ -218,6 +219,7 @@ Base.@propagate_inbounds function _swizzle_copyto_onetomask_noop!(dst, src)
     @inbounds loop(eachindex(arg, dst)) do i
         Base.@_propagate_inbounds_meta
         dst[i] = arg[i]
+        return nothing
     end
 end
 
@@ -227,6 +229,7 @@ Base.@propagate_inbounds function _swizzle_copyto_onetomask_op!(dst, src)
     @inbounds loop(eachindex(arg, dst)) do i
         Base.@_propagate_inbounds_meta
         dst[i] = src.op(dst[i], arg[i])
+        return nothing
     end
 end
 
@@ -237,6 +240,7 @@ Base.@propagate_inbounds function _swizzle_copyto_anymask_noop!(dst, src)
         Base.@_propagate_inbounds_meta
         i′ = childindex(src, inds[i])
         dst[i′...] = arg[i]
+        return nothing
     end
 end
 
@@ -248,6 +252,7 @@ Base.@propagate_inbounds function _swizzle_copyto_anymask_op!(dst, src)
         Base.@_propagate_inbounds_meta
         i′ = childindex(src, inds[i])
         dst[i′...] = src.op(dst[i′...], arg[i])
+        return nothing
     end
 end
 
