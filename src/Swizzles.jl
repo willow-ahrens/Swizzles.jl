@@ -4,8 +4,8 @@ export loop
 export Nil, nil
 export arrayify
 export Guard
-export Swizzle, Yoink
-export Beam, Yeet
+export Swizzle, Focus
+export Pour, Beam
 export Reduce, Sum
 export Drop, SumOut
 export Delay, Intercept
@@ -15,7 +15,7 @@ include("util.jl")
 include("properties.jl")
 
 include("loop.jl")
-include("BoxArrays.jl")
+include("ScalarArrays.jl")
 include("WrapperArrays.jl")
 include("NullArrays.jl")
 include("GeneratedArrays.jl")
@@ -121,8 +121,8 @@ end
 end
 
 """
-    `Yoink(mask...)`
-    `Yoink(mask)`
+    `Focus(mask...)`
+    `Focus(mask)`
 
 Similar to `Swizzle`, but the resulting operator `Y` creates lazy
 transformations which do not reduce. Dimensions of the argument which do not
@@ -135,7 +135,7 @@ See also: [`Swizzle`](@ref), [`permutedims`](@ref).
 julia> A = [1 2 3 4 5]
 1×5 Array{Int64,2}:
  1  2  3  4  5
-julia> Yoink(nil, nil, 2).(A)
+julia> Focus(nil, nil, 2).(A)
 1×1×5 Array{Int64,3}:
 [:, :, 1] =
  1
@@ -149,17 +149,17 @@ julia> Yoink(nil, nil, 2).(A)
  5
 ```
 """
-@inline Yoink(_mask...) = Swizzle(nothing, _mask...)
+@inline Focus(_mask...) = Swizzle(nothing, _mask...)
 
 
 
-struct Beam{Op, _imask} <: Swizzles.Intercept
+struct Pour{Op, _imask} <: Swizzles.Intercept
     op::Op
 end
 
 """
-    `Beam(op, imask...)`
-    `Beam(op, imask)`
+    `Pour(op, imask...)`
+    `Pour(op, imask)`
 
 Similar to [`Swizzle`](@ref), but the mask is "inverted". Creates an operator
 which lazily reduces the input `A`. Dimension `i` of `A` is associated with
@@ -178,10 +178,10 @@ julia> A = [1 2; 3 4; 5 6; 7 8; 9 10]
  5   6
  7   8
  9  10
-julia> Beam(+, 2).(A)
+julia> Pour(+, 2).(A)
 1x5 Array{Int64,2}:
  3  7  11  15  19
-julia> Beam(+, nil, 3).(A)
+julia> Pour(+, nil, 3).(A)
 1×1×2 Array{Int64,3}:
 [:, :, 1] =
  25
@@ -189,17 +189,17 @@ julia> Beam(+, nil, 3).(A)
  30
 ```
 """
-@inline Beam(op::Op, _imask...) where {Op} = Beam{Op, _imask}(op)
-@inline Beam(op::Op, _imask::Tuple) where {Op} = Beam{Op, _imask}(op)
-@inline Beam(op::Op, ::Val{_imask}) where {Op, _imask} = Beam{Op, _imask}(op)
+@inline Pour(op::Op, _imask...) where {Op} = Pour{Op, _imask}(op)
+@inline Pour(op::Op, _imask::Tuple) where {Op} = Pour{Op, _imask}(op)
+@inline Pour(op::Op, ::Val{_imask}) where {Op, _imask} = Pour{Op, _imask}(op)
 
 @inline function parse_beam_mask(arr, _imask::Tuple{Vararg{Union{Int, Nil}}})
     N = max(0, _imask[1:min(ndims(arr), length(_imask))]...)
     return imasktuple(d->nil, identity, _imask, N)
 end
-@inline (ctr::Beam)(arg) = ctr(arrayify(arg))
-@inline (ctr::Beam)(init, arg) = ctr(arrayify(init), arrayify(arg))
-@inline function(ctr::Beam{Op, _imask})(arg::Arg) where {Op, _imask, Arg <: AbstractArray}
+@inline (ctr::Pour)(arg) = ctr(arrayify(arg))
+@inline (ctr::Pour)(init, arg) = ctr(arrayify(init), arrayify(arg))
+@inline function(ctr::Pour{Op, _imask})(arg::Arg) where {Op, _imask, Arg <: AbstractArray}
     if @generated
         mask = parse_beam_mask(Arg, _imask)
         return :(return Swizzle{Op, $mask}(ctr.op)(arg))
@@ -208,7 +208,7 @@ end
         return Swizzle(ctr.op, mask)(arg)
     end
 end
-@inline function(ctr::Beam{Op, _imask})(init::Init, arg::Arg) where {Op, _imask, Arg <: AbstractArray, Init <: AbstractArray}
+@inline function(ctr::Pour{Op, _imask})(init::Init, arg::Arg) where {Op, _imask, Arg <: AbstractArray, Init <: AbstractArray}
     if @generated
         mask = parse_beam_mask(Arg, _imask)
         return :(return Swizzle{Op, $mask}(ctr.op)(init, arg))
@@ -221,14 +221,14 @@ end
 
 
 """
-    `Yeet(imask...)`
-    `Yeet(imask)`
+    `Beam(imask...)`
+    `Beam(imask)`
 
-Similar to `Beam`, but the resulting operator `Y` creates lazy
+Similar to `Pour`, but the resulting operator `Y` creates lazy
 transformations which do not reduce. Dimensions of the argument which do not
 have integer destinations in `imask` are asserted to have length `1`.
 
-See also: [`Beam`](@ref).
+See also: [`Pour`](@ref).
 
 
 # Examples
@@ -236,7 +236,7 @@ See also: [`Beam`](@ref).
 julia> A = [1 2 3 4 5]
 1×5 Array{Int64,2}:
  1  2  3  4  5
-julia> Yeet(nil, 3).(A)
+julia> Beam(nil, 3).(A)
 1×1×5 Array{Int64,3}:
 [:, :, 1] =
  1
@@ -250,7 +250,7 @@ julia> Yeet(nil, 3).(A)
  5
 ```
 """
-@inline Yeet(_imask...) = Beam(nothing, _imask...)
+@inline Beam(_imask...) = Pour(nothing, _imask...)
 
 
 
