@@ -160,42 +160,31 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     copyto!(dst, arr′)
 end
 
-is_scalar_mask(mask) = mask == ()
-@generated function is_scalar_mask(::Val{mask}) where {mask}
-    return is_scalar_mask(mask)
-end
-
 is_nil_mask(mask) = mask == ntuple(n->nil, length(mask))
 @generated function is_nil_mask(::Val{mask}) where {mask}
     return is_nil_mask(mask)
 end
 
-is_identity_mask(mask) = mask == 1:length(mask)
-@generated function is_identity_mask(::Val{mask}) where {mask}
-    return is_identity_mask(mask)
+is_oneto_mask(mask) = mask == 1:length(mask)
+@generated function is_oneto_mask(::Val{mask}) where {mask}
+    return is_oneto_mask(mask)
 end
 
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
     op = arr.op
-    if is_scalar_mask(Val(mask(arr)))
-        if op === nothing
-            _swizzle_copyto_scalarmask_noop!(dst, arr)
-        else
-            _swizzle_copyto_scalarmask_op!(dst, arr)
-        end
-    elseif is_nil_mask(Val(mask(arr)))
+    if is_nil_mask(Val(mask(arr)))
         if op === nothing
             _swizzle_copyto_nilmask_noop!(dst, arr)
         else
             _swizzle_copyto_nilmask_op!(dst, arr)
         end
-    elseif is_identity_mask(Val(mask(arr)))
+    elseif is_oneto_mask(Val(mask(arr)))
         if op === nothing
-            _swizzle_copyto_identitymask_noop!(dst, arr)
+            _swizzle_copyto_onetomask_noop!(dst, arr)
         else
-            _swizzle_copyto_identitymask_op!(dst, arr)
+            _swizzle_copyto_onetomask_op!(dst, arr)
         end
     else
         if op === nothing
@@ -205,23 +194,6 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
         end
     end
     return dst
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_scalarmask_noop!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    @inbounds loop(eachindex(arg)) do i
-        Base.@_inline_meta
-        dst[] = arg[i]
-    end
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_scalarmask_op!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    dst .= src.init
-    @inbounds loop(eachindex(arg)) do i
-        Base.@_propagate_inbounds_meta
-        dst[] = src.op(dst[], arg[i])
-    end
 end
 
 Base.@propagate_inbounds function _swizzle_copyto_nilmask_noop!(dst, src)
@@ -241,7 +213,7 @@ Base.@propagate_inbounds function _swizzle_copyto_nilmask_op!(dst, src)
     end
 end
 
-Base.@propagate_inbounds function _swizzle_copyto_identitymask_noop!(dst, src)
+Base.@propagate_inbounds function _swizzle_copyto_onetomask_noop!(dst, src)
     arg = ArrayifiedArrays.preprocess(dst, src.arg)
     @inbounds loop(eachindex(arg, dst)) do i
         Base.@_propagate_inbounds_meta
@@ -249,7 +221,7 @@ Base.@propagate_inbounds function _swizzle_copyto_identitymask_noop!(dst, src)
     end
 end
 
-Base.@propagate_inbounds function _swizzle_copyto_identitymask_op!(dst, src)
+Base.@propagate_inbounds function _swizzle_copyto_onetomask_op!(dst, src)
     arg = ArrayifiedArrays.preprocess(dst, src.arg)
     dst .= src.init
     @inbounds loop(eachindex(arg, dst)) do i
