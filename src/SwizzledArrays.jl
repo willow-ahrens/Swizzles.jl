@@ -160,11 +160,6 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
     copyto!(dst, arr′)
 end
 
-is_identity_mask(mask) = mask == 1:length(mask)
-@generated function is_identity_mask(::Val{mask}) where {mask}
-    return is_identity_mask(mask)
-end
-
 is_scalar_mask(mask) = mask == ()
 @generated function is_scalar_mask(::Val{mask}) where {mask}
     return is_scalar_mask(mask)
@@ -174,6 +169,12 @@ is_nil_mask(mask) = mask == ntuple(n->nil, length(mask))
 @generated function is_nil_mask(::Val{mask}) where {mask}
     return is_nil_mask(mask)
 end
+
+is_identity_mask(mask) = mask == 1:length(mask)
+@generated function is_identity_mask(::Val{mask}) where {mask}
+    return is_identity_mask(mask)
+end
+
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
