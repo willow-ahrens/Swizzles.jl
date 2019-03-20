@@ -6,7 +6,6 @@ using Base.Broadcast: Broadcasted
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
-using Swizzles: loop
 using Swizzles.NullArrays
 
 export GeneratedArray
@@ -48,8 +47,8 @@ end
 
 
 
-@inline Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
-@inline Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
+Base.@propagate_inbounds Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
+Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
 
 
 
@@ -83,13 +82,6 @@ end
 
 Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
     NullArray(axes(arr)) .= f.(arr, tail...)
-    return nothing
-end
-
-
-
-Base.@propagate_inbounds function Swizzles.loop(f::F, arr::GeneratedArray) where {F}
-    NullArray(axes(arr)) .= f.(arr)
     return nothing
 end
 

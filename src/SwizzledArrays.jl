@@ -11,6 +11,7 @@ using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, Abs
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, broadcast_shape
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 using StaticArrays
+using Base.Cartesian
 
 
 
@@ -80,7 +81,7 @@ end
 Base.parent(arr::SwizzledArray) = arr.arg
 Base.parent(::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg} = Arg
 WrapperArrays.iswrapper(arr::SwizzledArray) = true
-function WrapperArrays.adopt(arg::Arg, arr::SwizzledArray{T, N, Op, mask, Init}) where {T, N, Op, mask, Init, Arg}
+Base.@propagate_inbounds function WrapperArrays.adopt(arg::Arg, arr::SwizzledArray{T, N, Op, mask, Init}) where {T, N, Op, mask, Init, Arg}
     SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arg)
 end
 
@@ -212,86 +213,52 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arr = src.args[1]
-    op = arr.op
+    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
     if is_nil_mask(Val(mask(arr)))
-        if op === nothing
-            _swizzle_copyto_nilmask_noop!(dst, arr)
-        else
-            _swizzle_copyto_nilmask_op!(dst, arr)
-        end
+        itr = eachindex(arg)
     elseif is_oneto_mask(Val(mask(arr)))
-        if op === nothing
-            _swizzle_copyto_onetomask_noop!(dst, arr)
-        else
-            _swizzle_copyto_onetomask_op!(dst, arr)
-        end
+        itr = eachindex(arg, dst)
     else
-        if op === nothing
-            _swizzle_copyto_anymask_noop!(dst, arr)
-        else
-            _swizzle_copyto_anymask_op!(dst, arr)
-        end
+        itr = eachindex(arg, CartesianIndices(arg))
     end
+    if arr.op !== nothing
+        dst .= arr.init
+    end
+    @boundscheck axes(dst) == axes(arr)
+    @inbounds swizzle_loop!(dst, adopt(arg, arr), itr)
     return dst
 end
 
-Base.@propagate_inbounds function _swizzle_copyto_nilmask_noop!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    @inbounds loop(eachindex(arg)) do i
-        Base.@_propagate_inbounds_meta
-        dst[1] = arg[i]
-        return nothing
+Base.@propagate_inbounds function swizzle_loop!(dst, arr, itr)
+    if arr.op === nothing
+        for i in itr
+            i′ = childindex(arr, i)
+            dst[i′...] = arr.arg[i]
+        end
+    else
+        for i in itr
+            i′ = childindex(arr, i)
+            dst[i′...] = arr.op(dst[i′...], arr.arg[i])
+        end
     end
 end
 
-Base.@propagate_inbounds function _swizzle_copyto_nilmask_op!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    dst .= src.init
-    @inbounds loop(eachindex(arg)) do i
+@generated function swizzle_loop!(dst, arr, itr::CartesianIndices{N}) where {N}
+    return quote
         Base.@_propagate_inbounds_meta
-        dst[1] = src.op(dst[1], arg[i])
-        return nothing
-    end
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_onetomask_noop!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    @inbounds loop(eachindex(arg, dst)) do i
-        Base.@_propagate_inbounds_meta
-        dst[i] = arg[i]
-        return nothing
-    end
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_onetomask_op!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    dst .= src.init
-    @inbounds loop(eachindex(arg, dst)) do i
-        Base.@_propagate_inbounds_meta
-        dst[i] = src.op(dst[i], arg[i])
-        return nothing
-    end
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_anymask_noop!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    inds = CartesianIndices(arg)
-    @inbounds loop(eachindex(arg, inds)) do i
-        Base.@_propagate_inbounds_meta
-        i′ = childindex(src, inds[i])
-        dst[i′...] = arg[i]
-        return nothing
-    end
-end
-
-Base.@propagate_inbounds function _swizzle_copyto_anymask_op!(dst, src)
-    arg = ArrayifiedArrays.preprocess(dst, src.arg)
-    dst .= src.init
-    inds = CartesianIndices(arg)
-    @inbounds loop(eachindex(arg, inds)) do i
-        Base.@_propagate_inbounds_meta
-        i′ = childindex(src, inds[i])
-        dst[i′...] = src.op(dst[i′...], arg[i])
+        if arr.op === nothing
+            @nloops $N i itr begin
+                i = CartesianIndex(@ntuple $N i)
+                i′ = childindex(arr, i)
+                dst[i′...] = arr.arg[i]
+            end
+        else
+            @nloops $N i itr begin
+                i = CartesianIndex(@ntuple $N i)
+                i′ = childindex(arr, i)
+                dst[i′...] = arr.op(dst[i′...], arr.arg[i])
+            end
+        end
         return nothing
     end
 end
@@ -321,7 +288,7 @@ end
 
 
 """
-   parentindex(arr, i)
+   parentindex(arr, i...)
 
    For all wrapper arrays arr such that `arr` involves an index remapping,
    return the indices into `parent(arr)` which affect the indices `i` of `arr`.
@@ -331,19 +298,37 @@ end
 parentindex
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
-    return childindex(arr, CartesianIndices(arr.arg)[i])
+    if is_nil_mask(mask(arr))
+        return (1,)
+    elseif is_oneto_mask(mask(arr))
+        return (i,)
+    else
+        return childindex(arr, CartesianIndices(arr.arg)[i])
+    end
 end
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
-    return childindex(arr, Tuple(i)...)
+    if is_nil_mask(mask(arr))
+        return (CartesianIndex(ntuple(n->1, length(mask(arr)))),)
+    elseif is_oneto_mask(mask(arr))
+        return (i,)
+    else
+        return childindex(arr, Tuple(i)...)
+    end
 end
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    masktuple(d->1, d->i[d], Val(mask(arr)))
+    if is_nil_mask(mask(arr))
+        return ntuple(n->1, length(mask(arr)))
+    elseif is_oneto_mask(mask(arr))
+        return i
+    else
+        masktuple(d->1, d->i[d], Val(mask(arr)))
+    end
 end
 
 """
-   childindex(arr, i)
+   childindex(arr, i...)
 
    For all wrapper arrays arr such that `arr` involves an index remapping,
    return the indices into `arr` which affect the indices `i` of `parent(arr)`.
@@ -351,7 +336,6 @@ end
    See also: [`swizzle`](@ref).
 """
 childindex
-
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Op, mask, Arg}) where {T, N, Arg, Op, mask}
 #    arg = preprocess(dest, arr.arg)

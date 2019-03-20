@@ -14,7 +14,6 @@ include("base.jl")
 include("util.jl")
 include("properties.jl")
 
-include("loop.jl")
 include("ScalarArrays.jl")
 include("WrapperArrays.jl")
 include("NullArrays.jl")
