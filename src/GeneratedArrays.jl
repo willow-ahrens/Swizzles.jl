@@ -54,11 +54,11 @@ end
 
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer) = _getindex(arr, I)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex) = _getindex(arr, I)
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(arr) = _getindex(arr, I)
+Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex)::eltype(arr) = _getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
-Base.@propagate_inbounds function _getindex(arr, I...)::eltype(arr)
+Base.@propagate_inbounds function _getindex(arr, I...)
     identity.(view(arr, I...))
 end
 

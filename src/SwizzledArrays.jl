@@ -122,24 +122,41 @@ end
 
 Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
-    inds = parentindices(src)
+    inds = Base.parentindices(src)
     arg = arr.arg
     init = arr.init
-    mask′ = _remask(inds, mask(arr))
-    init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds′[n]), Val(ndims(init))))
-    arg′ = SubArray(arg, parentindex(arr, inds...))
+    init′ = SubArray(init, ntuple(n -> (Base.@_inline_meta; size(init, n) == 1 ? firstindex(init, n) : inds[n]), Val(ndims(init))))
+    inds′ = parentindex(arr, inds...)
+    arg′ = SubArray(arg, inds′)
+    mask′ = remask(inds, inds′, mask(arr))
     return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, init′, arg′)
 end
-@inline function _remask(inds::Tuple{Vararg{Any, N}}, mask::Tuple{Vararg{Any, N}}) where {N}
-    if Base.index_dimsum(first(inds)) isa Tuple{}
-        return _remask(Base.tail(inds), Base.tail(mask))
-    else
-        return (first(mask), _remask(Base.tail(inds), Base.tail(mask))...)
+
+@inline function remask(inds, inds′, mask)
+    _remask(map(Base.index_dimsum, inds), map(Base.index_dimsum, inds′), Val(mask))
+end
+@inline function remask(inds, inds′, mask::Tuple{})
+    ()
+end
+@generated function _remask(inds, inds′, ::Val{mask}) where {mask}
+    return quote
+        Base.@_inline_meta
+        $(__remask(map(i -> !(i <: Tuple{}), Tuple(inds.parameters)),
+                   map(i -> !(i <: Tuple{}), Tuple(inds′.parameters)), mask))
     end
 end
-@inline function _remask(::Tuple{}, ::Tuple{})
-    return ()
+function __remask(inds, inds′, mask)
+    if first(inds)
+        if first(mask) === nil
+            return (nil, __remask(Base.tail(inds), inds′, Base.tail(mask))...)
+        else
+            return (count(inds′[1:first(mask)]), __remask(Base.tail(inds), inds′, Base.tail(mask))...)
+        end
+    else
+        return __remask(Base.tail(inds), inds′, Base.tail(mask))
+    end
 end
+__remask(::Tuple{}, inds′, ::Tuple{}) = ()
 
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = ScalarArray{T}()
 
@@ -259,7 +276,7 @@ end
 
 
 Base.@propagate_inbounds function parentindex(arr::SubArray, i...)
-    return Base.reindex(arr, Base.parentindices(arr), i)
+    return Base.reindex(Base.parentindices(arr), i)
 end
 
 Base.@propagate_inbounds function parentindex(arr::SwizzledArray, i::Integer)
