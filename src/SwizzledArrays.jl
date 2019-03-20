@@ -212,8 +212,8 @@ is_oneto_mask(mask) = mask == 1:length(mask)
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
-    arr = src.args[1]
-    arg = ArrayifiedArrays.preprocess(dst, arr.arg)
+    arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
+    arr = adopt(arg, src.args[1])
     if is_nil_mask(Val(mask(arr)))
         itr = eachindex(arg)
     elseif is_oneto_mask(Val(mask(arr)))
@@ -225,7 +225,7 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
         dst .= arr.init
     end
     @boundscheck axes(dst) == axes(arr)
-    @inbounds swizzle_loop!(dst, adopt(arg, arr), itr)
+    @inbounds swizzle_loop!(dst, arr, itr)
     return dst
 end
 
