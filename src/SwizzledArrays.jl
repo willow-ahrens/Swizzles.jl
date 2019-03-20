@@ -132,11 +132,33 @@ Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubAr
     return SwizzledArray{eltype(src), M, Op, mask′}(arr.op, init′, arg′)
 end
 
-@inline function remask(inds, inds′, mask)
-    _remask(map(Base.index_dimsum, inds), map(Base.index_dimsum, inds′), Val(mask))
-end
 @inline function remask(inds, inds′, mask::Tuple{})
     ()
+end
+@inline function remask(inds, inds′, mask)
+    counts = _remask_counts((), inds′)
+    _remask_mask(counts, inds, mask)
+end
+@inline function _remask_mask(counts, inds, mask)
+    rest = _remask_mask(counts, Base.tail(inds), Base.tail(mask))
+    if Base.index_dimsum(first(inds)) isa Tuple{}
+        return rest
+    elseif first(mask) === nil
+        return (nil, rest...)
+    else
+        return (counts[first(mask)], rest...)
+    end
+end
+@inline _remask_mask(counts, ::Tuple{}, ::Tuple{}) = ()
+@inline function _remask_counts(firsts, inds′)
+    firsts = (firsts..., first(inds′))
+    return (length(Base.index_dimsum(firsts...)), _remask_counts(firsts, Base.tail(inds′))...)
+end
+@inline _remask_counts(counts, ::Tuple{}) = ()
+
+#=
+@inline function remask(inds, inds′, mask)
+    _remask(map(Base.index_dimsum, inds), map(Base.index_dimsum, inds′), Val(mask))
 end
 @generated function _remask(inds, inds′, ::Val{mask}) where {mask}
     return quote
@@ -157,6 +179,7 @@ function __remask(inds, inds′, mask)
     end
 end
 __remask(::Tuple{}, inds′, ::Tuple{}) = ()
+=#
 
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = ScalarArray{T}()
 
