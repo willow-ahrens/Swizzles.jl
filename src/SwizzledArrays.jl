@@ -232,14 +232,14 @@ end
 
 #FIXME This is a separate method for the scalar case so that swizzles can avoid
 #recursion depth limiting.
-Base.@propagate_inbounds function assign!(dst, index, src, drive::Tuple{CartesianIndex{0}})
+Base.@propagate_inbounds function assign!(dst, index, src, drive::Tuple{Any})
     i = drive[1]
     dst[index[i]] = src[i]
 end
 
 #FIXME This is a separate method for the scalar case so that swizzles can avoid
 #recursion depth limiting.
-Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive::Tuple{CartesianIndex{0}}) where {Op}
+Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive::Tuple{Any}) where {Op}
     i = drive[1]
     i′ = index[i]
     dst[i′] = op(dst[i′], src[i])
