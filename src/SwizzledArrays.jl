@@ -117,7 +117,7 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of nilping view indices). Therefore, we convert first.
+    #complexity of dropping view indices). Therefore, we convert first.
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
