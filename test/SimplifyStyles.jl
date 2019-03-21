@@ -1,4 +1,4 @@
-using Swizzles.RecognizeStyles: reprexpr
+using Swizzles.SimplifyStyles: reprexpr
 using LinearAlgebra
 using Base.Broadcast: broadcasted
 

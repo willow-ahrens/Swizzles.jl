@@ -22,7 +22,7 @@ include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("MatchedArrays.jl")
 include("SwizzledArrays.jl")
-include("RecognizeStyles.jl")
+include("SimplifyStyles.jl")
 
 
 

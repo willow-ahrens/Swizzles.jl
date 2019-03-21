@@ -1,10 +1,17 @@
-using Base.Broadcast: Broadcasted, broadcasted
+module SimplifyStyles
 
+using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted
+
+using LinearAlgebra
 using MacroTools
 using Rewrite
 using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
+using Swizzles.Antennae
+
+
+export Simplify
 
 
 SymbolExpr = Union{Symbol, Expr}  # Type alias for convenience
@@ -196,4 +203,31 @@ Currently only supports broadcast expressions.
     return quote
         $simple_expr
     end
+end
+
+
+"""
+    Simplify
+
+Simplify is an abstract type which when passed as the first expression of
+broadcasted returns a simplified version of the second Broadcasted expression.
+
+Due to the way the dot syntactic sugar for broadcasts works, this also
+allows Simplify to intercept broadcasted expressions. See the example below.
+
+# Example
+```jldoctest
+julia> A, B = [1 2 3; 4 5 6], [100 200 300]
+([1 2 3; 4 5 6], [100 200 300])
+
+julia> Simplify.(A .+ B)
+2×3 Array{Int64,2}:
+ 101  202  303
+ 104  205  306
+```
+"""
+abstract type Simplify end
+Base.broadcasted(::Type{Simplify}, b::Broadcasted) = simplify(b)
+
+
 end
