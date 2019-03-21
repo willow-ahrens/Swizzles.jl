@@ -308,8 +308,9 @@ end
 @inline Base.size(arr::ConstantIndices) = size(arr.inds)
 @inline Base.axes(arr::ConstantIndices) = axes(arr.inds)
 @inline Base.IndexStyle(arr::ConstantIndices) = IndexStyle(arr.inds)
-Base.@propagate_inbounds Base.getindex(arr::ConstantIndices{<:Any, N, i}, ::CartesianIndex{N}) where {N, i} = i
-Base.@propagate_inbounds Base.getindex(arr::ConstantIndices{<:Any, <:Any, i}, ::Integer) where {i} = i
+Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, N, i}, ::Vararg{Any, N})::T) where {T, N, i} = i
+Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, 1, i}, ::Integer)::T) where {T, N, i} = i
+Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, <:Any, i}, ::Integer)::T) where {T, i} = i
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Op, mask, Arg}) where {T, N, Arg, Op, mask}
 #    arg = preprocess(dest, arr.arg)
