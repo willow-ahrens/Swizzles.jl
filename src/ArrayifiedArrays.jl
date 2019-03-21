@@ -116,20 +116,26 @@ Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::CartesianIndex) 
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::Int...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray) = getindex(arr.arg)
 
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I...) = setindex(arr.arg, x, I...)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int) = setindex(arr.arg, x, I)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::CartesianIndex) = setindex(arr.arg, x, I)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int...) = setindex(arr.arg, x, I...)
+Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.arg, x)
+
 @inline myidentity(x) = x
 
 @inline Base.Broadcast.broadcastable(arr::ArrayifiedArray) = broadcastable(arr.arg)
 
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
-function preprocess(dst, arr)
+@inline function preprocess(dst, arr)
     if iswrapper(arr)
         adopt(preprocess(dst, parent(arr)), arr)
     else
         arr
     end
 end
-function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
+@inline function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
     if arr.arg isa AbstractArray
         return arr
     end

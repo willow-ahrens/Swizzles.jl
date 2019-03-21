@@ -7,5 +7,6 @@ using Test
     include("ExtrudedArrays.jl")
     include("ArrayifiedArrays.jl")
     include("SimplifyStyles.jl")
+    include("GeneratedArrays.jl")
     include("util.jl")
 end

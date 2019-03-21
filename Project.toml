@@ -1,7 +1,7 @@
 name = "Swizzles"
 uuid = "6997b572-c796-11e8-2991-b59c2857380c"
 authors = ["Peter Ahrens <ptrahrens@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -11,6 +11,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [targets]
-test = ["Test"]
+test = ["Test", "LinearAlgebra"]

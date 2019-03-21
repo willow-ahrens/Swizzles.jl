@@ -30,5 +30,22 @@ module BaseHacks
         Base._range(st, nothing, nothing, length(s)) #gotta use this version of range instead of const-propping through the kwarg version.
     end
 
+    #Why is this here? This is here because Swizzles benefits from zero dimensional arrays declaring themselves as such. Otherwise,
+    #it can be tricky for llvm to figure out that the second swizzle index is truly scalar.
+    Base.eachindex(::AbstractArray{<:Any, 0}...) = CartesianIndices(())
+
+    #=
+    Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,<:NTuple{N,Base.OneTo}}, I::Vararg{Int, N}) where {N}
+        @boundscheck checkbounds(iter, I...)
+        CartesianIndex(I)
+    end
+
+    Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,R}, I::Vararg{Int, N}) where {N,R}
+        @boundscheck checkbounds(iter, I...)
+        CartesianIndex(I .- first.(Base.axes1.(iter.indices)) .+ first.(iter.indices))
+    end
+    =#
+
+
     @info "BaseHacks is online. all your Base are belong to us."
 end

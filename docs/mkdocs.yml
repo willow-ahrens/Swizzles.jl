@@ -1,7 +1,7 @@
 # See the mkdocs user guide for more information on these settings.
 #   http://www.mkdocs.org/user-guide/configuration/
 
-site_name:        SwizzledDimsArrays.jl
+site_name:        Swizzles.jl
 #repo_url:         https://github.com/USER_NAME/PACKAGE_NAME.jl
 #site_description: Description...
 #site_author:      USER_NAME

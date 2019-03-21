@@ -1,16 +1,16 @@
 using StaticArrays: SVector, setindex
 using AbstractTrees
 
-struct Drop end
+struct Nil end
 
-const drop = Drop()
+const nil = Nil()
 
-Base.isequal(::Drop, ::Drop) = true
-Base.isequal(::Drop, ::Integer) = false
-Base.isequal(::Integer, ::Drop) = false
-Base.isless(::Drop, ::Integer) = true
-Base.isless(::Integer, ::Drop) = false
-Base.isless(::Drop, ::Drop) = false
+Base.isequal(::Nil, ::Nil) = true
+Base.isequal(::Nil, ::Integer) = false
+Base.isequal(::Integer, ::Nil) = false
+Base.isless(::Nil, ::Integer) = true
+Base.isless(::Integer, ::Nil) = false
+Base.isless(::Nil, ::Nil) = false
 
 struct Keep end
 
@@ -23,24 +23,24 @@ Base.isless(::Keep, ::Integer) = false
 Base.isless(::Integer, ::Keep) = true
 Base.isless(::Keep, ::Keep) = false
 
-Base.isless(::Drop, ::Keep) = true
-Base.isless(::Keep, ::Drop) = false
+Base.isless(::Nil, ::Keep) = true
+Base.isless(::Keep, ::Nil) = false
 
 """
     masktuple(f, g, I)
 Return `R::Tuple` such that `R[j] == f(j) when `I[j] isa
-Drop` and `R[j] == g(I[j])` otherwise.
+Nil` and `R[j] == g(I[j])` otherwise.
 # Examples
 ```jldoctest
 julia> A = [-1; -2; -3; -4; -5];
 julia> B = [11; 12; 13; 14; 15];
-julia> I = (2; 4; drop; 3; 1);
+julia> I = (2; 4; nil; 3; 1);
 julia> masktuple(i->A[i], j->B[i], I)
   (12, 14, -3, 13, 11)
 ```
 """
-@inline function masktuple(f, g, I::Tuple{Vararg{Union{Int, Drop}}})
-    ntuple(j -> I[j] isa Drop ? f(j) : g(I[j]), length(I))
+@inline function masktuple(f, g, I::Tuple{Vararg{Union{Int, Nil}}})
+    ntuple(j -> I[j] isa Nil ? f(j) : g(I[j]), length(I))
 end
 @generated function masktuple(f, g, ::Val{I}) where {I}
     return quote
@@ -51,22 +51,22 @@ end
 
 """
     imasktuple(f, g, I, n)
-Return `R::Tuple` of length `max(0, I...)` such that `R[I[j]] == g(j)` whenever
-`!(I[j] isa Drop)`, and `R[i] = f[i]` otherwise.
+Return `R::Tuple` of length `n` such that `R[I[j]] == g(j)` whenever
+`!(I[j] isa Nil)`, and `R[i] = f[i]` otherwise.
 # Examples
 ```jldoctest
 julia> A = (2, 4, 0, 3, 1);
-julia> imasktuple(A, (-1, -2), (drop, 3))
+julia> imasktuple(A, (-1, -2), (nil, 3))
   (2, 4, -2, 3, 1)
 ```
 """
-@inline function imasktuple(f, g, I::Tuple{Vararg{Union{Int, Drop}}})
-    ntuple(j-> (k = findfirst(isequal(j), I)) === nothing ? f(j) : g(k), max(0, I...))
+@inline function imasktuple(f, g, I::Tuple{Vararg{Union{Int, Nil}}}, N)
+    ntuple(j-> (k = findfirst(isequal(j), I)) === nothing ? f(j) : g(k), N)
 end
-@generated function imasktuple(f, g, ::Val{I}) where {I}
+@generated function imasktuple(f, g, ::Val{I}, ::Val{N}) where {I, N}
     return quote
         Base.@_inline_meta
-        ($(imasktuple(i->:(f($i)), i->:(g($i)),I)...),)
+        ($(imasktuple(i->:(f($i)), i->:(g($i)), I, N)...),)
     end
 end
 
@@ -81,6 +81,7 @@ end
 @inline _combinetuple(f, ::Tuple{}, b::Tuple) = b
 @inline _combinetuple(f, a::Tuple, ::Tuple{}) = a
 @inline _combinetuple(f::F, a::Tuple, b::Tuple) where {F} = (f(first(a), first(b)), _combinetuple(f, Base.tail(a), Base.tail(b))...)
+
 using Base.Broadcast: broadcasted, BroadcastStyle, Broadcasted
 
 struct Delay
