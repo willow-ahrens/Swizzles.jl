@@ -34,6 +34,18 @@ module BaseHacks
     #a different thunk for the scalar case and avoid recursion depth limiting.
     Base.eachindex(args::AbstractArray{<:Any, 0}...) = (CartesianIndex(),)
 
+    Base.@propagate_inbounds function Base.eachindex(::IndexLinear, A::AbstractArray, B::AbstractArray...)
+        indsA = eachindex(IndexLinear(), A)
+        @boundscheck Base._all_match_first(X->eachindex(IndexLinear(), X), indsA, B...) || Base.throw_eachindex_mismatch(IndexLinear(), A, B...)
+        indsA
+    end
+
+    Base.@propagate_inbounds function Base.eachindex(::IndexCartesian, A::AbstractArray, B::AbstractArray...)
+        axsA = axes(A)
+        @boundscheck Base._all_match_first(axes, axsA, B...) || Base.throw_eachindex_mismatch(IndexCartesian(), A, B...)
+        CartesianIndices(axsA)
+    end
+
     #=
     Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,<:NTuple{N,Base.OneTo}}, I::Vararg{Int, N}) where {N}
         @boundscheck checkbounds(iter, I...)
