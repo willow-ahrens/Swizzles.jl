@@ -23,6 +23,7 @@ include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("SwizzledArrays.jl")
 
+include("extra.jl")
 
 
 
