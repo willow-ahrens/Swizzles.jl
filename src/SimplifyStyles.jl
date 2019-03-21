@@ -220,14 +220,20 @@ allows Simplify to intercept broadcasted expressions. See the example below.
 julia> A, B = [1 2 3; 4 5 6], [100 200 300]
 ([1 2 3; 4 5 6], [100 200 300])
 
-julia> Simplify.(A .+ B)
+julia> Simplify().(A)
+2×3 Array{Int64,2}:
+ 1  2  3
+ 4  5  6
+
+julia> Simplify().(A .+ B)
 2×3 Array{Int64,2}:
  101  202  303
  104  205  306
 ```
 """
-abstract type Simplify end
-Base.broadcasted(::Type{Simplify}, b::Broadcasted) = simplify(b)
+struct Simplify end
+Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
+Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 
 
 end
