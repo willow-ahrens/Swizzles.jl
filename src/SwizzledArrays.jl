@@ -214,54 +214,123 @@ end
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
     arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
     arr = adopt(arg, src.args[1])
-    if is_nil_mask(Val(mask(arr)))
-        itr = eachindex(arg)
-    elseif is_oneto_mask(Val(mask(arr)))
-        itr = eachindex(arg, dst)
-    else
-        itr = eachindex(arg, CartesianIndices(arg))
-    end
-    if arr.op !== nothing
-        dst .= arr.init
-    end
+    index = swizzleindex(dst, arr)
+    drive = eachindex(arg, index)
+    op = arr.op
+    init = arr.init
     @boundscheck axes(dst) == axes(arr)
-    @inbounds swizzle_loop!(dst, arr, itr)
+    if op === nothing
+        @inbounds assign!(dst, index, arg, drive)
+    else
+        @inbounds dst .= init
+        @inbounds increment!(op, dst, index, arg, drive)
+    end
     return dst
 end
 
-Base.@propagate_inbounds function swizzle_loop!(dst, arr, itr)
-    if arr.op === nothing
-        for i in itr
-            i′ = childindex(arr, i)
-            dst[i′...] = arr.arg[i]
-        end
+Base.@propagate_inbounds swizzleindex(dst, arr) = swizzleindex(IndexStyle(dst), dst, arr)
+
+Base.@propagate_inbounds function swizzleindex(::IndexLinear, dst, arr)
+    if is_nil_mask(mask(arr))
+        return ConstantIndices(1, arr.arg)
+    elseif is_oneto_mask(mask(arr))
+        return LinearIndices(dst)
     else
-        for i in itr
-            i′ = childindex(arr, i)
-            dst[i′...] = arr.op(dst[i′...], arr.arg[i])
+        return SwizzledIndices(arr)
+    end
+end
+
+Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
+    if is_nil_mask(mask(arr))
+        i = CartesianIndex(ntuple(n->1, ndims(dst)))
+        return ConstantIndices(i, arr.arg)
+    elseif is_oneto_mask(mask(arr))
+        return CartesianIndices(dst)
+    else
+        return SwizzledIndices(arr)
+    end
+end
+
+Base.@propagate_inbounds function assign!(dst, index, src, drive)
+    for i in drive
+        dst[index[i]] = src[i]
+    end
+end
+
+Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive) where {Op}
+    for i in drive
+        i′ = index[i]
+        dst[i′] = op(dst[i′], src[i])
+    end
+end
+
+@generated function assign!(dst, index, src, drive::CartesianIndices{N}) where {N}
+    return quote
+        Base.@_propagate_inbounds_meta
+        @nloops $N i drive begin
+            i = CartesianIndex(@ntuple $N i)
+            dst[index[i]] = src[i]
         end
     end
 end
 
-@generated function swizzle_loop!(dst, arr, itr::CartesianIndices{N}) where {N}
+@generated function increment!(op::Op, dst, index, src, drive::CartesianIndices{N}) where {Op, N}
     return quote
         Base.@_propagate_inbounds_meta
-        if arr.op === nothing
-            @nloops $N i itr begin
-                i = CartesianIndex(@ntuple $N i)
-                i′ = childindex(arr, i)
-                dst[i′...] = arr.arg[i]
-            end
-        else
-            @nloops $N i itr begin
-                i = CartesianIndex(@ntuple $N i)
-                i′ = childindex(arr, i)
-                dst[i′...] = arr.op(dst[i′...], arr.arg[i])
-            end
+        @nloops $N i drive begin
+            i = CartesianIndex(@ntuple $N i)
+            i′ = index[i]
+            dst[i′] = op(dst[i′], src[i])
         end
-        return nothing
     end
 end
+
+
+
+struct SwizzledIndices{T, N, mask, Inds <: CartesianIndices{N}} <: AbstractArray{T, N}
+    inds::Inds
+    function SwizzledIndices{T, N, mask, Inds}(inds::Inds) where {T, N, mask, Inds}
+        @assert T <: CartesianIndex{length(mask)}
+        @assert max(0, mask...) <= ndims(inds)
+        #TODO assert mask is unique
+        return new{T, N, mask, Inds}(inds)
+    end
+end
+
+Base.@propagate_inbounds SwizzledIndices(arr::SwizzledArray) = SwizzledIndices(Val(mask(arr)), CartesianIndices(arr.arg))
+Base.@propagate_inbounds SwizzledIndices(mask, inds) = SwizzledIndices(mask, CartesianIndices(inds))
+Base.@propagate_inbounds SwizzledIndices(mask, inds::CartesianIndices) = SwizzledIndices(Val(mask), inds)
+Base.@propagate_inbounds function SwizzledIndices(::Val{mask}, inds::CartesianIndices) where {mask}
+    return SwizzledIndices{CartesianIndex{length(mask)}, ndims(inds), mask, typeof(inds)}(inds)
+end
+
+@inline Base.size(arr::SwizzledIndices) = size(arr.inds)
+@inline Base.axes(arr::SwizzledIndices) = axes(arr.inds)
+@inline mask(arr::SwizzledIndices{<:Any, <:Any, _mask}) where {_mask} = _mask
+#Base.@propagate_inbounds Base.getindex(arr::SwizzledIndices, i...) = error(i)
+#Base.@propagate_inbounds Base.getindex(arr::SwizzledIndices{<:Any, N}, i::CartesianIndex{N}) where {N} = arr[Tuple(i)...]
+Base.@propagate_inbounds function Base.getindex(arr::SwizzledIndices{<:Any, N}, i::Vararg{Any, N}) where {N}
+    return CartesianIndex(masktuple(d->1, d->i[d], Val(mask(arr))))
+end
+
+struct ConstantIndices{T, N, i, Inds <: AbstractArray{<:Any, N}} <: AbstractArray{T, N}
+    inds::Inds
+    @inline function ConstantIndices{T, N, i, Inds}(inds::Inds) where {T, N, i, Inds}
+        @assert i isa T
+        return new{T, N, i, Inds}(inds)
+    end
+end
+
+Base.@propagate_inbounds ConstantIndices(i, inds) = ConstantIndices(Val(i), inds)
+Base.@propagate_inbounds function ConstantIndices(::Val{i}, inds) where {i}
+    return ConstantIndices{typeof(i), ndims(inds), i, typeof(inds)}(inds)
+end
+
+@inline Base.size(arr::ConstantIndices) = size(arr.inds)
+@inline Base.axes(arr::ConstantIndices) = axes(arr.inds)
+@inline Base.IndexStyle(arr::ConstantIndices) = IndexStyle(arr.inds)
+Base.@propagate_inbounds Base.getindex(arr::ConstantIndices{<:Any, N, i}, ::CartesianIndex{N}) where {N, i} = i
+Base.@propagate_inbounds Base.getindex(arr::ConstantIndices{<:Any, <:Any, i}, ::Integer) where {i} = i
 
 
 
