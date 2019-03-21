@@ -117,7 +117,7 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
     #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of nilping view indices). Therefore, we convert first.
+    #complexity of dropping view indices). Therefore, we convert first.
     return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
 end
 
@@ -217,6 +217,15 @@ Base.@propagate_inbounds function swizzleindex(::IndexLinear, dst, arr)
     else
         return SwizzledIndices(arr)
     end
+end
+
+Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
+    if is_nil_mask(Val(mask(arr)))
+        i = CartesianIndex(ntuple(n->1, Val(ndims(dst))))
+        return ConstantIndices(i, CartesianIndices(arr.arg))
+    elseif is_oneto_mask(Val(mask(arr)))
+        return CartesianIndices(dst)
+    else
 end
 
 Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
