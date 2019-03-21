@@ -231,9 +231,9 @@ end
 Base.@propagate_inbounds swizzleindex(dst, arr) = swizzleindex(IndexStyle(dst), dst, arr)
 
 Base.@propagate_inbounds function swizzleindex(::IndexLinear, dst, arr)
-    if is_nil_mask(mask(arr))
-        return ConstantIndices(1, arr.arg)
-    elseif is_oneto_mask(mask(arr))
+    if is_nil_mask(Val(mask(arr)))
+        return ConstantIndices(1, LinearIndices(arr.arg))
+    elseif is_oneto_mask(Val(mask(arr)))
         return LinearIndices(dst)
     else
         return SwizzledIndices(arr)
@@ -241,10 +241,10 @@ Base.@propagate_inbounds function swizzleindex(::IndexLinear, dst, arr)
 end
 
 Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
-    if is_nil_mask(mask(arr))
+    if is_nil_mask(Val(mask(arr)))
         i = CartesianIndex(ntuple(n->1, ndims(dst)))
-        return ConstantIndices(i, arr.arg)
-    elseif is_oneto_mask(mask(arr))
+        return ConstantIndices(i, CartesianIndices(arr.arg))
+    elseif is_oneto_mask(Val(mask(arr)))
         return CartesianIndices(dst)
     else
         return SwizzledIndices(arr)
@@ -367,9 +367,9 @@ end
 parentindex
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
-    if is_nil_mask(mask(arr))
+    if is_nil_mask(Val(mask(arr)))
         return (1,)
-    elseif is_oneto_mask(mask(arr))
+    elseif is_oneto_mask(Val(mask(arr)))
         return (i,)
     else
         return childindex(arr, CartesianIndices(arr.arg)[i])
@@ -377,9 +377,9 @@ Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::In
 end
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
-    if is_nil_mask(mask(arr))
+    if is_nil_mask(Val(mask(arr)))
         return (CartesianIndex(ntuple(n->1, length(mask(arr)))),)
-    elseif is_oneto_mask(mask(arr))
+    elseif is_oneto_mask(Val(mask(arr)))
         return (i,)
     else
         return childindex(arr, Tuple(i)...)
@@ -387,9 +387,9 @@ Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Ca
 end
 
 Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
-    if is_nil_mask(mask(arr))
+    if is_nil_mask(Val(mask(arr)))
         return ntuple(n->1, length(mask(arr)))
-    elseif is_oneto_mask(mask(arr))
+    elseif is_oneto_mask(Val(mask(arr)))
         return i
     else
         masktuple(d->1, d->i[d], Val(mask(arr)))
