@@ -32,7 +32,7 @@ module BaseHacks
 
     #FIXME This is a separate eachindex for scalar cases so that swizzles can use
     #a different thunk for the scalar case and avoid recursion depth limiting.
-    Base.eachindex(args::AbstractArray{<:Any, 0}...) = (firstindex(args[1]),)
+    Base.eachindex(args::AbstractArray{<:Any, 0}...) = (CartesianIndex(),)
 
     #=
     Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,<:NTuple{N,Base.OneTo}}, I::Vararg{Int, N}) where {N}

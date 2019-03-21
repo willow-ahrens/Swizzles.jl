@@ -226,6 +226,8 @@ Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
     elseif is_oneto_mask(Val(mask(arr)))
         return CartesianIndices(dst)
     else
+        return SwizzledIndices(arr)
+    end
 end
 
 Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
@@ -239,17 +241,19 @@ Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
     end
 end
 
-Base.@propagate_inbounds function assign!(dst, index, src, drive::Tuple)
-    for i in drive
-        dst[index[i]] = src[i]
-    end
+#FIXME This is a separate method for the scalar case so that swizzles can avoid
+#recursion depth limiting.
+Base.@propagate_inbounds function assign!(dst, index, src, drive::Tuple{CartesianIndex{0}})
+    i = drive[1]
+    dst[index[i]] = src[i]
 end
 
-Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive::Tuple) where {Op}
-    for i in drive
-        i′ = index[i]
-        dst[i′] = op(dst[i′], src[i])
-    end
+#FIXME This is a separate method for the scalar case so that swizzles can avoid
+#recursion depth limiting.
+Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive::Tuple{CartesianIndex{0}}) where {Op}
+    i = drive[1]
+    i′ = index[i]
+    dst[i′] = op(dst[i′], src[i])
 end
 
 Base.@propagate_inbounds function assign!(dst, index, src, drive)
@@ -312,7 +316,7 @@ end
 @inline mask(arr::SwizzledIndices{<:Any, <:Any, _mask}) where {_mask} = _mask
 @inline mask(::Type{<:SwizzledIndices{<:Any, <:Any, _mask}}) where {_mask} = _mask
 
-Base.@propagate_inbounds function Base.getindex(arr::SwizzledIndices{<:Any, N}, i::Vararg{Any, N}) where {N}
+Base.@propagate_inbounds function Base.getindex(arr::SwizzledIndices{T, N}, i::Vararg{Any, N})::T where {T, N}
     return CartesianIndex(masktuple(d->1, d->i[d], Val(mask(arr))))
 end
 
