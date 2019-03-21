@@ -196,11 +196,13 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     op = arr.op
     init = arr.init
     @boundscheck axes(dst) == axes(arr)
-    if op === nothing
-        @inbounds assign!(dst, index, arg, drive)
-    else
-        @inbounds dst .= init
-        @inbounds increment!(op, dst, index, arg, drive)
+    @inbounds begin
+        if op === nothing
+            assign!(dst, index, arg, drive)
+        else
+            dst .= init
+            increment!(op, dst, index, arg, drive)
+        end
     end
     return dst
 end
@@ -219,12 +221,25 @@ end
 
 Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
     if is_nil_mask(Val(mask(arr)))
-        i = CartesianIndex(ntuple(n->1, ndims(dst)))
+        i = CartesianIndex(ntuple(n->1, Val(ndims(dst))))
         return ConstantIndices(i, CartesianIndices(arr.arg))
     elseif is_oneto_mask(Val(mask(arr)))
         return CartesianIndices(dst)
     else
         return SwizzledIndices(arr)
+    end
+end
+
+Base.@propagate_inbounds function assign!(dst, index, src, drive::Tuple)
+    for i in drive
+        dst[index[i]] = src[i]
+    end
+end
+
+Base.@propagate_inbounds function increment!(op::Op, dst, index, src, drive::Tuple) where {Op}
+    for i in drive
+        i′ = index[i]
+        dst[i′] = op(dst[i′], src[i])
     end
 end
 
