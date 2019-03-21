@@ -207,11 +207,15 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Br
     return dst
 end
 
+Base.@propagate_inbounds indices(arr) = indices(IndexStyle(arr), arr)
+Base.@propagate_inbounds indices(::IndexLinear, arr) = LinearIndices(arr)
+Base.@propagate_inbounds indices(::IndexCartesian, arr) = CartesianIndices(arr)
+
 Base.@propagate_inbounds swizzleindex(dst, arr) = swizzleindex(IndexStyle(dst), dst, arr)
 
 Base.@propagate_inbounds function swizzleindex(::IndexLinear, dst, arr)
     if is_nil_mask(Val(mask(arr)))
-        return ConstantIndices(1, LinearIndices(arr.arg))
+        return ConstantIndices(1, indices(arr.arg))
     elseif is_oneto_mask(Val(mask(arr)))
         return LinearIndices(dst)
     else
@@ -222,7 +226,7 @@ end
 Base.@propagate_inbounds function swizzleindex(::IndexCartesian, dst, arr)
     if is_nil_mask(Val(mask(arr)))
         i = CartesianIndex(ntuple(n->1, Val(ndims(dst))))
-        return ConstantIndices(i, CartesianIndices(arr.arg))
+        return ConstantIndices(i, indices(arr.arg))
     elseif is_oneto_mask(Val(mask(arr)))
         return CartesianIndices(dst)
     else
@@ -326,7 +330,7 @@ end
 @inline Base.axes(arr::ConstantIndices) = axes(arr.inds)
 @inline Base.IndexStyle(arr::ConstantIndices) = IndexStyle(arr.inds)
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, N, i}, ::Vararg{Any, N})::T) where {T, N, i} = i
-Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, 1, i}, ::Integer)::T) where {T, N, i} = i
+Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, 1, i}, ::Integer)::T) where {T, i} = i
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, <:Any, i}, ::Integer)::T) where {T, i} = i
 
 #function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Op, mask, Arg}) where {T, N, Arg, Op, mask}
