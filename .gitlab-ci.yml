@@ -25,9 +25,9 @@
       Pkg.instantiate();
       Pkg.resolve();
       Pkg.build();
-      include("test/runtests.jl")'
+      Pkg.test("Swizzles", coverage=true)'
     # Comment out below if you do not want coverage results.
-    - julia -e 'using Pkg; Pkg.add("Coverage");
+    - julia --project=test -e 'using Pkg; Pkg.add("Coverage");
       import Swizzles; cd(joinpath(dirname(pathof(Swizzles)), ".."));
       using Coverage; cl, tl = get_summary(process_folder());
       println("(", cl/tl*100, "%) covered")'
