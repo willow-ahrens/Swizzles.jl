@@ -24,10 +24,8 @@
     - julia --project=test -e 'using Pkg;
       Pkg.instantiate();
       Pkg.resolve();
-      Pkg.build();
-      Pkg.develop(Pkg.PackageSpec("."));
-      Pkg.test("Swizzles";
-      coverage = true)'
+      Pkg.build();'
+    - julia --project=test --code-coverage=user -e 'include("tests/runtests.jl")'
     # Comment out below if you do not want coverage results.
     - julia -e 'using Pkg; Pkg.add("Coverage");
       import Swizzles; cd(joinpath(dirname(pathof(Swizzles)), ".."));
