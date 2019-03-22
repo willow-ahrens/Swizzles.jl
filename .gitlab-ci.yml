@@ -21,11 +21,11 @@
     # want coverage results.
     - julia -e 'using InteractiveUtils;
       versioninfo()'
-    - julia --project=test -e 'using Pkg;
+    - julia --project=test --code-coverage=user -e 'using Pkg;
       Pkg.instantiate();
       Pkg.resolve();
-      Pkg.build();'
-    - julia --project=test --code-coverage=user -e 'include("test/runtests.jl")'
+      Pkg.build();
+      include("test/runtests.jl")'
     # Comment out below if you do not want coverage results.
     - julia -e 'using Pkg; Pkg.add("Coverage");
       import Swizzles; cd(joinpath(dirname(pathof(Swizzles)), ".."));
