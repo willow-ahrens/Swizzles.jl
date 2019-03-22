@@ -3,6 +3,7 @@ using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
+using Swizzles.ValArrays
 using Swizzles.ScalarArrays
 
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
@@ -357,6 +358,8 @@ is applied by overriding the `childstyle` method.
     childstyle(Arr, BroadcastStyle(parent(Arr)))
 end
 
+
+
 @inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
     arr_keeps = masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
@@ -372,5 +375,9 @@ end
 =#
 
 function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray)
-    return adopt(arrayify(lift_keeps(parent(arr))), arr)
+    return adopt(lift_keeps(parent(arr)), arr)
+end
+
+function Swizzles.ValArrays.lift_vals(arr::SwizzledArray)
+    return adopt(lift_vals(parent(arr)), arr)
 end

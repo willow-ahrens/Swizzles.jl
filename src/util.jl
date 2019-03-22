@@ -12,20 +12,6 @@ Base.isless(::Nil, ::Integer) = true
 Base.isless(::Integer, ::Nil) = false
 Base.isless(::Nil, ::Nil) = false
 
-struct Keep end
-
-const keep = Keep()
-
-Base.isequal(::Keep, ::Keep) = true
-Base.isequal(::Keep, ::Integer) = false
-Base.isequal(::Integer, ::Keep) = false
-Base.isless(::Keep, ::Integer) = false
-Base.isless(::Integer, ::Keep) = true
-Base.isless(::Keep, ::Keep) = false
-
-Base.isless(::Nil, ::Keep) = true
-Base.isless(::Keep, ::Nil) = false
-
 """
     masktuple(f, g, I)
 Return `R::Tuple` such that `R[j] == f(j) when `I[j] isa
