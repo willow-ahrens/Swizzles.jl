@@ -22,6 +22,7 @@ include("ArrayifiedArrays.jl")
 include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("ValArrays.jl")
+include("NamedArrays.jl")
 include("SwizzledArrays.jl")
 
 include("extra.jl")

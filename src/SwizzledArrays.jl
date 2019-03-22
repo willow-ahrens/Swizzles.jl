@@ -381,3 +381,7 @@ end
 function Swizzles.ValArrays.lift_vals(arr::SwizzledArray)
     return adopt(lift_vals(parent(arr)), arr)
 end
+
+function Swizzles.NamedArrays.lift_names(arr::SwizzledArray, stuff)
+    return adopt(lift_names(parent(arr), stuff), arr)
+end
