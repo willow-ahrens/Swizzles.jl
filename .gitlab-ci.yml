@@ -25,6 +25,7 @@
       Pkg.instantiate();
       Pkg.resolve();
       Pkg.build();
+      Pkg.develop(Pkg.PackageSpec("."));
       Pkg.test("Swizzles";
       coverage = true)'
     # Comment out below if you do not want coverage results.
