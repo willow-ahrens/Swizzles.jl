@@ -19,7 +19,14 @@
   script:
     # Let's run the tests. Substitute `coverage = false` below, if you do not
     # want coverage results.
-    - julia -e 'using Pkg; Pkg.clone(pwd()); Pkg.build("Swizzles"); Pkg.test("Swizzles"; coverage = true)'
+    - julia -e 'using InteractiveUtils;
+      versioninfo()'
+    - julia -e --project=test 'using Pkg;
+      Pkg.instantiate();
+      Pkg.resolve();
+      Pkg.build();
+      Pkg.test("Swizzles";
+      coverage = true)'
     # Comment out below if you do not want coverage results.
     - julia -e 'using Pkg; Pkg.add("Coverage");
       import Swizzles; cd(joinpath(dirname(pathof(Swizzles)), ".."));
