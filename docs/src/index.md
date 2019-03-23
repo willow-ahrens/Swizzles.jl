@@ -208,13 +208,17 @@ If we think of $i$ as dimension 1, $k$ as dimension 2, and  $j$ as dimension 3, 
     C .= Swizzle(+, 1, 3).(A .* Beam(2, 3).(B))
 ```
 
+## Future Documentation
 
-#"Getting Started" => "getting_started.md"
-#"Swizzle Friends" => "swizzle_friends.md"
-#"Abstracter Arrays" => "abstracter_arrays.md"
-# internals
-# eltypes, inititalization
-# performance tips and tricks
-#"API" => "api.md"
 
- example
+# Getting Started
+# Abstracter Arrays
+## philosophy
+## copy and copyto!
+## examples
+# Internals
+## initial values and empty arguments
+## eltype
+## masktuple and imasktuple
+## swizzleindex and eachindex
+## assign! and increment!
