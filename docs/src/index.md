@@ -166,7 +166,7 @@ Although they have different semantics, all of the friends of Swizzles eventuall
 
 `SwizzledArrays` can compose with `Broadcasted` objects (Julia's lazy representation of pointwise function application) to create more exciting kernels. Consider the operation to produce the Euclidian distance $d$ between two vectors $u$ and $v$. The relation can be summarized mathematically as
 
-$\sqrt{\sum\limits_{i} (u\_i - v\_i)^2}$
+$\sqrt{\sum\limits_{i} (u_{i} - v_{i})^2}$
 
 and implemented in Julia as
 
@@ -177,7 +177,7 @@ sqrt(sum((u .- v).^2))
 However, the above kernel allocates an intermediate vector to hold the result of `(u .- v).^2` before summation. We can avoid this by writing the entire fused kernel using a `Swizzle`.
 
 ```
-$sqrt.(Swizzle(+).((u .- v).^2))
+sqrt.(Swizzle(+).((u .- v).^2))
 ```
 
 The above kernel allocates no additional memory!
@@ -185,8 +185,10 @@ The above kernel allocates no additional memory!
 Note that fusion is not always advantageous.
 
 Consider the operation to compute the standard deviation `σ` of a sample set `X` of size `n`. Mathematically,
-    $μ = \frac{1}{n}\sum\limits_i X_i
-    σ = \sqrt{\sum\limits(\frac{(X\_i - \mu)^2)}{n}}$ #TODO
+
+$μ = \frac{1}{n}\sum\limits_i X_i$
+
+$σ = \sqrt{\frac{1}{n}\sum\limits(X_i - \mu)^2}$
 
 We could write this in one line of `Swizzles` as
 ```
@@ -202,7 +204,7 @@ As an example of a multidimensional kernel, consider matrix multiplication of ma
 
 $C_{i j} = \sum\limits_k A_{i k} B_{k j}$
 
-If we think of $i$ as dimension 1, $k$ as dimension 2, and  $j$ as dimension 3, then we can consider $B_{k j}$ as `Beam(2, 3).(B)` and we can consider $A_{i k} B_{k j}$ as $A .* Beam(2, 3).(B)$. Thus, to produce $C$, we need only write
+If we think of $i$ as dimension 1, $k$ as dimension 2, and  $j$ as dimension 3, then we can consider $B_{k j}$ as `Beam(2, 3).(B)` and we can consider $A_{i k} B_{k j}$ as `A .* Beam(2, 3).(B)`. Thus, to produce $C$, we need only write
 
 ```
     C .= Swizzle(+, 1, 3).(A .* Beam(2, 3).(B))
