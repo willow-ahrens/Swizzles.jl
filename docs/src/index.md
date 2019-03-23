@@ -2,13 +2,13 @@
 
 ## Overview
 
-`Swizzles` is an intermediate representation for array operations written in Julia. `Swizzles` functions harmoniously with Julia's `broadcast` facilities, so that users can use (mostly) familiar syntax to build their own tensor kernels in a high-level language.
+Swizzles is an intermediate representation for array operations written in Julia. Swizzles functions harmoniously with Julia's broadcast facilities, so that users can use (mostly) familiar syntax to build their own tensor kernels in a high-level language.
 
-For developers, `Swizzles` is an experimental approach to generating efficient fused multidimensional broadcast and reduction operations. Swizzles provides the lazy `SwizzledArray` type, which represents a lazy simultaneous reduction and transposition, and the `GeneratedArray` abstract type, which users can override to take advantage of a fused trait-based implementation of Julia's `AbstractArray` built on lazy array types like `Broadcasted`, `SubArray`, and `SwizzledArray`.
+For developers, Swizzles is an experimental approach to generating efficient fused multidimensional broadcast and reduction operations. Swizzles provides the lazy `SwizzledArray` type, which represents a lazy simultaneous reduction and transposition, and the `GeneratedArray` abstract type, which users can override to take advantage of a fused trait-based implementation of Julia's `AbstractArray` built on lazy array types like `Broadcasted`, `SubArray`, and `SwizzledArray`.
 
 ## What is a Swizzle?
 
-`Swizzle(op, mask...)(A)` produces a lazy array `R` where the `n`^{th} dimension of `R` corresponds to dimension `mask[n]` of `A`, and other dimensions have been reduced out using the reduction operator `op`.
+`Swizzle(op, mask...)(A)` produces a lazy array `R` where the `n`$^{th}$ dimension of `R` corresponds to dimension `mask[n]` of `A`, and other dimensions have been reduced out using the reduction operator `op`.
 
 ```julia
 julia> using Swizzles
@@ -29,7 +29,7 @@ julia> Swizzle(max, 2)(A)
 
 In the above example, we see that `Swizzle(max, 2)(A)[i] == maximum(A[:, i])`.
 
-`Swizzles` overrides broadcast rules to apply Swizzles to an entire array instead of applying the `Swizzle` pointwise, so we also get
+Swizzles overrides broadcast rules to apply `Swizzle` to an entire array instead of applying the `Swizzle` pointwise to each element, so we also get
 
 ```
 julia> Swizzle(max, 2).(A)
@@ -43,7 +43,7 @@ julia> Swizzle(max, 2).(A)
 
 Notice that since we broadcasted, Julia has automagically called `materialize` on the result and we are given a materialized array.
 
-The dimensions in Swizzle masks don't have to occur in any particular order, so `Swizzle(max, 2, 1)` should transpose our array.
+The dimensions in `Swizzle` masks don't have to occur in any particular order, so `Swizzle(max, 2, 1)` should transpose our array.
 ```
 julia> Swizzle(max, 2, 1).(A)
 5×2 Array{Int64,2}:
@@ -64,7 +64,7 @@ julia> Swizzle(max, nil, 2).(A)
  2  4  6  8  10
 ```
 
-#Swizzle Friends!
+## Swizzle Friends!
 
 
 `Swizzle` has many friends. `Focus(mask...)` is equivalent to `Swizzle(nothing, mask...)`, a shorthand for swizzling when we are only permuting dimensions.
@@ -164,8 +164,57 @@ Although they have different semantics, all of the friends of Swizzles eventuall
 
 ## Fusion
 
-`SwizzledArrays` can fuse easily with 
+`SwizzledArrays` can compose with `Broadcasted` objects (Julia's lazy representation of pointwise function application) to create more exciting kernels. Consider the operation to produce the Euclidian distance $d$ between two vectors $u$ and $v$. The relation can be summarized mathematically as
+
+$\sqrt{\sum\limits_{i} (u\_i - v\_i)^2}$
+
+and implemented in Julia as
+
+```
+sqrt(sum((u .- v).^2))
+```
+
+However, the above kernel allocates an intermediate vector to hold the result of `(u .- v).^2` before summation. We can avoid this by writing the entire fused kernel using a `Swizzle`.
+
+```
+$sqrt.(Swizzle(+).((u .- v).^2))
+```
+
+The above kernel allocates no additional memory!
+
+Note that fusion is not always advantageous.
+
+Consider the operation to compute the standard deviation `σ` of a sample set `X` of size `n`. Mathematically,
+    $μ = \frac{1}{n}\sum\limits_i X_i
+    σ = \sqrt{\sum\limits(\frac{(X\_i - \mu)^2)}{n}}$ #TODO
+
+We could write this in one line of `Swizzles` as
+```
+    σ = sqrt.(Swizzle(+).((X .- (Swizzle(+).(X)./length(X)))^2))
+```
+but this kernel would recompute the mean at every step. The less-fused version will likely perform better.
+```
+    μ = Swizzle(+).(X)/length(X)
+    σ = sqrt(Swizzle(+).((X .- μ)^2))
+```
+
+As an example of a multidimensional kernel, consider matrix multiplication of matrices $A$ and $B$ to produce $C$. Mathematically, we have
+
+$C_{i j} = \sum\limits_k A_{i k} B_{k j}$
+
+If we think of $i$ as dimension 1, $k$ as dimension 2, and  $j$ as dimension 3, then we can consider $B_{k j}$ as `Beam(2, 3).(B)` and we can consider $A_{i k} B_{k j}$ as $A .* Beam(2, 3).(B)$. Thus, to produce $C$, we need only write
+
+```
+    C .= Swizzle(+, 1, 3).(A .* Beam(2, 3).(B))
+```
 
 
+#"Getting Started" => "getting_started.md"
+#"Swizzle Friends" => "swizzle_friends.md"
+#"Abstracter Arrays" => "abstracter_arrays.md"
+# internals
+# eltypes, inititalization
+# performance tips and tricks
+#"API" => "api.md"
 
  example
