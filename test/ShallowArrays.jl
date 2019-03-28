@@ -16,13 +16,13 @@ WrapperArrays.adopt(arg, arr::SimpleShallowArray) = SimpleShallowArray(arg)
 Base.size(arr::SimpleShallowArray{<:Any, <:Any, <:Tuple}) = length(arr.arg)
 Base.axes(arr::SimpleShallowArray{<:Any, <:Any, <:Tuple}) = (Base.OneTo(length(arr.arg)),)
 
-myidentity(x) = x
+foo(x) = x
 
 @testset "ShallowArrays" begin
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
 
-        x = myidentity.(arg)
-        y = myidentity.(SimpleShallowArray(arg))
+        x = foo.(arg)
+        y = foo.(SimpleShallowArray(arg))
         @test x == y
         @test typeof(x) == typeof(y)
 

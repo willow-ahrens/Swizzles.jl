@@ -175,4 +175,11 @@
   @test Swizzle(+).(rand(3,3)) isa Float64
   @test copy(Swizzle(+)(rand(3,3))) isa Array{Float64, 0}
 
+  A = reshape(1:27, 3, 3, 3)
+
+  @test Sum(2).(A)[1, 1:1, 2:3] == Sum(2)(A)[1, 1:1, 2:3]
+  @test Sum(2).(A)[1, 1:1, 3] == Sum(2)(A)[1, 1:1, 3]
+  @test Sum(2).(A)[1, 1, 3:3] == Sum(2)(A)[1, 1, 3:3]
+
+
 end

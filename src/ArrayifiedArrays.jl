@@ -128,14 +128,14 @@ Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.
 
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
 @inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
-function preprocess(dst, arr)
+@inline function preprocess(dst, arr)
     if iswrapper(arr)
         adopt(preprocess(dst, parent(arr)), arr)
     else
         arr
     end
 end
-function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
+@inline function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
     if arr.arg isa AbstractArray
         return arr
     end
