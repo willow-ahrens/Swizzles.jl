@@ -83,17 +83,12 @@ Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::PermuteStyle{S}) where {T, S<
 
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{<:PermuteStyle{<:Base.Broadcast.AbstractArrayStyle{0}}})
-    perms(src) = () || throw(DimensionMismatchError("TODO"))
-    return copy(convert(Broadcasted{S}, parent(repermute(src.args[0]))))
+    return copy(convert(Broadcasted{S}, repermute(src.args[1])))
 end
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S <:Base.Broadcast.AbstractArrayStyle}
-    try
-        src = repermute(src)
-        return PermutedArray(src.perms, copy(src.arg))
-    catch PermutationMismatch
-        return PermutedArray(src.perms, copy(src.arg))
-    end
+    src = repermute(src.args[1])
+    return PermutedArray(src.perms, copy(src.arg))
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S}
@@ -103,86 +98,77 @@ Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcas
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::PermutedArray, src::Broadcasted{PermuteStyle{S}}) where {S}
-    axes(dst) == axes(src) || throw(DimensionMismatchError("TODO"))
-    src = repermute(src)::PermutedArray
-    if dst.perms == src.perms
-        copyto!(dst.arg, src.arg)
-    else
-        copyto!(dst.arg, PermutedArray(dst.iperms, src))
-    end
+    src = repermute(src.args[1])
+    dst.perms == src.perms || PermutationMismatch("TODO")
+    copyto!(dst, src)
     return dst
 end
 
-@inline permtype(p1::P, p2::P) where {P} = p1
-@inline permtype(p1::AbstractVector{Int}, p2::AbstractVector{Int}) = Array{Int}(p1)
-@inline permtype(p1::Base.OneTo, p2::Base.OneTo) = Base.OneTo(convert(promote_type(eltype(p1), eltype(p2)), p1[end]))
+
 
 @inline function repermute(src::Broadcasted{S}) where {S}
     args = map(repermute(arg), src.args)
-    perms, iperms = combine_perms(success, args...)
+    combineables = map(arg->ziptuple(arg.perms, arg.iperms, keeps(arg)), args)
+    (perms, iperms, _) = ziptuple(combinetuple(result_perm, combineables...)...)
     args = map(parent(args))
-    return ShuffledArray(perms, iperms, ArrayfiedArray(Broadcasted{S}(src.f, axes=src.axes)
-
-@inline function combine_perms(success, args::ShuffledArray...)
-    combineables = map(arg->map(tuple, arg.perms, keeps(arg)), args)
-    results = combinetuple(result_perm, combineables...)
-    map(first,results)
+    return ShuffledArray(perms, iperms, ArrayfiedArray(Broadcasted{S}(src.f, axes=src.axes)))
 end
 
-function result_perm((p1, k1), (p2, k2))
+
+function result_perm((p1, ip1, k1), (p2, ip2, k2))
     if !kept(k2)
-        return (permtype(p1, p2), k1 | k2)
+        return (permtype(p1, p2), permtype(ip1, ip2), k1 | k2)
     elseif !kept(k1)
-        return (permtype(p2, p1), k1 | k2)
+        return (permtype(p2, p1), permtype(ip2, ip1), k1 | k2)
     else
         p1 == p2 || throw(ArgumentError("Conflicting perms declared"))
-        return (permtype(p1, p2), k1 | k2)
+        return (permtype(p1, p2), permtype(ip1, ip2), k1 | k2)
     end
 end
-@inline result_perm((p1, k1)::Tuple{Any, Keep}, (p2, k2)::Tuple{Any, Extrude}) = (p1, Keep())
-@inline result_perm((p1, k1)::Tuple{Any, Extrude}, (p2, k2)::Tuple{Any, Keep}) = (p2, Keep())
-@inline function result_perm((p1, k1)::Tuple{Any, Keep}, (p2, k2)::Tuple{Any, Keep})
+@inline result_perm((p1, ip1, k1)::Tuple{Any, Keep}, (p2, ip2, k2)::Tuple{Any, Extrude}) = (p1, ip1, Keep())
+@inline result_perm((p1, ip1, k1)::Tuple{Any, Extrude}, (p2, ip2, k2)::Tuple{Any, Keep}) = (p2, ip2, Keep())
+@inline function result_perm((p1, ip1, k1)::Tuple{Any, Keep}, (p2, ip2, k2)::Tuple{Any, Keep})
     p1 == p2 || throw(ArgumentError("Conflicting perms declared"))
-    (p1, Keep())
+    (p1, ip1, Keep())
 end
 
-@inline function repermute(src::Broadcasted)
-    return Ref(src.f), map(repermute, src.args)...)
-end
+@inline permtype(p1::P, p2::P) where {P} = p1
+@inline permtype(p1::AbstractVector{Int}, p2::AbstractVector{Int}) = Vector{Int}(p1)
+@inline permtype(p1::Base.OneTo, p2::Base.OneTo) = Base.OneTo(convert(promote_type(eltype(p1), eltype(p2)), p1[end]))
 
 
 
 @inline Swizzles.childstyle(Arr::Type{<:SwizzledArray}, ::PermuteStyle{S}) where {S} = PermuteStyle(Swizzles.childstyle(Arr, S()))
 
-function perms(arr::SwizzledArray)
-    arg_perms = perms(arr.arg)
+@inline function repermute(arr::SwizzledArray{T}) where {T}
+    arg = repermute(arr.arg)
+    init = repermute(arr.init)
+    arg_perms = arr.arg.perms
     arr_perms = masktuple(d->[Base.OneTo(1)], d->arg_perms[d], Val(mask(arr)))
+    arg_iperms = arr.arg.iperms
+    arr_iperms = masktuple(d->[Base.OneTo(1)], d->arg_iperms[d], Val(mask(arr)))
     arg_keeps = keeps(arr.arg)
     arr_keeps = masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
-    init_perms = perms(arr.init)
+    init_perms = arr.init.perms
     init_keeps = keeps(arr.init)
-    return map(first, combinetuple(result_perm, map(tuple, arr_perms, arr_keeps), map(tuple, init_perms, init_keeps)))
-end
-
-@inline function repermute(arr::SwizzledArray{T}) where {T}
-    if perm is dropped, don't worry about shuffling it
-    return Swizzle(Swizzle(arr.op, mask(arr)), mask(arr))(repermute(arr.init), repermute(arr.arg))
+    (perms, iperms, _) = ziptuple(combinetuple(result_perm, ziptuple(arr_perms, arr_iperms, arr_keeps), ziptuple(init_perms, init_iperms, init_keeps))...)
+    return PermutedArray(perms, iperms, Swizzle(arr.op, arr.mask...)(parent(arg), parent(init)))
 end
 
 
 
-perms(arr::ArrayifiedArray) = perms(arr.arg)
-
-repermute(arr::ArrayifiedArray) = broadcasted(ArrayifiedArray, repermute(arr.arg))
-
-
-
-perms(arr::ExtrudedArray) = perms(arr.arg)
-
-repermute(arr::ExtrudedArray) = repermute(arr.arg) #TODO this is sad
-
+function repermute(arr::ArrayifiedArray)
+    arg = repermute(arr.arg)
+    if parent(arg) isa ArrayifiedArray
+        return PermutedArray(arg.perms, arg.iperms, parent(arg))
+    else
+        return PermutedArray(arg.perms, arg.iperms, ArrayifiedArray(parent(arg)))
+    end
+end
 
 
+
+#=
 @inline function parse_specs_perms(arr, specs::Tuple{Vararg{Any, M}}) where {M}
     if @generated
         return :(($(ntuple(n -> n <= M ? :(parse_specs_perms(arr, $n, specs[$n])) : :([axes(arr, $n)]), ndims(arr))...),))
@@ -192,6 +178,7 @@ repermute(arr::ExtrudedArray) = repermute(arr.arg) #TODO this is sad
 end
 @inline parse_specs_perms(arr, n, spec::Integer) = ChunkedUnitRange(1:size(arr, n), spec)
 @inline parse_specs_perms(arr, n, spec) = spec
+=#
 
 
 
