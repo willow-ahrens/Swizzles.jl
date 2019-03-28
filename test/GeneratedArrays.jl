@@ -127,6 +127,13 @@ using LinearAlgebra
         @testset "reductions" begin
             A = [1 2 3; 4 5 6; 7 8 9]
 
+            @test mapreduce(-, +, GenTest(A)) == mapreduce(-, +, A)
+            @test mapreduce(-, +, GenTest(A), dims=2) == mapreduce(-, +, A, dims=2)
+            @test mapreduce(-, +, GenTest(A), dims=(1, 2)) == mapreduce(-, +, A, dims=(1, 2))
+            @test mapreduce(-, +, GenTest(A), dims=:) == mapreduce(-, +, A, dims=:)
+            @test mapreduce(-, +, GenTest(A), dims=()) == mapreduce(-, +, A, dims=())
+            @test mapreduce(-, +, GenTest(A), init=10) == mapreduce(-, +, A, init=10)
+
             @test reduce(+, GenTest(A)) == reduce(+, A)
             @test reduce(+, GenTest(A), dims=2) == reduce(+, A, dims=2)
             @test reduce(+, GenTest(A), dims=(1, 2)) == reduce(+, A, dims=(1, 2))
