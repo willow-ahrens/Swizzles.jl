@@ -2,13 +2,13 @@ using Base.Broadcast: broadcastable, Broadcasted
 using Swizzles.ExtrudedArrays
 using Swizzles.ArrayifiedArrays
 
-myidentity(x) = x
+foo(x) = x
 
 @testset "ExtrudedArrays" begin
     for arg in ((1, 2, 3.0), (1, 2, 3), (), [1, 2, 3.0], [1, 2, 3], [], [1 2; 3 4], transpose([1, 2]))
 
-        x = myidentity.(arg)
-        y = myidentity.(ExtrudedArray(arg))
+        x = foo.(arg)
+        y = foo.(ExtrudedArray(arg))
         @test x == y
         @test typeof(x) == typeof(y)
 

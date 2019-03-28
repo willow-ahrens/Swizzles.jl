@@ -112,16 +112,6 @@ end
 
 
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
-    return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
-end
-
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
-    #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-    #complexity of dropping view indices). Therefore, we convert first.
-    return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
-end
-
 Base.@propagate_inbounds function Base.convert(::Type{SwizzledArray}, src::SubArray{T, M, Arr, <:Tuple{Vararg{Any, N}}}) where {T, N, M, Op, Arr <: SwizzledArray{T, N, Op}}
     arr = parent(src)
     inds = Base.parentindices(src)
@@ -160,24 +150,64 @@ end
 @inline _remask_counts(counts, ::Tuple{}) = ()
 
 
+
 Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:SwizzledArray{T}}}) where {T} = ScalarArray{T}()
+
+
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
     arr = src.args[1]
     dst = similar(src)
-    copyto!(dst, Broadcasted{Nothing}(identity, (arr,)))
+    copyto!(dst, Broadcasted{DefaultArrayStyle{0}}(identity, (arr,)))
     return dst[]
 end
 
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{SwizzledArray}})
-    #This method gets called when the destination eltype is unsuitable for
-    #accumulating the swizzle. Therefore, we should allocate a suitable
-    #destination and then accumulate.
-    arr = src.args[1]
-    arr′ = copyto!(similar(arr), arr)
-    @assert ndims(dst) == ndims(arr′)
-    copyto!(dst, arr′)
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
+    return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
 end
+
+for Identity = (typeof(identity), typeof(myidentity))
+    for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
+        @eval begin
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
+                #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+                #complexity of dropping view indices). Therefore, we convert first.
+                return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
+            end
+
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
+                #This method gets called when the destination eltype is unsuitable for
+                #accumulating the swizzle. Therefore, we should allocate a suitable
+                #destination and then accumulate.
+                arr = src.args[1]
+                arr′ = copyto!(similar(arr), arr)
+                @assert ndims(dst) == ndims(arr′)
+                copyto!(dst, arr′)
+            end
+
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{<:$Style, <:Any, $Identity, Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
+                arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
+                arr = adopt(arg, src.args[1])
+                op = arr.op
+                init = arr.init
+                @boundscheck axes(dst) == axes(arr)
+                @inbounds begin
+                    index = swizzleindex(dst, arr)
+                    drive = eachindex(arg, index)
+                    if op === nothing
+                        assign!(dst, index, arg, drive)
+                    else
+                        dst .= init
+                        increment!(op, dst, index, arg, drive)
+                    end
+                end
+                return dst
+            end
+        end
+    end
+end
+
+
 
 is_nil_mask(mask) = mask == ntuple(n->nil, length(mask))
 @generated function is_nil_mask(::Val{mask}) where {mask}
@@ -189,24 +219,7 @@ is_oneto_mask(mask) = mask == 1:length(mask)
     return is_oneto_mask(mask)
 end
 
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{Nothing, <:Any, typeof(identity), Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
-    arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
-    arr = adopt(arg, src.args[1])
-    op = arr.op
-    init = arr.init
-    @boundscheck axes(dst) == axes(arr)
-    @inbounds begin
-        index = swizzleindex(dst, arr)
-        drive = eachindex(arg, index)
-        if op === nothing
-            assign!(dst, index, arg, drive)
-        else
-            dst .= init
-            increment!(op, dst, index, arg, drive)
-        end
-    end
-    return dst
-end
+
 
 Base.@propagate_inbounds indices(arr) = indices(IndexStyle(arr), arr)
 Base.@propagate_inbounds indices(::IndexLinear, arr) = LinearIndices(arr)
