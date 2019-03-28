@@ -11,44 +11,23 @@ module ExtrudedArrays
 
     export ExtrudedArray
     export keeps, kept, lift_keeps
-    export StableKeep, ShakyKeep, Extrude, Dynamic
+    export Keep, Extrude
 
-    struct StableKeep end
-    struct ShakyKeep end
+    struct Keep end
     struct Extrude end
-    struct Dynamic end
 
-    Base.:|(::StableKeep, ::StableKeep) = StableKeep()
-    Base.:|(::StableKeep, ::ShakyKeep) = ShakyKeep()
-    Base.:|(::StableKeep, ::Extrude) = StableKeep()
-    Base.:|(::StableKeep, ::Dynamic) = ShakyKeep()
-    Base.:|(::StableKeep, ::Bool) = ShakyKeep()
+    Base.:|(::Keep, ::Keep) = Keep()
+    Base.:|(::Keep, ::Extrude) = Keep()
+    Base.:|(::Keep, ::Bool) = Keep()
 
-    Base.:|(::ShakyKeep, ::StableKeep) = ShakyKeep()
-    Base.:|(::ShakyKeep, ::ShakyKeep) = ShakyKeep()
-    Base.:|(::ShakyKeep, ::Extrude) = ShakyKeep()
-    Base.:|(::ShakyKeep, ::Dynamic) = ShakyKeep()
-    Base.:|(::ShakyKeep, ::Bool) = ShakyKeep()
-
-    Base.:|(::Extrude, ::StableKeep) = StableKeep()
-    Base.:|(::Extrude, ::ShakyKeep) = ShakyKeep()
+    Base.:|(::Extrude, ::Keep) = Keep()
     Base.:|(::Extrude, ::Extrude) = Extrude()
-    Base.:|(::Extrude, ::Dynamic) = Dynamic()
     Base.:|(::Extrude, k::Bool) = k
 
-    Base.:|(::Dynamic, ::StableKeep) = ShakyKeep()
-    Base.:|(::Dynamic, ::ShakyKeep) = ShakyKeep()
-    Base.:|(::Dynamic, ::Extrude) = Dynamic()
-    Base.:|(::Dynamic, ::Dynamic) = Dynamic()
-    Base.:|(::Dynamic, ::Bool) = Dynamic()
-
-    Base.:|(::Bool, ::StableKeep) = ShakyKeep()
-    Base.:|(::Bool, ::ShakyKeep) = ShakyKeep()
+    Base.:|(::Bool, ::Keep) = Keep()
     Base.:|(k::Bool, ::Extrude) = k
-    Base.:|(::Bool, ::Dynamic) = Dynamic()
 
-    kept(::StableKeep) = true
-    kept(::ShakyKeep) = true
+    kept(::Keep) = true
     kept(::Extrude) = false
     kept(k::Bool) = k
 
@@ -78,9 +57,9 @@ module ExtrudedArrays
     keeps(x) = ntuple(ndims(x)) do n
         return size(x, n) != 1
     end
-    keeps(::Tuple{}) = (StableKeep(),)
+    keeps(::Tuple{}) = (Keep(),)
     keeps(::Tuple{Any}) = (Extrude(),)
-    keeps(::Tuple) = (StableKeep(),)
+    keeps(::Tuple) = (Keep(),)
     keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
     keeps(ext::Extruded) = ext.keeps
     keeps(bc::Broadcasted) = combinetuple(|, map(keeps, bc.args)...)
@@ -119,4 +98,5 @@ module ExtrudedArrays
     lift_keeps(x::Number) = x
     lift_keeps(x::RefValue) = x
     lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_keeps, bc.args))
+
 end
