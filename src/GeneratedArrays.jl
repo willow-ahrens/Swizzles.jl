@@ -35,14 +35,31 @@ Base.copyto!(dst::GeneratedArray, src) = _copyto!(dst, broadcastable(src))
 Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
 Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
-Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
+function Base.copyto!(dst::GeneratedArray, src::Broadcasted)
+    invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
+end
+#using myidentity avoids a pesky Base copyto! implementation for identity
+@inline myidentity(x) = x
+function Base.copyto!(dst::GeneratedArray, src::Broadcasted{Nothing})
+    invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
+    #=
+    if src.f === identity
+        #avoid pesky Base copyto! implementation for identity
+        src′ = Broadcasted{Nothing}(myidentity, src.args, src.axes)
+        invoke(copyto!, Tuple{AbstractArray, typeof(src′)}, dst, src′)
+    else
+        invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
+    end
+    =#
+end
 
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        reshape(dst, axes(src)) .= src
+        reshape(dst, axes(src)) .= myidentity.(src)
     else
-        dst .= src
+        dst .= myidentity.(src)
     end
+    return dst
 end
 
 
@@ -162,6 +179,47 @@ end
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::GeneratedArray)
     return Sum().(x .* y)
+end
+
+
+
+Base.@propagate_inbounds function LinearAlgebra.adjoint(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(adjoint.(x))))
+end
+
+Base.@propagate_inbounds function LinearAlgebra.transpose(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(transpose.(x))))
+end
+
+Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(x)))
+end
+
+Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray, perm)
+    return arrayify(Delay().(Focus(perm...).(x)))
+end
+
+
+
+Ts = (:(GeneratedArray{<:Any, 1}), :(GeneratedArray{<:Any, 2}), :(AbstractArray{<:Any, 1}), :(AbstractArray{<:Any, 2}))
+for (A, B) in Iterators.product(Ts, Ts)
+    if :(GeneratedArray{<:Any, 1}) in (A, B) || :(GeneratedArray{<:Any, 2}) in (A, B)
+        @eval begin
+            Base.@propagate_inbounds function Base.:*(A::$A, B::$B)
+                return SumOut(2).(A.*Beam(2, 3).(B))
+            end
+        end
+    end
+end
+
+for (Y, A, B) in Iterators.product(Ts, Ts, Ts)
+    if :(GeneratedArray{<:Any, 1}) in (Y, A, B) || :(GeneratedArray{<:Any, 2}) in (Y, A, B)
+        @eval begin
+            Base.@propagate_inbounds function LinearAlgebra.mul!(Y::$Y, A::$A, B::$B)
+                return Y .= SumOut(2).(A.*Beam(2, 3).(B))
+            end
+        end
+    end
 end
 
 
