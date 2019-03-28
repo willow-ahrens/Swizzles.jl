@@ -17,6 +17,5 @@ foo(x) = x
     @test name(lift_names(bc).args[2]) == :obj3
 
     bc = Delay().(Swizzle(+).(A .+ B))
-    println(typeof(lift_names(bc)))
     @test typeof(lift_names(bc)) <: Swizzles.SwizzledArray{<:Any, <:Any, typeof(+), (), <:Any, <:ArrayifiedArray{<:Any, <:Any, <:Broadcasted{<:Any, <:Any, typeof(+), <:Tuple{<:NamedArray{<:Any, <:Any, <:Any, :obj1}, <:NamedArray{<:Any, <:Any, <:Any, :obj2}}}}}
 end
