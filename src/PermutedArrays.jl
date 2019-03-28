@@ -15,47 +15,27 @@ using Base.Broadcast: BroadcastStyle, Broadcasted, AbstractArrayStyle
 using Base.Broadcast: broadcast_shape, check_broadcast_shape, result_style, axistype, broadcasted
 using Base.Iterators: repeated, flatten, take
 
-export PermuteStyle, perms
-export Permute
+export PermuteStyle, Permute
 
 """
-    perms(arr::PermutedArray)
+    PermutationMismatch([msg])
 
-Return the permutations of the axes of `parent(arr)`, such that
-`arr[i...] = parent(arr)[map(getindex, perms(arr), i)]
+The objects called do not have matching permutations. Optional argument `msg` is
+a descriptive error string.
 """
-function perms(arr)
-    return map(Base.OneTo, size(arr))
+struct PermutationMismatch <: Exception
+    msg::AbstractString
 end
+PermutationMismatch() = PermutationMismatch("")
 
 """
-    perms(arr, n)
-
-Return the permutation of the axis `n` of `parent(arr)`, such that
+permute an array so that
 `arr[i...] = parent(arr)[map(getindex, perms(arr), i)]
-"""
-perms(arr, n) = perms(arr)[n]
-
-
-
-"""
-    unPermute(arr)
-
-Return an array representing the original unPermuted array.
-each axis with [`perms`](@ref).
-"""
-function unPermute(arr)
-    return arr
-end
-
-
-
-"""
 interesting observation: perms[i] must be a permutation of axes(perms[i]).
 """
-struct PermutedArray{T, N, perms <: NTuple{<:AbstractVector, N}, Iperms <: NTuple{<:AbstractVector, N}, Arg <: AbstractArray} <: GeneratedArray{T, N}
-    perms::perms
-    iperms::Iperms
+struct PermutedArray{T, N, Perms <: NTuple{<:AbstractVector, N}, InvPerms <: NTuple{<:AbstractVector, N}, Arg <: AbstractArray} <: GeneratedArray{T, N}
+    perms::Perms
+    invperms::InvPerms
     arg::Arg
 end
 
@@ -69,6 +49,7 @@ Base.BroadcastStyle(::Type{PermutedArray{<:Any, <:Any, <:Any, Arg}}) where {Arg}
 
 Base.IndexStyle(arr::PermutedArray) = IndexCartesian()
 Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}) where {T, N} = IndexStyle(arr.arg)
+Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}) where {T, N} = IndexStyle(arr.arg)
 Base.size(arr::PermutedArray) = size(arr.arg)
 Base.size(arr::PermutedArray, d::Int) = size(arr.arg, d)
 Base.axes(arr::PermutedArray) = axes(arr.arg)
@@ -77,16 +58,20 @@ function Base.getindex(arr::PermutedArray{T, N}, i...)::T where {T, N}
     arr.arg[ntuple(n->arr.perms[n][i[n]], Val(ndims(arr)))...]
 end
 (Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}, i...)::T) where {T, N} = arr.arg[i...]
+(Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, i...)::T) where {T, N} = arr.arg[i...]
 (Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}, i::Integer)::T) where {T, N} = arr.arg[i]
+(Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, i::Integer)::T) where {T, N} = arr.arg[i]
 function Base.setindex!(arr::PermutedArray{T, N}, x, i...)::T where {T, N}
     arr.arg[ntuple(n->arr.perms[n][i[n]], Val(ndims(arr)))...] = x
 end
 (Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
 (Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
 
 
 
-similar(bc::Broadcasted{<:PermuteStyle{S}}) where {S} = similar(convert(Broadcasted{S()}, bc))
+#similar(bc::Broadcasted{<:PermuteStyle{S}}) where {S} = similar(convert(Broadcasted{S()}, bc))
 
 struct PermuteStyle{S<:BroadcastStyle} <: BroadcastStyle end
 PermuteStyle(style::S) where {S <: BroadcastStyle} = PermuteStyle{S}()
@@ -99,12 +84,16 @@ Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::PermuteStyle{S}) where {T, S<
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{<:PermuteStyle{<:Base.Broadcast.AbstractArrayStyle{0}}})
     perms(src) = () || throw(DimensionMismatchError("TODO"))
-    return copy(convert(Broadcasted{S}, parent(rePermute(src.args[0]))))
+    return copy(convert(Broadcasted{S}, parent(repermute(src.args[0]))))
 end
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{<:PermuteStyle{S}}) where {S <:Base.Broadcast.AbstractArrayStyle}
-    src = rePermute(src)::PermutedArray
-    return PermutedArray(src.perms, copy(src.arg))
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S <:Base.Broadcast.AbstractArrayStyle}
+    try
+        src = repermute(src)
+        return PermutedArray(src.perms, copy(src.arg))
+    catch PermutationMismatch
+        return PermutedArray(src.perms, copy(src.arg))
+    end
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S}
@@ -115,7 +104,7 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::PermutedArray, src::Broadcasted{PermuteStyle{S}}) where {S}
     axes(dst) == axes(src) || throw(DimensionMismatchError("TODO"))
-    src = rePermute(src)::PermutedArray
+    src = repermute(src)::PermutedArray
     if dst.perms == src.perms
         copyto!(dst.arg, src.arg)
     else
@@ -124,28 +113,18 @@ Base.@propagate_inbounds function Base.copyto!(dst::PermutedArray, src::Broadcas
     return dst
 end
 
-
 @inline permtype(p1::P, p2::P) where {P} = p1
-@inline function permtype(p1::SVector{1, <:AbstractUnitRange}, p2::ChunkedUnitRange)
-    return ChunkedUnitRange(axistype(p1[1], p2.arg), first(promote(length(p1[1]), p2.chunk)))
-end
-@inline function permtype(p1::ChunkedUnitRange, p2::SVector{1, <:AbstractUnitRange})
-    return ChunkedUnitRange(axistype(p1.arg, p2[1]), first(promote(p1.chunk, length(p2[1]))))
-end
-@inline function permtype(p1::Vector{<:AbstractUnitRange}, p2::ChunkedUnitRange)
-    return Vector{UnitRange{Int}}(p1)
-end
-@inline function permtype(p1::ChunkedUnitRange, p2::Vector{<:AbstractUnitRange})
-    return Vector{UnitRange{Int}}(p1)
-end
-@inline function permtype(p1, p2)
-    return Vector{Vector{Int}}(p1)
-end
+@inline permtype(p1::AbstractVector{Int}, p2::AbstractVector{Int}) = Array{Int}(p1)
+@inline permtype(p1::Base.OneTo, p2::Base.OneTo) = Base.OneTo(convert(promote_type(eltype(p1), eltype(p2)), p1[end]))
 
-@inline perms(arg::Broadcasted) = combine_perms(arg.args...)
+@inline function repermute(src::Broadcasted{S}) where {S}
+    args = map(repermute(arg), src.args)
+    perms, iperms = combine_perms(success, args...)
+    args = map(parent(args))
+    return ShuffledArray(perms, iperms, ArrayfiedArray(Broadcasted{S}(src.f, axes=src.axes)
 
-@inline function combine_perms(args...)
-    combineables = map(arg -> map(tuple, perms(arg), keeps(arg)), args)
+@inline function combine_perms(success, args::ShuffledArray...)
+    combineables = map(arg->map(tuple, arg.perms, keeps(arg)), args)
     results = combinetuple(result_perm, combineables...)
     map(first,results)
 end
@@ -160,16 +139,15 @@ function result_perm((p1, k1), (p2, k2))
         return (permtype(p1, p2), k1 | k2)
     end
 end
-@inline result_perm((p1, k1)::Tuple{Any, StableKeep}, (p2, k2)::Tuple{Any, Extrude}) = (p1, StableKeep())
-@inline result_perm((p1, k1)::Tuple{Any, Extrude}, (p2, k2)::Tuple{Any, StableKeep}) = (p2, StableKeep())
-@inline function result_perm((p1, k1)::Tuple{Any, StableKeep}, (p2, k2)::Tuple{Any, StableKeep})
+@inline result_perm((p1, k1)::Tuple{Any, Keep}, (p2, k2)::Tuple{Any, Extrude}) = (p1, Keep())
+@inline result_perm((p1, k1)::Tuple{Any, Extrude}, (p2, k2)::Tuple{Any, Keep}) = (p2, Keep())
+@inline function result_perm((p1, k1)::Tuple{Any, Keep}, (p2, k2)::Tuple{Any, Keep})
     p1 == p2 || throw(ArgumentError("Conflicting perms declared"))
-    (p1, StableKeep())
+    (p1, Keep())
 end
 
-@inline function rePermute(src::Broadcasted)
-    if Permutes don't match, materialize Permutes
-    return broadcasted(broadcasted, Ref(src.f), map(rePermute, src.args)...)
+@inline function repermute(src::Broadcasted)
+    return Ref(src.f), map(repermute, src.args)...)
 end
 
 
@@ -186,22 +164,22 @@ function perms(arr::SwizzledArray)
     return map(first, combinetuple(result_perm, map(tuple, arr_perms, arr_keeps), map(tuple, init_perms, init_keeps)))
 end
 
-@inline function rePermute(arr::SwizzledArray{T}) where {T}
+@inline function repermute(arr::SwizzledArray{T}) where {T}
     if perm is dropped, don't worry about shuffling it
-    return Swizzle(Swizzle(arr.op, mask(arr)), mask(arr))(rePermute(arr.init), rePermute(arr.arg))
+    return Swizzle(Swizzle(arr.op, mask(arr)), mask(arr))(repermute(arr.init), repermute(arr.arg))
 end
 
 
 
 perms(arr::ArrayifiedArray) = perms(arr.arg)
 
-rePermute(arr::ArrayifiedArray) = broadcasted(ArrayifiedArray, rePermute(arr.arg))
+repermute(arr::ArrayifiedArray) = broadcasted(ArrayifiedArray, repermute(arr.arg))
 
 
 
 perms(arr::ExtrudedArray) = perms(arr.arg)
 
-rePermute(arr::ExtrudedArray) = rePermute(arr.arg) #TODO this is sad
+repermute(arr::ExtrudedArray) = repermute(arr.arg) #TODO this is sad
 
 
 
