@@ -2,7 +2,7 @@ module GeneratedArrays
 
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-using Base.Broadcast: Broadcasted
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
@@ -38,29 +38,54 @@ Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
 function Base.copyto!(dst::GeneratedArray, src::Broadcasted)
     invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
 end
-#using myidentity avoids a pesky Base copyto! implementation for identity
-@inline myidentity(x) = x
-function Base.copyto!(dst::GeneratedArray, src::Broadcasted{Nothing})
-    invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
-    #=
-    if src.f === identity
-        #avoid pesky Base copyto! implementation for identity
-        src′ = Broadcasted{Nothing}(myidentity, src.args, src.axes)
-        invoke(copyto!, Tuple{AbstractArray, typeof(src′)}, dst, src′)
-    else
-        invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
-    end
-    =#
-end
-
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        reshape(dst, axes(src)) .= myidentity.(src)
+        dst .= reshape(arrayify(src), axes(dst))
     else
-        dst .= myidentity.(src)
+        dst .= src
     end
     return dst
 end
+
+# avoid identity optimizations
+@inline function Base.copyto!(dest::GeneratedArray, bc::Broadcasted{<:AbstractArrayStyle{0}})
+    return copyto!(dest, convert(Broadcasted{Nothing}, bc))
+end
+@inline function Base.copyto!(dest::AbstractArray, bc::Broadcasted{<:AbstractArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:GeneratedArray}})
+    return copyto!(dest, convert(Broadcasted{Nothing}, bc))
+end
+@inline function Base.copyto!(dest::GeneratedArray, bc::Broadcasted{<:AbstractArrayStyle{0}, <:Any, typeof(identity), <:Tuple{<:GeneratedArray}})
+    return copyto!(dest, convert(Broadcasted{Nothing}, bc))
+end
+@inline function Base.copyto!(dest::GeneratedArray, bc::Broadcasted{Nothing})
+    axes(dest) == axes(bc) || throwdm(axes(dest), axes(bc))
+    bc′ = preprocess(dest, bc)
+    @simd for I in eachindex(bc′)
+        @inbounds dest[I] = bc′[I]
+    end
+    return dest
+end
+@inline function Base.Broadcast.copyto!(dest::AbstractArray, bc::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{<:GeneratedArray}})
+    axes(dest) == axes(bc) || throwdm(axes(dest), axes(bc))
+    bc′ = preprocess(dest, bc)
+    @simd for I in eachindex(bc′)
+        @inbounds dest[I] = bc′[I]
+    end
+    return dest
+end
+@inline function Base.copyto!(dest::GeneratedArray, bc::Broadcasted{Nothing, <:Any, typeof(identity), <:Tuple{<:GeneratedArray}})
+    axes(dest) == axes(bc) || throwdm(axes(dest), axes(bc))
+    bc′ = preprocess(dest, bc)
+    @simd for I in eachindex(bc′)
+        @inbounds dest[I] = bc′[I]
+    end
+    return dest
+end
+
+
+
+
+
 
 
 
