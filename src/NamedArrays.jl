@@ -8,6 +8,8 @@ module NamedArrays
     using Swizzles.ShallowArrays
     using Swizzles.Properties
 
+    export NamedArray, name, lift_names
+
     struct NamedArray{T, N, Arg<:AbstractArray{T, N}, name} <: ShallowArray{T, N, Arg}
         arg::Arg
         function NamedArray{T, N, Arg, name}(arg::Arg) where {T, N, Arg, name}
@@ -16,7 +18,7 @@ module NamedArrays
     end
 
     function NamedArray(arg, name)
-        return NamedArray{eltype(arr), ndims(arr), typeof(arr), name}(arr)
+        return NamedArray{eltype(arg), ndims(arg), typeof(arg), name}(arg)
     end
 
     Base.parent(arr::NamedArray) = arr.arg
@@ -27,12 +29,11 @@ module NamedArrays
     name(arr::NamedArray{<:Any, <:Any, <:Any, _name}) where {_name} = _name
     name(::Type{<:NamedArray{<:Any, <:Any, <:Any, _name}}) where {_name} = _name
 
-
     function name(obj, stuff)
-        if obj in stuff
+        if haskey(stuff, obj)
             return stuff[obj]
         else
-            stuff[obj] = Symbol("obj$(length(stuff))")
+            stuff[obj] = Symbol("obj$(length(stuff) + 1)")
         end
     end
 
@@ -42,6 +43,6 @@ module NamedArrays
         return NamedArray(arr, name(arr, stuff))
     end
     lift_names(arr::AbstractArray, stuff) = NamedArray(arr, name(arr, stuff))
-    lift_names(arr::ArrayifiedArray{T, N}, stuff) where {T, N} = ArrayifiedArray{T, N}(lift_names(x.arg, stuff))
-    lift_names(bc::Broadcasted{Style}, stuff) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, stuff), bc.args))
+    lift_names(arr::ArrayifiedArray{T, N}, stuff) where {T, N} = ArrayifiedArray{T, N}(lift_names(arr.arg, stuff))
+    lift_names(bc::Broadcasted{Style}, stuff) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, stuff), bc.args), bc.axes)
 end

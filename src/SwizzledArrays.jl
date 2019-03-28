@@ -4,6 +4,7 @@ using Swizzles.ArrayifiedArrays
 using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Swizzles.ValArrays
+using Swizzles.NamedArrays
 using Swizzles.ScalarArrays
 
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias

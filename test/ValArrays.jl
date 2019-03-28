@@ -3,7 +3,7 @@ using Swizzles.ValArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles
 
-myidentity(x) = x
+foo(x) = x
 
 @testset "ValArrays" begin
     A0 = ValArray(0)
