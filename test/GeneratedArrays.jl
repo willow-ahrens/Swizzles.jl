@@ -181,10 +181,10 @@ using LinearAlgebra
                     @test mul!(identity.(y), GenTest(a), b) ≈ mul!(identity.(y), a, b)
                     @test mul!(identity.(y), a, GenTest(b)) ≈ mul!(identity.(y), a, b)
                     @test mul!(identity.(y), GenTest(a), GenTest(b)) ≈ mul!(identity.(y), a, b)
-                    #@test mul!(GenTest(identity.(y)), a, b) ≈ mul!(identity.(y), a, b)
-                    #@test mul!(GenTest(identity.(y)), GenTest(a), b) ≈ mul!(identity.(y), a, b)
-                    #@test mul!(GenTest(identity.(y)), a, GenTest(b)) ≈ mul!(identity.(y), a, b)
-                    #@test mul!(GenTest(identity.(y)), GenTest(a), GenTest(b)) ≈ mul!(identity.(y), a, b)
+                    @test mul!(GenTest(identity.(y)), a, b) ≈ mul!(identity.(y), a, b)
+                    @test mul!(GenTest(identity.(y)), GenTest(a), b) ≈ mul!(identity.(y), a, b)
+                    @test mul!(GenTest(identity.(y)), a, GenTest(b)) ≈ mul!(identity.(y), a, b)
+                    @test mul!(GenTest(identity.(y)), GenTest(a), GenTest(b)) ≈ mul!(identity.(y), a, b)
                 end
             end
         end
