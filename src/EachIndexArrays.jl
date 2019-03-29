@@ -1,15 +1,22 @@
-module EachIndexArrays
+module EachindexArrays
 
-struct EachIndexArray{T, N, Arg, Inds} <: ShallowArray{T, N, Arg}
+using Swizzles
+using Swizzles.ShallowArrays
+using Swizzles.ArrayifiedArrays
+using Swizzles.WrapperArrays
+
+using Swizzles: assign!, increment!
+
+struct EachindexArray{T, N, Arg, Inds} <: ShallowArray{T, N, Arg}
     arg::Arg
     inds::Inds
 end
 
-Base.parent(arr::EachIndexArray) = arr.arg
-WrapperArrays.iswrapper(arr) = true
-WrapperArrays.adopt(arg, arr::EachIndexArray) = EachIndexArray(arg, arr.inds)
+Base.parent(arr::EachindexArray) = arr.arg
+WrapperArrays.iswrapper(arr::EachindexArray) = true
+WrapperArrays.adopt(arg, arr::EachindexArray) = EachindexArray(arg, arr.inds)
 
-function Base.eachindex(arr::EachIndexArray)
+function Base.eachindex(arr::EachindexArray)
     return arr.inds
 end
 
@@ -48,6 +55,24 @@ end
         end
     end
     return thunk
+end
+
+struct Tile{_tile_size} <: Swizzles.Intercept end
+
+@inline Tile(_tile_size...) = Tile{_tile_size}()
+
+@inline function parse_tile_size(arr, _tile_size::Tuple{Vararg{Int}})
+    return ntuple(n -> n <= length(_tile_size) ? _tile_size[n] : 1, ndims(arr))
+end
+@inline (ctr::Tile)(arg) = ctr(arrayify(arg))
+@inline function(ctr::Tile{_tile_size})(arg::Arg) where {_tile_size, Arg <: AbstractArray}
+    if @generated
+        tile_size = parse_tile_size(arg, _tile_size)
+        return :(return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), tile_size)))
+    else
+        tile_size = parse_tile_size(arg, _tile_size)
+        return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), tile_size))
+    end
 end
 
 end
