@@ -16,17 +16,17 @@ struct EachindexArray{T, N, Arg, Indices} <: ShallowArray{T, N, Arg}
     indices::Indices
 end
 
-EachindexArray(arg::AbstractArray, indices) = EachindexArray{eltype(arg), ndims(arg), typeof(arg), typeof(indices)}(arg, indices)
+@inline EachindexArray(arg::AbstractArray, indices) = EachindexArray{eltype(arg), ndims(arg), typeof(arg), typeof(indices)}(arg, indices)
 
-Base.parent(arr::EachindexArray) = arr.arg
-WrapperArrays.iswrapper(arr::EachindexArray) = true
-WrapperArrays.adopt(arg, arr::EachindexArray) = EachindexArray(arg, arr.indices)
+@inline Base.parent(arr::EachindexArray) = arr.arg
+@inline WrapperArrays.iswrapper(arr::EachindexArray) = true
+@inline WrapperArrays.adopt(arg, arr::EachindexArray) = EachindexArray(arg, arr.indices)
 
-function Base.eachindex(arr::EachindexArray)
+@inline function Base.eachindex(arr::EachindexArray)
     return arr.indices
 end
 
-function Base.eachindex(arr::EachindexArray, args::AbstractArray...)
+@inline function Base.eachindex(arr::EachindexArray, args::AbstractArray...)
     return arr.indices
 end
 
@@ -38,11 +38,11 @@ struct CartesianTiledIndices{N, Indices <: CartesianIndices{N}, tile_size} <: Sh
     end
 end
 
-Base.parent(arr::CartesianTiledIndices) = arr.indices
-WrapperArrays.iswrapper(arr::CartesianTiledIndices) = true
+@inline Base.parent(arr::CartesianTiledIndices) = arr.indices
+@inline WrapperArrays.iswrapper(arr::CartesianTiledIndices) = true
 
-CartesianTiledIndices(indices::CartesianIndices, tile_size) = CartesianTiledIndices(indices, Val(tile_size))
-function CartesianTiledIndices(indices::CartesianIndices{N}, ::Val{tile_size}) where {N, tile_size}
+@inline CartesianTiledIndices(indices::CartesianIndices, tile_size) = CartesianTiledIndices(indices, Val(tile_size))
+@inline function CartesianTiledIndices(indices::CartesianIndices{N}, ::Val{tile_size}) where {N, tile_size}
     return CartesianTiledIndices{N, typeof(indices), tile_size}(indices)
 end
 
@@ -93,10 +93,10 @@ end
                 $i_n = 0
                 for $ii_n = 1:$II_n
                     $j_n = $i_n + $(tile_size[n])
-                    $(loop((:(drive.indices.indices[$n][($i_n + 1):$j_n]), axes...), n - 1))
+                    $(loop((:(@inbounds drive.indices.indices[$n][($i_n + 1):$j_n]), axes...), n - 1))
                     $i_n = $j_n
                 end
-                $(loop((:(drive.indices.indices[$n][($i_n + 1):end]), axes...), n - 1))
+                $(loop((:(@inbounds drive.indices.indices[$n][($i_n + 1):end]), axes...), n - 1))
             end
         end
     end
