@@ -96,4 +96,30 @@ function __remask(inds, inds′, mask)
     end
 end
 __remask(::Tuple{}, inds′, ::Tuple{}) = ()
+
+
+thunk = quote
+    Base.@_propagate_inbounds_meta
+    drive_size = size(drive.indices)
+    @nexprs $N n -> II_n = 0:fld(drive_size[n],tile_size[n]) - 1
+    $(loop((), N))
+end
+for nn = 0:N
+    thunk = quote
+        $thunk
+        @nloops $nn ii n -> II_n begin
+            axes = @ntuple $N n -> begin
+                if n < $nn
+                    drive.indices.indices[n][(i_n + 1):(i_n + tile_size[n])]
+                else
+                    drive.indices.indices[n][(i_n + 1):end]
+                end
+            end
+            println((axes))
+            assign!(dst, index, src, CartesianIndices(axes))
+            i_n += tile_size[n]
+        end
+    end
+end
+
 =#
