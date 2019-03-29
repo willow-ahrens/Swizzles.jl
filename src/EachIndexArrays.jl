@@ -49,24 +49,30 @@ end
 
 
 @generated function Swizzles.assign!(dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {N, Indices, tile_size}
-    function loop(axes, n)
+    function loop(n)
         i_n = Symbol(:i, '_', n)
         j_n = Symbol(:j, '_', n)
         ii_n = Symbol(:ii, '_', n)
         II_n = Symbol(:II, '_', n)
         if n == 0
             return quote
-                assign!(dst, index, src, CartesianIndices(($(axes...),)))
+                @nloops $N k m->i_m + 1:j_m begin
+                    drive_indices = drive.indices
+                    i = @inbounds @nref $N drive_indices k
+                    i′ = index[i]
+                    dst[i′] = src[i]
+                end
             end
         else
             return quote
                 $i_n = 0
                 for $ii_n = 1:$II_n
                     $j_n = $i_n + $(tile_size[n])
-                    $(loop((:(drive.indices.indices[$n][($i_n + 1):$j_n]), axes...), n - 1))
+                    $(loop(n - 1))
                     $i_n = $j_n
                 end
-                $(loop((:(drive.indices.indices[$n][($i_n + 1):end]), axes...), n - 1))
+                $j_n = drive_size[$n]
+                $(loop(n - 1))
             end
         end
     end
@@ -74,29 +80,36 @@ end
         Base.@_propagate_inbounds_meta
         drive_size = size(drive.indices)
         @nexprs $N n -> II_n = fld(drive_size[n],tile_size[n])
-        $(loop((), N))
+        $(loop(N))
     end
 end
 
 @generated function Swizzles.increment!(op::Op, dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {Op, N, Indices, tile_size}
-    function loop(axes, n)
+    function loop(n)
         i_n = Symbol(:i, '_', n)
         j_n = Symbol(:j, '_', n)
+        J_n = Symbol(:J, '_', n)
         ii_n = Symbol(:ii, '_', n)
         II_n = Symbol(:II, '_', n)
         if n == 0
             return quote
-                increment!(op, dst, index, src, CartesianIndices(($(axes...),)))
+                @nloops $N k m->1:j_m begin
+                    drive_indices = drive.indices
+                    i = @inbounds @nref $N drive_indices m->i_m + k_m
+                    i′ = index[i]
+                    dst[i′] = op(dst[i′], src[i])
+                end
             end
         else
             return quote
                 $i_n = 0
                 for $ii_n = 1:$II_n
-                    $j_n = $i_n + $(tile_size[n])
-                    $(loop((:(@inbounds drive.indices.indices[$n][($i_n + 1):$j_n]), axes...), n - 1))
-                    $i_n = $j_n
+                    $j_n = $(tile_size[n])
+                    $(loop(n - 1))
+                    $i_n += $(tile_size[n])
                 end
-                $(loop((:(@inbounds drive.indices.indices[$n][($i_n + 1):end]), axes...), n - 1))
+                $j_n = $J_n
+                $(loop(n - 1))
             end
         end
     end
@@ -104,7 +117,8 @@ end
         Base.@_propagate_inbounds_meta
         drive_size = size(drive.indices)
         @nexprs $N n -> II_n = fld(drive_size[n],tile_size[n])
-        $(loop((), N))
+        @nexprs $N n -> J_n = mod(drive_size[n],tile_size[n])
+        $(loop(N))
     end
 end
 
