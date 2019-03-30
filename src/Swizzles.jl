@@ -26,8 +26,6 @@ include("NamedArrays.jl")
 include("SwizzledArrays.jl")
 include("EachindexArrays.jl")
 
-include("extra.jl")
-
 
 
 struct Swizzle{Op, mask} <: Swizzles.Intercept
