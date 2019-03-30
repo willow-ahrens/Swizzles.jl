@@ -18,6 +18,59 @@ using Base.Iterators: repeated, flatten, take
 export PermuteStyle, Permute
 
 """
+    isperm(v::AbstractVector) -> Bool
+
+Return `true` if `v` is a valid permutation of `axes(v, 1)`.
+"""
+Base.isperm(v::AbstractVector) = Base.isperm(v, axes(v, 1))
+
+"""
+    isperm(v, u) -> Bool
+
+Return `true` if `v` is a valid permutation of `u`.
+"""
+function Base.isperm(v, u)
+    return sort(v) == sort(u)
+end
+function Base.isperm(v::UnitRange{T}, u::UnitRange{T}) where {T<:Integer}
+    return v == u
+end
+function Base.isperm(v::UnitRange{T}, u::AbstractVector{T}) where {T<:Integer}
+    return isperm(u, v)
+end
+function Base.isperm(v::AbstractVector{T}, u::UnitRange{T}) where {T<:Integer}
+    n = length(u)
+    used = falses(n)
+    for x in v
+        i = x - u.start
+        (0 < x <= n) && (used[x] ⊻= true) || return false
+    end
+    true
+end
+function Base.isperm(v::Base.OneTo{T}, u::Base.OneTo{T}) where {T<:Integer}
+    return v == u
+end
+function Base.isperm(v::Base.OneTo{T}, u::AbstractVector{T}) where {T<:Integer}
+    return isperm(u, v)
+end
+function Base.isperm(v::AbstractVector{T}, u::Base.OneTo{T}) where {T<:Integer}
+    n = length(u)
+    used = falses(n)
+    for x in v
+        i = x - 1
+        (0 < x <= n) && (used[x] ⊻= true) || return false
+    end
+    true
+end
+
+
+
+Base.invperm(v::UnitRange{<:Integer}) = v
+Base.invperm(v::Base.OneTo{<:Integer}) = v
+
+
+
+"""
     PermutationMismatch([msg])
 
 The objects called do not have matching permutations. Optional argument `msg` is
@@ -168,24 +221,23 @@ end
 
 
 
-#=
-@inline function parse_specs_perms(arr, specs::Tuple{Vararg{Any, M}}) where {M}
+struct Permute{_Perms, _InvPerms} <: Swizzles.Intercept
+    _perms::Perms
+    _invperms::InvPerms
+end
+
+Permute(_perms...) = Permute(_perms, map(invperm, _perms))
+
+@inline function(ctr::Permute{<:Tuple{Vararg{Any, _N}}, <:Tuple{Vararg{Any, _N}}})(arg::Arg) where {_N, Arg <: AbstractArray}
     if @generated
-        return :(($(ntuple(n -> n <= M ? :(parse_specs_perms(arr, $n, specs[$n])) : :([axes(arr, $n)]), ndims(arr))...),))
+        perms = ntuple(n -> n <= _N ? :(ctr._perms[$n]) : :(axes(arg, $n)), ndims(arg))
+        invperms = ntuple(n -> n <= _N ? :(ctr._invperms[$n]) : :(axes(arg, $n)), ndims(arg))
+        return :(return PermutedArray(($(perms...),), ($(invperms...),), arg))
     else
-        return ntuple(n -> n <= M ? parse_specs_perms(arr, n, specs[n]) : [axes(arr, n)], Val(ndims(arr)))
+        perms = ntuple(n -> n <= _N ? ctr._perms[n] : axes(arg, n), ndims(arg))
+        invperms = ntuple(n -> n <= _N ? ctr._invperms[n] : axes(arg, n), ndims(arg))
+        return PermutedArray(perms, invperms, arg)
     end
 end
-@inline parse_specs_perms(arr, n, spec::Integer) = ChunkedUnitRange(1:size(arr, n), spec)
-@inline parse_specs_perms(arr, n, spec) = spec
-=#
-
-
-
-struct Permute{perms<:Tuple} <: Swizzles.Intercept
-    perms::perms
-end
-
-@inline (shf::Permute)(arg) = PermutedArray(shf.perms, arrayify(arg))
 
 end
