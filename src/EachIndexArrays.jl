@@ -52,42 +52,6 @@ end
     function loop(n)
         i_n = Symbol(:i, '_', n)
         j_n = Symbol(:j, '_', n)
-        ii_n = Symbol(:ii, '_', n)
-        II_n = Symbol(:II, '_', n)
-        if n == 0
-            return quote
-                @nloops $N k m->i_m + 1:j_m begin
-                    drive_indices = drive.indices
-                    i = @inbounds @nref $N drive_indices k
-                    i′ = index[i]
-                    dst[i′] = src[i]
-                end
-            end
-        else
-            return quote
-                $i_n = 0
-                for $ii_n = 1:$II_n
-                    $j_n = $i_n + $(tile_size[n])
-                    $(loop(n - 1))
-                    $i_n = $j_n
-                end
-                $j_n = drive_size[$n]
-                $(loop(n - 1))
-            end
-        end
-    end
-    return quote
-        Base.@_propagate_inbounds_meta
-        drive_size = size(drive.indices)
-        @nexprs $N n -> II_n = fld(drive_size[n],tile_size[n])
-        $(loop(N))
-    end
-end
-
-@generated function Swizzles.increment!(op::Op, dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {Op, N, Indices, tile_size}
-    function loop(n)
-        i_n = Symbol(:i, '_', n)
-        j_n = Symbol(:j, '_', n)
         J_n = Symbol(:J, '_', n)
         ii_n = Symbol(:ii, '_', n)
         II_n = Symbol(:II, '_', n)
@@ -97,7 +61,7 @@ end
                     drive_indices = drive.indices
                     i = @inbounds @nref $N drive_indices m->i_m + k_m
                     i′ = index[i]
-                    dst[i′] = op(dst[i′], src[i])
+                    dst[i′] = src[i]
                 end
             end
         else
@@ -119,6 +83,63 @@ end
         @nexprs $N n -> II_n = fld(drive_size[n],tile_size[n])
         @nexprs $N n -> J_n = mod(drive_size[n],tile_size[n])
         $(loop(N))
+    end
+end
+
+@generated function Swizzles.increment!(op::Op, dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {Op, N, Indices, tile_size}
+    return quote
+        Base.@_propagate_inbounds_meta
+        drive_size = size(drive.indices)
+        #=
+        =#
+        @nloops $N ii n -> 0:2:127 begin
+            drive_indices = drive.indices
+            i′ = drive.indices[ii_1 + 1, ii_2 + 1, ii_3 + 1]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 2, ii_2 + 1, ii_3 + 1]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 1, ii_2 + 2, ii_3 + 1]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 2, ii_2 + 2, ii_3 + 1]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 1, ii_2 + 1, ii_3 + 2]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 2, ii_2 + 1, ii_3 + 2]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 1, ii_2 + 2, ii_3 + 2]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+            i′ = drive.indices[ii_1 + 2, ii_2 + 2, ii_3 + 2]
+            i′′ = index[i′]
+            dst[i′′] = op(dst[i′′], src[i′])
+        end
+        #=
+        @nloops $N ii n -> 0:2:127 begin
+            @nloops $N i n->1:2 begin
+                drive_indices = drive.indices
+                i′ = @inbounds @nref $N drive_indices n -> ii_n + i_n
+                i′′ = index[i′]
+                dst[i′′] = op(dst[i′′], src[i′])
+            end
+        end
+        =#
+        #=
+        drive_size = size(drive.indices)
+        @nloops $N ii n -> 0:tile_size[n]:(drive_size[n] - tile_size[n] - 1) n->nothing n->$(nothing#=Expr(:loopinfo, (Symbol("llvm.loop.vectorize.enable"), true))=#) begin
+            @nloops $N i n->1:tile_size[n] n->nothing n->$(Expr(:loopinfo, (Symbol("llvm.loop.unroll.full"),))) begin
+                drive_indices = drive.indices
+                i′ = @inbounds @nref $N drive_indices n -> ii_n + i_n
+                i′′ = index[i′]
+                dst[i′′] = op(dst[i′′], src[i′])
+            end
+        end
+        =#
     end
 end
 
