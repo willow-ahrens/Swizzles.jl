@@ -151,7 +151,7 @@ end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S}
     pdst = repermute(dst)
-    psrc = repermute(src.args[1])
+    psrc = repermute(src)
     pdst.perms == psrc.perms || PermutationMismatch("TODO")
     copyto!(pdst.arg, psrc.arg)
     return dst
@@ -170,12 +170,15 @@ end
     return PermutedArray(map(getindex, src.perms, arg.perms), map(getindex, src.iperms, arg.iperms), arg.arg)
 end
 
+@inline function repermute(src::Broadcasted{PermuteStyle{S}}) where {S}
+    return repermute(convert(Broadcasted{S}, src))
+end
 @inline function repermute(src::Broadcasted{S}) where {S}
     args = map(repermute, src.args)
     combineables = map(arg->ziptuple(arg.perms, arg.iperms, keeps(arg)), args)
     (perms, iperms, _) = ziptuple(combinetuple(result_perm, combineables...)...)
     args = map(parent, args)
-    return ShuffledArray(perms, iperms, ArrayfiedArray(Broadcasted{S}(src.f, axes=src.axes)))
+    return PermutedArray(perms, iperms, ArrayifiedArray(Broadcasted{S}(src.f, args, src.axes)))
 end
 
 
@@ -215,7 +218,7 @@ end
     init_iperms = init.iperms
     init_keeps = keeps(init)
     (perms, iperms, _) = ziptuple(combinetuple(result_perm, ziptuple(arr_perms, arr_iperms, arr_keeps), ziptuple(init_perms, init_iperms, init_keeps))...)
-    return PermutedArray(perms, iperms, Swizzle(arr.op, mask(arr)...)(parent(arg), parent(init)))
+    return PermutedArray(perms, iperms, Swizzle(arr.op, Val(mask(arr)))(parent(init), parent(arg)))
 end
 
 
