@@ -53,7 +53,6 @@ Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = d
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(arr) = _getindex(arr, I)
-#Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex)::eltype(arr) = _getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
 Base.@propagate_inbounds function _getindex(arr, I...)
@@ -64,7 +63,6 @@ end
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _setindex!(arr, v, I)
-#Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::CartesianIndex) = _setindex!(arr, v, I)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I...) = _setindex!(arr, v, I...)
 
 Base.@propagate_inbounds function _setindex!(arr, v, I...)
