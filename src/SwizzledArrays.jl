@@ -280,7 +280,7 @@ end
 @generated function assign!(dst, index, src, drive::CartesianIndices{N}) where {N}
     return quote
         Base.@_propagate_inbounds_meta
-        @nloops $N i drive begin
+        @nloops $N i n -> drive.indices[n] begin
             i = CartesianIndex(@ntuple $N i)
             dst[index[i]] = src[i]
         end
@@ -290,7 +290,7 @@ end
 @generated function increment!(op::Op, dst, index, src, drive::CartesianIndices{N}) where {Op, N}
     return quote
         Base.@_propagate_inbounds_meta
-        @nloops $N i drive begin
+        @nloops $N i n -> drive.indices[n] begin
             i = CartesianIndex(@ntuple $N i)
             i′ = index[i]
             dst[i′] = op(dst[i′], src[i])

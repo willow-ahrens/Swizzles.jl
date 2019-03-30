@@ -34,7 +34,6 @@ struct CartesianTiledIndices{N, Indices <: CartesianIndices{N}, Chunks <: Tuple{
     indices::Indices
     chunks::Chunks
     function CartesianTiledIndices{N, Indices, Chunks}(indices, chunks) where {N, Indices, Chunks}
-        @assert tile_size isa Tuple{Vararg{Int, N}}
         return new{N, Indices, Chunks}(indices, chunks)
     end
 end
@@ -42,122 +41,46 @@ end
 @inline Base.parent(arr::CartesianTiledIndices) = arr.indices
 @inline WrapperArrays.iswrapper(arr::CartesianTiledIndices) = true
 
-@inline function CartesianTiledIndices(indices::Indices, chunks::Chunks)
+@inline function CartesianTiledIndices(indices::Indices, chunks::Chunks) where {Indices, Chunks}
     CartesianTiledIndices{ndims(indices), Indices, Chunks}(indices, chunks)
 end
 
 
 
-@generated function Swizzles.assign!(dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {N, Indices, tile_size}
-    function loop(n)
-        i_n = Symbol(:i, '_', n)
-        j_n = Symbol(:j, '_', n)
-        J_n = Symbol(:J, '_', n)
-        ii_n = Symbol(:ii, '_', n)
-        II_n = Symbol(:II, '_', n)
-        if n == 0
-            return quote
-                @nloops $N k m->1:j_m begin
-                    drive_indices = drive.indices
-                    i = @inbounds @nref $N drive_indices m->i_m + k_m
-                    i′ = index[i]
-                    dst[i′] = src[i]
-                end
-            end
-        else
-            return quote
-                $i_n = 0
-                for $ii_n = 1:$II_n
-                    $j_n = $(tile_size[n])
-                    $(loop(n - 1))
-                    $i_n += $(tile_size[n])
-                end
-                $j_n = $J_n
-                $(loop(n - 1))
-            end
-        end
-    end
+@generated function Swizzles.assign!(dst, index, src, drive::CartesianTiledIndices{N, Indices, chunks}) where {N, Indices, chunks}
     return quote
         Base.@_propagate_inbounds_meta
-        drive_size = size(drive.indices)
-        @nexprs $N n -> II_n = fld(drive_size[n],tile_size[n])
-        @nexprs $N n -> J_n = mod(drive_size[n],tile_size[n])
-        $(loop(N))
+        @nloops $N i n -> 1:drive.chunks[n]:length(drive.indices.indices[n]) begin
+            tile = @ntuple $N n -> drive.indices.indices[n][i_n:min(i_n + drive.chunks[n] - 1, length(drive.indices.indices[n]))]
+            assign!(dst, index, src, CartesianIndices(tile))
+        end
     end
 end
 
-@generated function Swizzles.increment!(op::Op, dst, index, src, drive::CartesianTiledIndices{N, Indices, tile_size}) where {Op, N, Indices, tile_size}
+@generated function Swizzles.increment!(op::Op, dst, index, src, drive::CartesianTiledIndices{N, Indices, chunks}) where {Op, N, Indices, chunks}
     return quote
         Base.@_propagate_inbounds_meta
-        drive_size = size(drive.indices)
-        #=
-        =#
-        @nloops $N ii n -> 0:2:127 begin
-            drive_indices = drive.indices
-            i′ = drive.indices[ii_1 + 1, ii_2 + 1, ii_3 + 1]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 2, ii_2 + 1, ii_3 + 1]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 1, ii_2 + 2, ii_3 + 1]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 2, ii_2 + 2, ii_3 + 1]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 1, ii_2 + 1, ii_3 + 2]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 2, ii_2 + 1, ii_3 + 2]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 1, ii_2 + 2, ii_3 + 2]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
-            i′ = drive.indices[ii_1 + 2, ii_2 + 2, ii_3 + 2]
-            i′′ = index[i′]
-            dst[i′′] = op(dst[i′′], src[i′])
+        @nloops $N i n -> 1:drive.chunks[n]:length(drive.indices.indices[n]) begin
+            tile = @ntuple $N n -> drive.indices.indices[n][i_n:min(i_n + drive.chunks[n] - 1, length(drive.indices.indices[n]))]
+            increment!(op, dst, index, src, CartesianIndices(tile))
         end
-        #=
-        @nloops $N ii n -> 0:2:127 begin
-            @nloops $N i n->1:2 begin
-                drive_indices = drive.indices
-                i′ = @inbounds @nref $N drive_indices n -> ii_n + i_n
-                i′′ = index[i′]
-                dst[i′′] = op(dst[i′′], src[i′])
-            end
-        end
-        =#
-        #=
-        drive_size = size(drive.indices)
-        @nloops $N ii n -> 0:tile_size[n]:(drive_size[n] - tile_size[n] - 1) n->nothing n->$(nothing#=Expr(:loopinfo, (Symbol("llvm.loop.vectorize.enable"), true))=#) begin
-            @nloops $N i n->1:tile_size[n] n->nothing n->$(Expr(:loopinfo, (Symbol("llvm.loop.unroll.full"),))) begin
-                drive_indices = drive.indices
-                i′ = @inbounds @nref $N drive_indices n -> ii_n + i_n
-                i′′ = index[i′]
-                dst[i′′] = op(dst[i′′], src[i′])
-            end
-        end
-        =#
     end
 end
 
-struct Tile{_tile_size} <: Swizzles.Intercept end
-
-@inline Tile(_tile_size...) = Tile{_tile_size}()
-
-@inline function parse_tile_size(arr, _tile_size::Tuple{Vararg{Int}})
-    return ntuple(n -> n <= length(_tile_size) ? _tile_size[n] : 1, ndims(arr))
+struct Tile{_Chunks} <: Swizzles.Intercept
+    _chunks::_Chunks
 end
+
+@inline Tile(_chunks...) = Tile{typeof(_chunks)}(_chunks)
+
 @inline (ctr::Tile)(arg) = ctr(arrayify(arg))
-@inline function(ctr::Tile{_tile_size})(arg::Arg) where {_tile_size, Arg <: AbstractArray}
+@inline function(ctr::Tile{<:Tuple{Vararg{Any, _N}}})(arg::Arg) where {_N, Arg <: AbstractArray}
     if @generated
-        tile_size = parse_tile_size(arg, _tile_size)
-        return :(return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), $tile_size)))
+        chunks = ntuple(n -> n <= _N ? :(ctr._chunks[$n]) : 1, ndims(arg))
+        return :(return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), ($(chunks...),))))
     else
-        tile_size = parse_tile_size(arg, _tile_size)
-        return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), tile_size))
+        chunks = ntuple(n -> n <= _N ? ctr._chunks[n] : 1, ndims(arg))
+        return EachindexArray(arg, CartesianTiledIndices(CartesianIndices(arg), chunks))
     end
 end
 
