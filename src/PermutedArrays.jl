@@ -4,14 +4,13 @@ using StaticArrays
 using Swizzles.WrapperArrays
 using Swizzles.ShallowArrays
 using Swizzles.ArrayifiedArrays
-using Swizzles.ChunkedUnitRanges
+using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
-using Swizzles.ProductArrays
 using Swizzles
 using Swizzles: SwizzledArray
 using Swizzles: mask, jointuple, combinetuple, masktuple
 
-using Base.Broadcast: BroadcastStyle, Broadcasted, AbstractArrayStyle
+using Base.Broadcast: BroadcastStyle, Broadcasted, Style, AbstractArrayStyle, DefaultArrayStyle
 using Base.Broadcast: broadcast_shape, check_broadcast_shape, result_style, axistype, broadcasted
 using Base.Iterators: repeated, flatten, take
 
@@ -101,8 +100,8 @@ WrapperArrays.adopt(arg, arr::PermutedArray{T, N, perms}) where {T, N, perms} = 
 Base.BroadcastStyle(::Type{PermutedArray{<:Any, <:Any, <:Any, Arg}}) where {Arg} = PermuteStyle(BroadcastStyle(Arg))
 
 Base.IndexStyle(arr::PermutedArray) = IndexCartesian()
-Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}) where {T, N} = IndexStyle(arr.arg)
-Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}) where {T, N} = IndexStyle(arr.arg)
+Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}) where {T, N} = IndexStyle(arr.arg)
+Base.IndexStyle(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}) where {T, N} = IndexStyle(arr.arg)
 Base.size(arr::PermutedArray) = size(arr.arg)
 Base.size(arr::PermutedArray, d::Int) = size(arr.arg, d)
 Base.axes(arr::PermutedArray) = axes(arr.arg)
@@ -117,10 +116,10 @@ end
 function Base.setindex!(arr::PermutedArray{T, N}, x, i...)::T where {T, N}
     arr.arg[ntuple(n->arr.perms[n][i[n]], Val(ndims(arr)))...] = x
 end
-(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
-(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
-(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
-(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, x, i...)::T) where {T, N} = arr.arg[i...] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
+(Base.setindex!(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, x, i::Integer)::T) where {T, N} = arr.arg[i] = x
 
 
 
@@ -129,6 +128,7 @@ end
 struct PermuteStyle{S<:BroadcastStyle} <: BroadcastStyle end
 PermuteStyle(style::S) where {S <: BroadcastStyle} = PermuteStyle{S}()
 PermuteStyle(style::S) where {S <: PermuteStyle} = style
+Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::S) where {T, S<:AbstractArrayStyle} = PermuteStyle(result_style(T(), S()))
 Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::S) where {T, S<:DefaultArrayStyle} = PermuteStyle(result_style(T(), S()))
 Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::S) where {T, S<:Style{Tuple}} = PermuteStyle(result_style(T(), S()))
 Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::PermuteStyle{S}) where {T, S<:BroadcastStyle} = PermuteStyle(result_style(T(), S()))
@@ -222,8 +222,8 @@ end
 
 
 struct Permute{_Perms, _InvPerms} <: Swizzles.Intercept
-    _perms::Perms
-    _invperms::InvPerms
+    _perms::_Perms
+    _invperms::_InvPerms
 end
 
 Permute(_perms...) = Permute(_perms, map(invperm, _perms))
