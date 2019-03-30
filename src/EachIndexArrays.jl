@@ -30,20 +30,20 @@ end
     return arr.indices
 end
 
-struct CartesianTiledIndices{N, Indices <: CartesianIndices{N}, tile_size} <: ShallowArray{CartesianIndex{N}, N, Indices}
+struct CartesianTiledIndices{N, Indices <: CartesianIndices{N}, Chunks <: Tuple{Vararg{Any, N}}} <: ShallowArray{CartesianIndex{N}, N, Indices}
     indices::Indices
-    function CartesianTiledIndices{N, Indices, tile_size}(indices) where {N, Indices, tile_size}
+    chunks::Chunks
+    function CartesianTiledIndices{N, Indices, Chunks}(indices, chunks) where {N, Indices, Chunks}
         @assert tile_size isa Tuple{Vararg{Int, N}}
-        return new{N, Indices, tile_size}(indices)
+        return new{N, Indices, Chunks}(indices, chunks)
     end
 end
 
 @inline Base.parent(arr::CartesianTiledIndices) = arr.indices
 @inline WrapperArrays.iswrapper(arr::CartesianTiledIndices) = true
 
-@inline CartesianTiledIndices(indices::CartesianIndices, tile_size) = CartesianTiledIndices(indices, Val(tile_size))
-@inline function CartesianTiledIndices(indices::CartesianIndices{N}, ::Val{tile_size}) where {N, tile_size}
-    return CartesianTiledIndices{N, typeof(indices), tile_size}(indices)
+@inline function CartesianTiledIndices(indices::Indices, chunks::Chunks)
+    CartesianTiledIndices{ndims(indices), Indices, Chunks}(indices, chunks)
 end
 
 
