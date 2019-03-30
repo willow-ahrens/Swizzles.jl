@@ -188,14 +188,14 @@ function result_perm((p1, ip1, k1), (p2, ip2, k2))
     elseif !kept(k1)
         return (permtype(p2, p1), permtype(ip2, ip1), k1 | k2)
     else
-        p1 == p2 || throw(ArgumentError("Conflicting perms declared"))
+        p1 == p2 || throw(PermutationMismatch("Conflicting permutations"))
         return (permtype(p1, p2), permtype(ip1, ip2), k1 | k2)
     end
 end
 @inline result_perm((p1, ip1, k1)::Tuple{Any, Keep}, (p2, ip2, k2)::Tuple{Any, Extrude}) = (p1, ip1, Keep())
 @inline result_perm((p1, ip1, k1)::Tuple{Any, Extrude}, (p2, ip2, k2)::Tuple{Any, Keep}) = (p2, ip2, Keep())
 @inline function result_perm((p1, ip1, k1)::Tuple{Any, Keep}, (p2, ip2, k2)::Tuple{Any, Keep})
-    p1 == p2 || throw(ArgumentError("Conflicting perms declared"))
+    p1 == p2 || throw(PermutationMismatch("Conflicting permutations"))
     (p1, ip1, Keep())
 end
 

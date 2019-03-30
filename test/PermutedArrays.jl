@@ -14,6 +14,6 @@ using Swizzles.PermutedArrays
     A = reshape(1:9, 3, 3)
     B = Permute(reverse(1:3))(reshape(1:9, 3, 3))
     @test_throws PermutationMismatch A * B
-    A = Permute(1:3, reverse(1:3)).(reshape(1:9, 3, 3))
+    A = Permute(1:3, reverse(1:3))(reshape(1:9, 3, 3))
     @test A * B == reshape(1:9, 3, 3) * reshape(1:9, 3, 3)
 end
