@@ -8,7 +8,7 @@ using Swizzles.GeneratedArrays
 using Swizzles.ExtrudedArrays
 using Swizzles
 using Swizzles: SwizzledArray
-using Swizzles: mask, jointuple, combinetuple, masktuple, ziptuple
+using Swizzles: mask, jointuple, combinetuple, masktuple, ziptuple, nziptuple
 
 using Base: Slice
 using Base.Broadcast: BroadcastStyle, Broadcasted, Style, AbstractArrayStyle, DefaultArrayStyle
@@ -140,12 +140,12 @@ Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::PermuteStyle{S}) where {T, S<
 
 
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{<:PermuteStyle{<:Base.Broadcast.AbstractArrayStyle{0}}})
-    return copy(convert(Broadcasted{S}, repermute(src.args[1])))
+Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S<:Base.Broadcast.AbstractArrayStyle{0}}
+    return copy(convert(Broadcasted{S}, repermute(src).arg.arg))
 end
 
 Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S <:Base.Broadcast.AbstractArrayStyle}
-    src = repermute(src.args[1])
+    src = repermute(src)
     return PermutedArray(src.perms, src.iperms, copy(src.arg))
 end
 
@@ -176,7 +176,7 @@ end
 @inline function repermute(src::Broadcasted{S}) where {S}
     args = map(repermute, src.args)
     combineables = map(arg->ziptuple(arg.perms, arg.iperms, keeps(arg)), args)
-    (perms, iperms, _) = ziptuple(combinetuple(result_perm, combineables...)...)
+    (perms, iperms, _) = nziptuple(Val(3), combinetuple(result_perm, combineables...)...)
     args = map(parent, args)
     return PermutedArray(perms, iperms, ArrayifiedArray(Broadcasted{S}(src.f, args, src.axes)))
 end
@@ -207,7 +207,7 @@ end
 
 @inline Swizzles.childstyle(Arr::Type{<:SwizzledArray}, ::PermuteStyle{S}) where {S} = PermuteStyle(Swizzles.childstyle(Arr, S()))
 
-@inline function repermute(arr::SwizzledArray{T}) where {T}
+function repermute(arr::SwizzledArray{T}) where {T}
     arg = repermute(arr.arg)::PermutedArray
     init = repermute(arr.init)::PermutedArray
     arr_perms = masktuple(d->Base.OneTo(1), d->arg.perms[d], Val(mask(arr)))
@@ -217,7 +217,8 @@ end
     init_perms = init.perms
     init_iperms = init.iperms
     init_keeps = keeps(init)
-    (perms, iperms, _) = ziptuple(combinetuple(result_perm, ziptuple(arr_perms, arr_iperms, arr_keeps), ziptuple(init_perms, init_iperms, init_keeps))...)
+    combineables = (ziptuple(arr_perms, arr_iperms, arr_keeps), ziptuple(init_perms, init_iperms, init_keeps))
+    (perms, iperms, _) = nziptuple(Val(3), combinetuple(result_perm, combineables...)...)
     return PermutedArray(perms, iperms, Swizzle(arr.op, Val(mask(arr)))(parent(init), parent(arg)))
 end
 

@@ -63,6 +63,12 @@ end
 @inline ziptuple(args::Tuple{}...) = ()
 @inline ziptuple(args::Tuple...) = (map(first, args), ziptuple(map(Base.tail, args)...)...)
 
+@inline nziptuple(N, args::Tuple{}...) = ntuple(n->(), N)
+@inline nziptuple(N, args::Tuple...) = (map(first, args), nziptuple(N, map(Base.tail, args)...)...)
+
+@inline expandtuple(N, arg::Tuple{}) = ntuple(n->(), N)
+@inline expandtuple(N, arg::Tuple) = arg
+
 @inline combinetuple(f, arg) = arg
 @inline combinetuple(f::F, arg, tail...) where {F} = _combinetuple(f, arg, combinetuple(f, tail...))
 @inline _combinetuple(f, ::Tuple{}, ::Tuple{}) = ()
