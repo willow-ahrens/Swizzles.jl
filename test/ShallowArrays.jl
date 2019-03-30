@@ -1,4 +1,5 @@
 using Base.Broadcast: broadcastable
+using Swizzles
 using Swizzles.ShallowArrays
 using Swizzles.WrapperArrays
 

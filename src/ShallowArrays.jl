@@ -39,9 +39,9 @@ Base.size(arr::ShallowArray{<:Any, <:Any, <:AbstractArray}) = size(parent(arr))
 
 Base.axes(arr::ShallowArray{<:Any, <:Any, <:AbstractArray}) = axes(parent(arr))
 
-Base.getindex(arr::ShallowArray, inds...) = getindex(parent(arr), inds...)
+Base.@propagate_inbounds Base.getindex(arr::ShallowArray, inds...) = getindex(parent(arr), inds...)
 
-Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
+Base.@propagate_inbounds  Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
 
 Base.eachindex(arr::ShallowArray) = eachindex(parent(arr))
 
