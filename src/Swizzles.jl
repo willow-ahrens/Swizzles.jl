@@ -9,6 +9,7 @@ export Pour, Beam
 export Reduce, Sum
 export Drop, SumOut
 export Delay, Intercept
+export @swizzle
 
 include("base.jl")
 include("util.jl")
@@ -408,5 +409,7 @@ See also: [`Reduce`](@ref).
 @inline Sum(dims...) = Reduce(Base.FastMath.add_fast, dims...)
 
 
+
+include("sugar.jl")
 
 end
