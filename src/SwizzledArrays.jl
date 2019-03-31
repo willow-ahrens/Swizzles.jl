@@ -177,32 +177,26 @@ for Identity = (typeof(identity), typeof(myidentity))
             end
 
             Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
-                #This method gets called when the destination eltype is unsuitable for
-                #accumulating the swizzle. Therefore, we should allocate a suitable
-                #destination and then accumulate.
-                arr = src.args[1]
-                arr′ = copyto!(similar(arr), arr)
-                @assert ndims(dst) == ndims(arr′)
-                copyto!(dst, arr′)
-            end
-
-            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray{T, N}, src::Broadcasted{<:$Style, <:Any, $Identity, Tuple{Arr}}) where {T, N, Arr <: SwizzledArray{<:T, N}}
-                arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
-                arr = adopt(arg, src.args[1])
-                op = arr.op
-                init = arr.init
-                @boundscheck axes(dst) == axes(arr)
-                @inbounds begin
-                    index = swizzleindex(dst, arr)
-                    drive = eachindex(arg, index)
-                    if op === nothing
-                        assign!(dst, index, arg, drive)
-                    else
-                        dst .= init
-                        increment!(op, dst, index, arg, drive)
+                if axes(dst) == axes(src.args[1]) && eltype(src.args[1]) <: eltype(dst)
+                    arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
+                    arr = adopt(arg, src.args[1])
+                    op = arr.op
+                    init = arr.init
+                    @inbounds begin
+                        index = swizzleindex(dst, arr)
+                        drive = eachindex(arg, index)
+                        if op === nothing
+                            assign!(dst, index, arg, drive)
+                        else
+                            dst .= init
+                            increment!(op, dst, index, arg, drive)
+                        end
                     end
+                    return dst
+                else
+                    #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
+                    dst .= copy(src)
                 end
-                return dst
             end
         end
     end
