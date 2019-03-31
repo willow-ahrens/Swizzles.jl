@@ -8,7 +8,8 @@ macro swizzle(ex)
     init = nothing
     elem = nothing
 
-        if @capture(ex, [vars__] += elem_) op = :+
+        if @capture(ex, [vars__] = elem_)
+    elseif @capture(ex, [vars__] += elem_) op = :+
     elseif @capture(ex, [vars__] *= elem_) op = :*
     elseif @capture(ex, [vars__] |= elem_) op = :|
     elseif @capture(ex, [vars__] &= elem_) op = :&
@@ -29,7 +30,6 @@ macro swizzle(ex)
     elseif @capture(ex, reg_[vars__] = init_ |= elem_) op = :|
     elseif @capture(ex, reg_[vars__] = init_ &= elem_) op = :&
     elseif @capture(ex, reg_[vars__] = init_ <op_>= elem_)
-    elseif @capture(ex, [vars__] = elem_)
     else
         return :(error("TODO"))
     end
