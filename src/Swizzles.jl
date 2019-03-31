@@ -9,7 +9,6 @@ export Pour, Beam
 export Reduce, Sum
 export Drop, SumOut
 export Delay, Intercept
-export @swizzle
 
 include("base.jl")
 include("util.jl")

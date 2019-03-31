@@ -1,7 +1,7 @@
 using MacroTools
 using Swizzles
 
-macro swizzle(ex)
+macro sugar(ex)
     op = nothing
     reg = nothing
     vars = nothing
@@ -34,34 +34,44 @@ macro swizzle(ex)
         return :(error("TODO"))
     end
 
-    N = length(vars)
-    dims = Dict(vars[n] => n for n in 1:N)
-
-    function dim(var)
-        if !haskey(dims, var)
-            dims[var] = length(dims) + 1
+    function dim(var, env)
+        if var == :(:)
+            return env[gensym()] = length(env) + 1
+        elseif var isa Symbol
+            if !haskey(dims, var)
+                env[var] = length(env) + 1
+            end
+            return universe[var]
+        elseif var isa Integer
+            return nil
         end
-        return dims[var]
+        error("TODO")
     end
 
-    function beamify(ex)
-        if @capture(ex, arr_[vars__])
-            return :($(Beam((map(dim, vars)...))).($arr))
+    N = length(vars)
+    Dict(vars[n] => n for n in 1:N)
+
+    function beamify(ex, env)
+        if @capture(ex, arr_[inds__])
+            return :($(Beam(map(ind -> dim(ind, env), inds)...)).($arr))
         elseif ex isa Expr
-	    return Expr(ex.head, map(beamify, ex.args)...)
+	    return Expr(ex.head, map(arg->beamify(arg, env), ex.args)...)
         else
             return ex
         end
     end
 
+    init_env = Dict(vars[n] => n for n in 1:N)
     if init === nothing
         init = ()
     else
-        init = (Base.Broadcast.__dot__(beamify(init)),)
+        init = (Base.Broadcast.__dot__(beamify(init, init_env)), )
     end
 
-    elem = Base.Broadcast.__dot__(beamify(elem))
-    mask = Val((1:length(vars)...,))
+    elem_env = Dict()
+    mask = Val((map(var-> dim(var, elem_env), vars)...,))
+    elem = Base.Broadcast.__dot__(beamify(elem, elem_env))
+
     if reg === nothing
         return esc(:(Swizzle($op, $mask).($(init...), $elem)))
     else
