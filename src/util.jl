@@ -12,20 +12,6 @@ Base.isless(::Nil, ::Integer) = true
 Base.isless(::Integer, ::Nil) = false
 Base.isless(::Nil, ::Nil) = false
 
-struct Keep end
-
-const keep = Keep()
-
-Base.isequal(::Keep, ::Keep) = true
-Base.isequal(::Keep, ::Integer) = false
-Base.isequal(::Integer, ::Keep) = false
-Base.isless(::Keep, ::Integer) = false
-Base.isless(::Integer, ::Keep) = true
-Base.isless(::Keep, ::Keep) = false
-
-Base.isless(::Nil, ::Keep) = true
-Base.isless(::Keep, ::Nil) = false
-
 """
     masktuple(f, g, I)
 Return `R::Tuple` such that `R[j] == f(j) when `I[j] isa
@@ -74,6 +60,14 @@ end
 @inline jointuple(x, y) = (x..., y...)
 @inline jointuple(x, y, z...) = (x..., jointuple(y, z...)...)
 
+@inline ziptuple(args::Tuple{}...) = ()
+@inline ziptuple(args::Tuple...) = (map(first, args), ziptuple(map(Base.tail, args)...)...)
+
+@inline nziptuple(N, args::Tuple{}...) = ntuple(n->(), N)
+@inline nziptuple(N, args::Tuple...) = (map(first, args), nziptuple(N, map(Base.tail, args)...)...)
+
+@inline expandtuple(N, arg::Tuple{}) = ntuple(n->(), N)
+@inline expandtuple(N, arg::Tuple) = arg
 
 @inline combinetuple(f, arg) = arg
 @inline combinetuple(f::F, arg, tail...) where {F} = _combinetuple(f, arg, combinetuple(f, tail...))

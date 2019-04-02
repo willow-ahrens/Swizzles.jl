@@ -1,0 +1,178 @@
+
+
+
+Base.@propagate_inbounds function parentindex(arr::SubArray, i...)
+    return Base.reindex(Base.parentindices(arr), i)
+end
+
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray, i::Integer)
+    return parentindex(arr, CartesianIndices(arr)[i])
+end
+
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray, i::CartesianIndex)
+    return parentindex(arr, Tuple(i)...)
+end
+
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, 1}, i::Integer)
+    return invoke(parentindex, Tuple{typeof(arr), Any}, arr, i)
+end
+
+Base.@propagate_inbounds function parentindex(arr::SwizzledArray{<:Any, N}, i::Vararg{Any, N}) where {N}
+    arg_axes = axes(arr.arg)
+    imasktuple(d->Base.Slice(arg_axes[d]), d->i[d], Val(mask(arr)), Val(ndims(arr.arg)))
+end
+
+
+"""
+   parentindex(arr, i...)
+
+   For all wrapper arrays arr such that `arr` involves an index remapping,
+   return the indices into `parent(arr)` which affect the indices `i` of `arr`.
+
+   See also: [`swizzle`](@ref).
+"""
+parentindex
+
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::Integer) where {N}
+    if is_nil_mask(Val(mask(arr)))
+        return (1,)
+    elseif is_oneto_mask(Val(mask(arr)))
+        return (i,)
+    else
+        return childindex(arr, CartesianIndices(arr.arg)[i])
+    end
+end
+
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N}, i::CartesianIndex) where {N}
+    if is_nil_mask(Val(mask(arr)))
+        return (CartesianIndex(ntuple(n->1, length(mask(arr)))),)
+    elseif is_oneto_mask(Val(mask(arr)))
+        return (i,)
+    else
+        return childindex(arr, Tuple(i)...)
+    end
+end
+
+Base.@propagate_inbounds function childindex(arr::SwizzledArray{<:Any, N, <:Any, <:Any, <:AbstractArray, <:AbstractArray{<:Any, M}}, i::Vararg{Integer, M}) where {N, M}
+    if is_nil_mask(Val(mask(arr)))
+        return ntuple(n->1, length(mask(arr)))
+    elseif is_oneto_mask(Val(mask(arr)))
+        return i
+    else
+        masktuple(d->1, d->i[d], Val(mask(arr)))
+    end
+end
+
+"""
+   childindex(arr, i...)
+
+   For all wrapper arrays arr such that `arr` involves an index remapping,
+   return the indices into `arr` which affect the indices `i` of `parent(arr)`.
+
+   See also: [`swizzle`](@ref).
+"""
+childindex
+
+#=
+@inline function remask(inds, inds′, mask)
+    _remask(map(Base.index_dimsum, inds), map(Base.index_dimsum, inds′), Val(mask))
+end
+@generated function _remask(inds, inds′, ::Val{mask}) where {mask}
+    return quote
+        Base.@_inline_meta
+        $(__remask(map(i -> !(i <: Tuple{}), Tuple(inds.parameters)),
+                   map(i -> !(i <: Tuple{}), Tuple(inds′.parameters)), mask))
+    end
+end
+function __remask(inds, inds′, mask)
+    if first(inds)
+        if first(mask) === nil
+            return (nil, __remask(Base.tail(inds), inds′, Base.tail(mask))...)
+        else
+            return (count(inds′[1:first(mask)]), __remask(Base.tail(inds), inds′, Base.tail(mask))...)
+        end
+    else
+        return __remask(Base.tail(inds), inds′, Base.tail(mask))
+    end
+end
+__remask(::Tuple{}, inds′, ::Tuple{}) = ()
+
+
+thunk = quote
+    Base.@_propagate_inbounds_meta
+    drive_size = size(drive.indices)
+    @nexprs $N n -> II_n = 0:fld(drive_size[n],tile_size[n]) - 1
+    $(loop((), N))
+end
+for nn = 0:N
+    thunk = quote
+        $thunk
+        @nloops $nn ii n -> II_n begin
+            axes = @ntuple $N n -> begin
+                if n < $nn
+                    drive.indices.indices[n][(i_n + 1):(i_n + tile_size[n])]
+                else
+                    drive.indices.indices[n][(i_n + 1):end]
+                end
+            end
+            println((axes))
+            assign!(dst, index, src, CartesianIndices(axes))
+            i_n += tile_size[n]
+        end
+    end
+end
+
+=#
+
+
+struct RecursiveIndices{T, N, Inds <: AbstractArray{T, N}} <: AbstractArray{T, N}
+    indices::Inds
+    limits::NTuple{Int, N}
+end
+
+@generated loop(f::F, inds::RecursiveIndices) where {F}
+    if n > N
+        return :(loop(f, CartesianIndices($(axes...))))
+    else
+        a = gensym()
+        l = gensym()
+        r = gensym()
+        s = gensym()
+        return quote
+            if length(ind_axes[$n]) > 10
+                $a = itr.indices[$n][1:10]
+                $(rloop(n + 1, N, cat(axes, a)))
+            else
+                $s = fld1(length(ax), 2)
+                $l = itr.indices[$n][1:$s]
+                $r = itr.indices[$n][$s + 1:end]
+                $(rloop(n + 1, N, cat(axes, l)))
+                $(rloop(n + 1, N, cat(axes, r)))
+            end
+        end
+    end
+end
+
+
+_RecursiveIndices_loop(n, N, axes)
+    if n > N
+        return :(loop(f, CartesianIndices($(axes...))))
+    else
+        a = gensym()
+        l = gensym()
+        r = gensym()
+        s = gensym()
+        return quote
+            if length(ind_axes[$n]) > 10
+                $a = itr.indices[$n][1:10]
+                $(rloop(n + 1, N, cat(axes, a)))
+            else
+                $s = fld1(length(ax), 2)
+                $l = itr.indices[$n][1:$s]
+                $r = itr.indices[$n][$s + 1:end]
+                $(rloop(n + 1, N, cat(axes, l)))
+                $(rloop(n + 1, N, cat(axes, r)))
+            end
+        end
+    end
+end

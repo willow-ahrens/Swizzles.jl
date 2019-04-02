@@ -2,13 +2,13 @@ module GeneratedArrays
 
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-using Base.Broadcast: Broadcasted
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
 using Swizzles.NullArrays
 
-export GeneratedArray
+export GeneratedArray, myidentity
 
 """
     GeneratedArray <: AbstractArray
@@ -31,18 +31,17 @@ Base.copy(src::GeneratedArray) = copyto!(similar(src), src)
 
 Base.copyto!(dst, src::GeneratedArray) = copyto!(dst, Array(src))
 
-Base.copyto!(dst::GeneratedArray, src) = _copyto!(dst, broadcastable(src))
 Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
 Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
-Base.copyto!(dst::GeneratedArray, src::Broadcasted) = invoke(copyto!, Tuple{AbstractArray, typeof(src)}, dst, src)
-
+myidentity(x) = x
 function _copyto!(dst::AbstractArray, src)
     if axes(dst) != axes(src)
-        reshape(dst, axes(src)) .= src
+        dst .= myidentity.(reshape(arrayify(src), axes(dst)))
     else
-        dst .= src
+        dst .= myidentity.(src)
     end
+    return dst
 end
 
 
@@ -54,7 +53,6 @@ Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = d
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(arr) = _getindex(arr, I)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::CartesianIndex)::eltype(arr) = _getindex(arr, I)
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
 Base.@propagate_inbounds function _getindex(arr, I...)
@@ -65,7 +63,6 @@ end
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _setindex!(arr, v, I)
-Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::CartesianIndex) = _setindex!(arr, v, I)
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I...) = _setindex!(arr, v, I...)
 
 Base.@propagate_inbounds function _setindex!(arr, v, I...)
@@ -162,6 +159,47 @@ end
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::GeneratedArray)
     return Sum().(x .* y)
+end
+
+
+
+Base.@propagate_inbounds function LinearAlgebra.adjoint(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(adjoint.(x))))
+end
+
+Base.@propagate_inbounds function LinearAlgebra.transpose(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(transpose.(x))))
+end
+
+Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray)
+    return arrayify(Delay().(Beam(2, 1).(x)))
+end
+
+Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray, perm)
+    return arrayify(Delay().(Focus(perm...).(x)))
+end
+
+
+
+Ts = (:(GeneratedArray{<:Any, 1}), :(GeneratedArray{<:Any, 2}), :(AbstractArray{<:Any, 1}), :(AbstractArray{<:Any, 2}))
+for (A, B) in Iterators.product(Ts, Ts)
+    if :(GeneratedArray{<:Any, 1}) in (A, B) || :(GeneratedArray{<:Any, 2}) in (A, B)
+        @eval begin
+            Base.@propagate_inbounds function Base.:*(A::$A, B::$B)
+                return SumOut(2).(A.*Beam(2, 3).(B))
+            end
+        end
+    end
+end
+
+for (Y, A, B) in Iterators.product(Ts, Ts, Ts)
+    if :(GeneratedArray{<:Any, 1}) in (Y, A, B) || :(GeneratedArray{<:Any, 2}) in (Y, A, B)
+        @eval begin
+            Base.@propagate_inbounds function LinearAlgebra.mul!(Y::$Y, A::$A, B::$B)
+                return Y .= SumOut(2).(A.*Beam(2, 3).(B))
+            end
+        end
+    end
 end
 
 

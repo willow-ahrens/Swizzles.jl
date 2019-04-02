@@ -30,9 +30,29 @@ module BaseHacks
         Base._range(st, nothing, nothing, length(s)) #gotta use this version of range instead of const-propping through the kwarg version.
     end
 
-    #Why is this here? This is here because Swizzles benefits from zero dimensional arrays declaring themselves as such. Otherwise,
-    #it can be tricky for llvm to figure out that the second swizzle index is truly scalar.
-    Base.eachindex(::AbstractArray{<:Any, 0}...) = CartesianIndices(())
+    #FIXME This is a separate eachindex for scalar cases so that swizzles can use
+    #a different thunk for the scalar case and avoid recursion depth limiting.
+    Base.eachindex(args::AbstractArray{<:Any, 0}...) = CartesianIndices(())
+
+    #=
+    #Avoid checking shapes in eachindex when inbounds scopes
+    Base.@propagate_inbounds function Base.eachindex(A::AbstractArray, B::AbstractArray)
+        eachindex(IndexStyle(A,B), A, B)
+    end
+    Base.@propagate_inbounds function Base.eachindex(A::AbstractArray, B::AbstractArray...)
+        eachindex(IndexStyle(A,B...), A, B...)
+    end
+    Base.@propagate_inbounds function Base.eachindex(::IndexLinear, A::AbstractArray, B::AbstractArray...)
+        indsA = eachindex(IndexLinear(), A)
+        @boundscheck Base._all_match_first(X->eachindex(IndexLinear(), X), indsA, B...) || Base.throw_eachindex_mismatch(IndexLinear(), A, B...)
+        indsA
+    end
+    Base.@propagate_inbounds function Base.eachindex(::IndexCartesian, A::AbstractArray, B::AbstractArray...)
+        axsA = axes(A)
+        @boundscheck Base._all_match_first(axes, axsA, B...) || Base.throw_eachindex_mismatch(IndexCartesian(), A, B...)
+        CartesianIndices(axsA)
+    end
+    =#
 
     #=
     Base.@propagate_inbounds function Base.getindex(iter::CartesianIndices{N,<:NTuple{N,Base.OneTo}}, I::Vararg{Int, N}) where {N}

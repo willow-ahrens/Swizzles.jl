@@ -4,6 +4,11 @@
 
   @test_throws DimensionMismatch Pour(max, (1, nil)).(A, [1, 2, 3, 4]) == [3; 6; 9]
 
+  C = zeros(Int, 4)
+
+  C .= Sum().(A)
+  @test C == [45; 45; 45; 45]
+
   @test Sum(()).(A) == A
   @test Sum(:).(A) == 45
   @test Reduce(+, ()).(A) == A

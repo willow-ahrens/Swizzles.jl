@@ -23,10 +23,12 @@ include("ArrayifiedArrays.jl")
 include("ShallowArrays.jl")
 include("ExtrudedArrays.jl")
 include("MatchedArrays.jl")
+include("ValArrays.jl")
+include("NamedArrays.jl")
 include("SwizzledArrays.jl")
+include("EachindexArrays.jl")
+include("PermutedArrays.jl")
 include("SimplifyStyles.jl")
-
-
 
 
 struct Swizzle{Op, mask} <: Swizzles.Intercept
@@ -407,5 +409,7 @@ See also: [`Reduce`](@ref).
 @inline Sum(dims...) = Reduce(Base.FastMath.add_fast, dims...)
 
 
+
+include("sugar.jl")
 
 end
