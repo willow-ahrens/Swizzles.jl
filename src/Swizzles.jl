@@ -89,7 +89,7 @@ julia> Swizzle(+, nil, 2).(parse.(Int, ["1", "2"]))
 @inline Swizzle(op::Op, _mask::Tuple) where {Op} = Swizzle{Op, _mask}(op)
 @inline Swizzle(op::Op, ::Val{_mask}) where {Op, _mask} = Swizzle{Op, _mask}(op)
 
-@inline function Properties.initial(ctr::Swizzle{<:Any, Op}, arg) where {Op}
+@inline function Properties.initial(ctr::Swizzle, arg)
     init = Properties.initial(ctr.op, eltype(arg))
     if init === nothing
         return nothing
