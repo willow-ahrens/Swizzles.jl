@@ -387,7 +387,10 @@ function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray)
 end
 
 function Swizzles.ValArrays.lift_vals(arr::SwizzledArray)
-    return adopt(lift_vals(parent(arr)), arr)
+    lifted_init = lift_vals(arr.init)
+    lifted_arg = lift_vals(arr.arg)
+    dims = typeof(arr).parameters[4]
+    return Swizzle(arr.op, dims)(lifted_init, lifted_arg)
 end
 
 function Swizzles.NamedArrays.lift_names(arr::SwizzledArray, stuff)

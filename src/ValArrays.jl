@@ -34,7 +34,7 @@ Base.size(::ValArray) = ()
     end
     return x
 end
-@inline lift_vals(arr::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_vals(arr.arg))
+@inline lift_vals(arr::ArrayifiedArray{T, N}) where {T, N} = arrayify(lift_vals(arr.arg))
 @inline function lift_vals(arr::AbstractArray)
     if iswrapper(arr)
         return adopt(lift_vals(parent(arr)), arr)

@@ -9,6 +9,8 @@ using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
 using Swizzles.Antennae
+using Swizzles.ValArrays
+using Swizzles: SwizzledArray
 
 
 export Simplify
@@ -39,26 +41,38 @@ true
 """
 reprexpr(root::SymbolExpr, T) :: Expr = :($root::$T)
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{Adjoint{T, Arg}}) :: Expr where {T, Arg}
-    root′ = :($root.parent)
-    arg′ = reprexpr(root′, Arg)
-    :($(Adjoint)($arg′))
+function reprexpr(root::SymbolExpr, ::Type{<:ValArray{<:Any, val}}) where {val}
+    val_arr = ValArray(val)
+    :($val_arr)
 end
 
 function reprexpr(root::SymbolExpr,
-                  ::Type{Transpose{T, Arg}}) :: Expr where {T, Arg}
-    root′ = :($root.parent)
-    arg′ = reprexpr(root′, Arg)
-    :($(Transpose)($arg′))
+                  ::Type{<:Adjoint{<:Any, Arg}}) :: Expr where Arg
+    arg_expr = reprexpr(:($root.parent), Arg)
+    :($Adjoint($arg_expr))
 end
 
 function reprexpr(root::SymbolExpr,
-                  ::Type{Broadcasted{T1, T2, F, Args}}) :: Expr where {T1, T2, F, Args<:Tuple}
+                  ::Type{<:Transpose{<:Any, Arg}}) :: Expr where Arg
+    arg_expr = reprexpr(:($root.parent), Arg)
+    :($Transpose($arg_expr))
+end
+
+function reprexpr(root::SymbolExpr,
+                  ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}) :: Expr where {F, Args<:Tuple}
     antenna = Antenna(F.instance)
     arg_exprs = tuple_reprexpr(:($root.args), Args)
 
     :($antenna($(arg_exprs...)))
+end
+
+function reprexpr(root::SymbolExpr,
+                  ::Type{<:SwizzledArray{<:Any, <:Any, Op, Mask, Init, Arg}}) :: Expr where {Op, Mask, Init, Arg}
+    swizzle = Swizzle(Op.instance, Mask)
+    init_expr = reprexpr(:($root.init), Init)
+    arg_expr = reprexpr(:($root.arg), Arg)
+
+    :($swizzle($init_expr, $arg_expr))
 end
 
 function tuple_reprexpr(root::SymbolExpr,
@@ -232,6 +246,7 @@ julia> Simplify().(A .+ B)
 ```
 """
 struct Simplify end
+#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_names(b))
 Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
 Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 

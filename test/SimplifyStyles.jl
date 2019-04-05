@@ -1,3 +1,6 @@
+using Swizzles
+using Swizzles.SimplifyStyles
+using Swizzles.ValArrays
 using Swizzles.SimplifyStyles: reprexpr
 using LinearAlgebra
 using Base.Broadcast: broadcasted
@@ -43,4 +46,17 @@ using Base.Broadcast: broadcasted
     # Check that Antennae are being used.
     bd = broadcasted(+, A, B)
     @test reprexpr(:bd, typeof(bd)).args[1] isa Swizzles.Antennae.Antenna
+
+    test_eval_reprexpr_is_id(Swizzle(+, 1)(A))
+    test_eval_reprexpr_is_id(Swizzle(*, 1)(A) |> lift_vals)
+    @test reprexpr(
+            :sw,
+            Swizzle(*, 1)(A) |> lift_vals |> typeof
+          ).args[2] == ValArray(1)
+end
+
+@testset "Simplify" begin
+    A, B = [1 2 3; 4 5 6], [100 200 300]
+    @test Simplify().(A) == A
+    @test Simplify().(A .+ B) == A .+ B
 end
