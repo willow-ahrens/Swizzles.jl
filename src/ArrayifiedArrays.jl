@@ -10,7 +10,7 @@ using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeU
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 
-export ArrayifiedArray, arrayify
+export ArrayifiedArray, arrayify, preprocess
 
 struct ArrayifiedArray{T, N, Arg} <: GeneratedArray{T, N}
     arg::Arg

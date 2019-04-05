@@ -10,7 +10,7 @@ using Swizzles.ScalarArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, broadcast_shape
+using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, broadcast_shape, broadcast_unalias
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 using StaticArrays
 using Base.Cartesian
@@ -87,17 +87,23 @@ Base.@propagate_inbounds function WrapperArrays.adopt(arg::Arg, arr::SwizzledArr
     SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arg)
 end
 
-Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.init), dataids(arr.arg))
-function Base.unaliascopy(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unaliascopy(arr.op)
-    init = unaliascopy(arr.init)
-    arg = unaliascopy(arr.arg)
+Base.dataids(src::SwizzledArray) = (dataids(src.op), dataids(src.init), dataids(src.arg))
+function Base.unaliascopy(src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    op = unaliascopy(src.op)
+    init = unaliascopy(src.init)
+    arg = unaliascopy(src.arg)
     SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
 end
-function Base.unalias(dst, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unalias(dst, arr.op)
-    init = unalias(dst, arr.init)
-    arg = unalias(dst, arr.arg)
+function Base.unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    op = unalias(dst, src.op)
+    init = unalias(dst, src.init)
+    arg = unalias(dst, src.arg)
+    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+end
+function Broadcast.broadcast_unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    op = unalias(dst, src.op)
+    init = broadcast_unalias(dst, src.init)
+    arg = unalias(dst, src.arg)
     SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
 end
 
@@ -178,7 +184,7 @@ for Identity = (typeof(identity), typeof(myidentity))
 
             Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
                 if axes(dst) == axes(src.args[1]) && eltype(src.args[1]) <: eltype(dst)
-                    arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
+                    arg = preprocess(dst, src.args[1].arg)
                     arr = adopt(arg, src.args[1])
                     op = arr.op
                     init = arr.init
