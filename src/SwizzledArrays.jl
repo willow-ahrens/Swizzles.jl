@@ -89,22 +89,36 @@ end
 
 Base.dataids(src::SwizzledArray) = (dataids(src.op), dataids(src.init), dataids(src.arg))
 function Base.unaliascopy(src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unaliascopy(src.op)
     init = unaliascopy(src.init)
     arg = unaliascopy(src.arg)
-    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
 end
 function Base.unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unalias(dst, src.op)
     init = unalias(dst, src.init)
     arg = unalias(dst, src.arg)
-    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
 end
 function Broadcast.broadcast_unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unalias(dst, src.op)
     init = broadcast_unalias(dst, src.init)
-    arg = unalias(dst, src.arg)
-    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+    if ndims(src.arg) != 0
+        #arg = unalias(dst, src.arg)
+    else
+        arg = src.arg
+    end
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
+end
+function Broadcast.broadcast_unalias(::Nothing, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return src
+end
+function ArrayifiedArrays.preprocess(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    init = src.init #preprocess that later
+    if ndims(src.arg) != 0
+        #arg = preprocess(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
+        arg = preprocess(nothing, src.arg)
+    else
+        arg = src.arg
+    end
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
 end
 
 @inline function Base.size(arr::SwizzledArray)
@@ -184,8 +198,8 @@ for Identity = (typeof(identity), typeof(myidentity))
 
             Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
                 if axes(dst) == axes(src.args[1]) && eltype(src.args[1]) <: eltype(dst)
-                    arg = preprocess(dst, src.args[1].arg)
-                    arr = adopt(arg, src.args[1])
+                    arr = preprocess(dst, src.args[1])
+                    arg = arr.arg
                     op = arr.op
                     init = arr.init
                     @inbounds begin
