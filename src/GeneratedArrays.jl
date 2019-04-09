@@ -2,13 +2,29 @@ module GeneratedArrays
 
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess, BroadcastStyle
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
 using Swizzles.NullArrays
 
 export GeneratedArray, myidentity
+
+
+
+struct Styled{Style, Arg}
+    arg::Arg
+end
+
+@inline Styled{Style}(arg::Arg) where {Style, Arg} = Styled{Style, Arg}(arg)
+@inline Styled(arg) = Styled{typeof(BroadcastStyle(typeof(arg)))}(arg)
+
+myidentity(x) = x
+@inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(dst)), args...)
+Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copyto!(similar(src), src)
+Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style} = copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
+
+
 
 """
     GeneratedArray <: AbstractArray
@@ -27,27 +43,21 @@ abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
 #Beware infinite recursion!
 
-Base.copy(src::GeneratedArray) = copyto!(similar(src), src)
+Base.@propagate_inbounds Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
+Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
 
-Base.copyto!(dst, src::GeneratedArray) = copyto!(dst, Array(src))
-
-Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
-Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
-Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
-myidentity(x) = x
-function _copyto!(dst::AbstractArray, src)
-    if axes(dst) != axes(src)
-        dst .= myidentity.(reshape(arrayify(src), axes(dst)))
-    else
-        dst .= myidentity.(src)
-    end
+Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
+Base.@propagate_inbounds function _copyto!(dst::AbstractArray, src)
+    @boundscheck axes(dst) == axes(src) || error("I don't like it when copyto! has mismatch axes lololol")
+    #dst .= myidentity.(reshape(arrayify(src), axes(dst)))
+    copyto!(dst, Styled(src))
     return dst
 end
 
 
 
-Base.@propagate_inbounds Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
-Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
 
 
 
