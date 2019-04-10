@@ -94,19 +94,20 @@ Base.@propagate_inbounds function _setindex!(arr, v, I...)
     else
         copyto!(dst, Styled(v))
     end
-    #view(arr, I...) .= v
 end
 
 
 
 Base.@propagate_inbounds function Base.map(f::F, arr::GeneratedArray, tail...) where {F}
-    f.(arr, tail...)
+    src = broadcasted(f, arr, tail...)
+    copyto!(similar(src), src)
 end
 
 
 
 Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
-    NullArray(axes(arr)) .= f.(arr, tail...)
+    src = broadcasted(f, arr, tail...)
+    copyto!(NullArray(axes(src)), src)
     return nothing
 end
 
@@ -151,29 +152,11 @@ end
 
 
 
-Base.@propagate_inbounds function Base.maximum(arr::GeneratedArray; dims=:, kwargs...)
-    return _maximum(arr, dims, kwargs.data)
-end
-
-Base.@propagate_inbounds function _maximum(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Reduce(max, dims).(arr)
-end
-Base.@propagate_inbounds function _maximum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Reduce(max, dims).(nt.init, arr)
-end
+Base.@propagate_inbounds Base.maximum(arr::GeneratedArray; kwargs...) = reduce(max, arr; kwargs...)
 
 
 
-Base.@propagate_inbounds function Base.minimum(arr::GeneratedArray; dims=:, kwargs...)
-    return _minimum(arr, dims, kwargs.data)
-end
-
-Base.@propagate_inbounds function _minimum(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Reduce(min, dims).(arr)
-end
-Base.@propagate_inbounds function _minimum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Reduce(min, dims).(nt.init, arr)
-end
+Base.@propagate_inbounds Base.minimum(arr::GeneratedArray; kwargs...) = reduce(min, arr; kwargs...)
 
 
 
