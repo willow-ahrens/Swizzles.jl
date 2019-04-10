@@ -72,8 +72,7 @@ Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
 Base.@propagate_inbounds function _getindex(arr, I...)
-    identity.(view(arr, I...))
-    #=
+    #identity.(view(arr, I...))
     x = Styled(view(arr, I...))
     res = copyto!(similar(x), x)
     if ndims(res) == 0
@@ -81,7 +80,6 @@ Base.@propagate_inbounds function _getindex(arr, I...)
     else
         return res
     end
-    =#
 end
 
 

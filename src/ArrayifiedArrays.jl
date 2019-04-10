@@ -70,7 +70,7 @@ end
 @inline Base.eltype(bc::Broadcasted) = combine_eltypes(bc.f, bc.args)
 @inline Base.similar(bc::Broadcasted) = similar(bc, eltype(bc))
 @inline Base.similar(bc::Broadcasted, size::Int...) = similar(bc, eltype(bc), size...)
-@inline Base.similar(bc::Broadcasted{DefaultArrayStyle{0}}) where {Style} = ScalarArray{eltype(bc)}()
+@inline Base.similar(bc::Broadcasted{DefaultArrayStyle{0}}) = ScalarArray{eltype(bc)}()
 
 
 @inline function Properties.eltype_bound(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted})
