@@ -176,19 +176,6 @@ Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tupl
 
 
 
-Base.@propagate_inbounds function Base.copy(bc::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
-    src = bc.args[1]
-    dst = similar(bc)
-    copyto!(dst, Broadcasted{DefaultArrayStyle{0}}(identity, (src,)))
-    return dst[]
-end
-
-Base.@propagate_inbounds function Base.copy(bc::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
-    sub = bc.args[1]
-    src = convert(SwizzledArray, sub)
-    return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (src,)))
-end
-
 for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
     @eval begin
         Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}) where {T, N}
@@ -196,6 +183,12 @@ for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style
             #complexity of dropping view indices). Therefore, we convert first.
             sub = sty.arg
             src = convert(SwizzledArray, sub)
+            return Base.copyto!(dst, src)
+        end
+
+        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SubArray{T, 0, <:SwizzledArray{T, 0}, <:Tuple{}}}) where {T}
+            #Zero-dimensional reswizzling case.
+            src = parent(sty.arg)
             return Base.copyto!(dst, src)
         end
 
