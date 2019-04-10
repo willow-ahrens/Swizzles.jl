@@ -176,53 +176,49 @@ Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tupl
 
 
 
-for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
-    @eval begin
-        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}) where {T, N}
-            #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-            #complexity of dropping view indices). Therefore, we convert first.
-            sub = sty.arg
-            src = convert(SwizzledArray, sub)
-            return Base.copyto!(dst, src)
-        end
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}) where {T, N}
+    #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+    #complexity of dropping view indices). Therefore, we convert first.
+    sub = sty.arg
+    src = convert(SwizzledArray, sub)
+    return Base.copyto!(dst, src)
+end
 
-        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SubArray{T, 0, <:SwizzledArray{T, 0}, <:Tuple{}}}) where {T}
-            #Zero-dimensional reswizzling case.
-            src = parent(sty.arg)
-            return Base.copyto!(dst, src)
-        end
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SubArray{T, 0, <:SwizzledArray{T, 0}, <:Tuple{}}}) where {T}
+    #Zero-dimensional reswizzling case.
+    src = parent(sty.arg)
+    return Base.copyto!(dst, src)
+end
 
-        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SwizzledArray})
-            @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
-            if eltype(sty.arg) <: eltype(dst)
-                src = preprocess(dst, sty.arg)
-                arg = src.arg
-                op = src.op
-                init = src.init
-                @inbounds begin
-                    index = swizzleindex(dst, src)
-                    drive = eachindex(arg, index)
-                    if op === nothing
-                        assign!(dst, index, arg, drive)
-                    else
-                        dst .= init
-                        increment!(op, dst, index, arg, drive)
-                    end
-                end
-                return dst
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SwizzledArray})
+    @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
+    if eltype(sty.arg) <: eltype(dst)
+        src = preprocess(dst, sty.arg)
+        arg = src.arg
+        op = src.op
+        init = src.init
+        @inbounds begin
+            index = swizzleindex(dst, src)
+            drive = eachindex(arg, index)
+            if op === nothing
+                assign!(dst, index, arg, drive)
             else
-                #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
-                copyto!(dst, copy(sty))
+                dst .= init
+                increment!(op, dst, index, arg, drive)
             end
         end
+        return dst
+    else
+        #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
+        copyto!(dst, copy(sty))
     end
 end
-for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
+
+#Broadcast Optimizations
+for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle{0}, DefaultArrayStyle)
     for Identity = (typeof(identity), typeof(myidentity))
         @eval begin
             Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {S<:$Style, T, N}
-                #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-                #complexity of dropping view indices). Therefore, we convert first.
                 if axes(dst) == axes(bc.args[1]) && eltype(bc.args[1]) <: eltype(dst)
                     copyto!(dst, Styled{S}(bc.args[1]))
                 else
