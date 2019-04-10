@@ -22,7 +22,7 @@ end
 
 myidentity(x) = x
 @inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)), args...)
-Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copy(Broadcasted{Style}(myidentity, (src.arg,), axes(src.arg)))
+#Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copyto!(similar(src), src)
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style}
     @boundscheck axes(dst) == axes(src.arg) || error("TODO")
     copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
