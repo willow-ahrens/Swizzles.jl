@@ -72,13 +72,12 @@ Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(
 Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
 
 Base.@propagate_inbounds function _getindex(arr, I...)
-    #identity.(view(arr, I...))
-    x = Styled(view(arr, I...))
-    res = copyto!(similar(x), x)
-    if ndims(res) == 0
-        return res[]
+    src = Styled(view(arr, I...))
+    dst = copyto!(similar(src), src)
+    if ndims(dst) == 0
+        return dst[]
     else
-        return res
+        return dst
     end
 end
 
@@ -89,7 +88,13 @@ Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _s
 Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I...) = _setindex!(arr, v, I...)
 
 Base.@propagate_inbounds function _setindex!(arr, v, I...)
-    view(arr, I...) .= v
+    dst = view(arr, I...)
+    if ndims(dst) == 0
+        copyto!(dst, Styled(ScalarArray(v)))[]
+    else
+        copyto!(dst, Styled(v))
+    end
+    #view(arr, I...) .= v
 end
 
 
