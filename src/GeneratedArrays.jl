@@ -2,11 +2,14 @@ module GeneratedArrays
 
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess, BroadcastStyle
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess, BroadcastStyle, DefaultArrayStyle
 using Base.Broadcast: instantiate, broadcasted
 using LinearAlgebra
 using Swizzles
 using Swizzles.NullArrays
+using Swizzles.ScalarArrays
+
+#BASE
 
 export GeneratedArray, myidentity
 
@@ -20,9 +23,12 @@ end
 @inline Styled(arg) = Styled{typeof(BroadcastStyle(typeof(arg)))}(arg)
 
 myidentity(x) = x
-@inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(dst)), args...)
-Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copyto!(similar(src), src)
-Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style} = copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
+@inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)), args...)
+Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copy(Broadcasted{Style}(myidentity, (src.arg,), axes(src.arg)))
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style}
+    @boundscheck axes(dst) == axes(src.arg) || error("TODO")
+    copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
+end
 
 
 
@@ -50,7 +56,7 @@ Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::AbstractArray) =
 Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
 Base.@propagate_inbounds function _copyto!(dst::AbstractArray, src)
-    @boundscheck axes(dst) == axes(src) || error("I don't like it when copyto! has mismatch axes lololol")
+    @boundscheck axes(dst) == axes(src) || error("I don't like it when copyto! has mismatched axes lololol")
     #dst .= myidentity.(reshape(arrayify(src), axes(dst)))
     copyto!(dst, Styled(src))
     return dst
@@ -67,6 +73,15 @@ Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(ar
 
 Base.@propagate_inbounds function _getindex(arr, I...)
     identity.(view(arr, I...))
+    #=
+    x = Styled(view(arr, I...))
+    res = copyto!(similar(x), x)
+    if ndims(res) == 0
+        return res[]
+    else
+        return res
+    end
+    =#
 end
 
 

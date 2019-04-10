@@ -3,6 +3,7 @@ module ArrayifiedArrays
 using Swizzles.Properties
 using Swizzles.WrapperArrays
 using Swizzles.GeneratedArrays
+using Swizzles.ScalarArrays
 using Swizzles
 
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
@@ -65,6 +66,12 @@ end
         end
     end
 end
+
+@inline Base.eltype(bc::Broadcasted) = combine_eltypes(bc.f, bc.args)
+@inline Base.similar(bc::Broadcasted) = similar(bc, eltype(bc))
+@inline Base.similar(bc::Broadcasted, size::Int...) = similar(bc, eltype(bc), size...)
+@inline Base.similar(bc::Broadcasted{DefaultArrayStyle{0}}) where {Style} = ScalarArray{eltype(bc)}()
+
 
 @inline function Properties.eltype_bound(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted})
     return combine_eltypes(arr.arg.f, arr.arg.args)
