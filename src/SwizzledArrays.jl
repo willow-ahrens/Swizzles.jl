@@ -223,6 +223,8 @@ for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style
             end
         end
     end
+end
+for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
     for Identity = (typeof(identity), typeof(myidentity))
         @eval begin
             Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {S<:$Style, T, N}
