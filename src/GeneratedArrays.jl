@@ -9,9 +9,7 @@ using Swizzles
 using Swizzles.NullArrays
 using Swizzles.ScalarArrays
 
-#BASE
-
-export GeneratedArray, myidentity
+export GeneratedArray, myidentity, Styled
 
 
 
