@@ -189,37 +189,57 @@ Base.@propagate_inbounds function Base.copy(bc::Broadcasted{DefaultArrayStyle{0}
     return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (src,)))
 end
 
-for Identity = (typeof(identity), typeof(myidentity))
-    for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
+for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
+    @eval begin
+        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}) where {T, N}
+            #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+            #complexity of dropping view indices). Therefore, we convert first.
+            sub = sty.arg
+            src = convert(SwizzledArray, sub)
+            return Base.copyto!(dst, src)
+        end
+
+        Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:$Style, <:SwizzledArray})
+            @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
+            if eltype(sty.arg) <: eltype(dst)
+                src = preprocess(dst, sty.arg)
+                arg = src.arg
+                op = src.op
+                init = src.init
+                @inbounds begin
+                    index = swizzleindex(dst, src)
+                    drive = eachindex(arg, index)
+                    if op === nothing
+                        assign!(dst, index, arg, drive)
+                    else
+                        dst .= init
+                        increment!(op, dst, index, arg, drive)
+                    end
+                end
+                return dst
+            else
+                #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
+                copyto!(dst, copy(sty))
+            end
+        end
+    end
+    for Identity = (typeof(identity), typeof(myidentity))
         @eval begin
-            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {S<:$Style, T, N}
                 #A view of a Swizzle can be computed as a swizzle of a view (hiding the
                 #complexity of dropping view indices). Therefore, we convert first.
-                sub = bc.args[1]
-                src = convert(SwizzledArray, sub)
-                return Base.copyto!(dst, src)
+                if axes(dst) == axes(bc.args[1]) && eltype(bc.args[1]) <: eltype(dst)
+                    copyto!(dst, Styled{S}(bc.args[1]))
+                else
+                    dst .= copy(bc.args[1])
+                end
             end
 
-            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SwizzledArray}}) where {S<:$Style}
                 if axes(dst) == axes(bc.args[1]) && eltype(bc.args[1]) <: eltype(dst)
-                    src = preprocess(dst, bc.args[1])
-                    arg = src.arg
-                    op = src.op
-                    init = src.init
-                    @inbounds begin
-                        index = swizzleindex(dst, src)
-                        drive = eachindex(arg, index)
-                        if op === nothing
-                            assign!(dst, index, arg, drive)
-                        else
-                            dst .= init
-                            increment!(op, dst, index, arg, drive)
-                        end
-                    end
-                    return dst
+                    copyto!(dst, Styled{S}(bc.args[1]))
                 else
-                    #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
-                    dst .= copy(bc)
+                    dst .= copy(bc.args[1])
                 end
             end
         end
