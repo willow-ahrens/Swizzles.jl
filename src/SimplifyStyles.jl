@@ -78,7 +78,7 @@ end
 
 SymbolExpr = Union{Symbol, Expr}
 """
-Transforms a SymbolExpr into a Term (used for Rewrite.jl)
+Transforms a reprexpr into a datatype suitable for Rewrite.jl (currently Term with Symbolics)
 """
 function expr_to_term(ex::SymbolExpr) :: Tuple{Term, Dict{Symbolic, SymbolExpr}}
     sym_to_ex = Dict{Symbolic, SymbolExpr}()
