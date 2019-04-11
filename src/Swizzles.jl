@@ -15,6 +15,8 @@ include("base.jl")
 include("util.jl")
 include("properties.jl")
 
+using Swizzles.Properties
+
 include("Antennae.jl")
 include("ScalarArrays.jl")
 include("WrapperArrays.jl")
@@ -101,7 +103,7 @@ end
 
 @inline (ctr::Swizzle)(arg) = ctr(arrayify(arg))
 @inline function (ctr::Swizzle{Op, _mask})(arg::AbstractArray) where {Op, _mask}
-    init = Properties.initial_value(ctr, arg)
+    init = initial(ctr, eltype_bound(arg))
     if init === nothing
         return Swizzle{Guard{Op}, _mask}(Guard(ctr.op))(Ref(nothing), arg)
     end
@@ -116,12 +118,12 @@ end
         mask = map(d -> d > ndims(arg) ? nil : d, _mask)
         return quote
             arr = SwizzledArray{Any, $(length(mask)), Op, $mask, Init, Arg}(ctr.op, init, arg)
-            return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
+            return convert(SwizzledArray{eltype_bound(arr)}, arr)
         end
     else
         mask = map(d -> d > ndims(arg) ? nil : d, _mask)
         arr = SwizzledArray{Any, length(mask), Op, mask, Init, Arg}(ctr.op, init, arg)
-        return convert(SwizzledArray{Properties.eltype_bound(arr)}, arr)
+        return convert(SwizzledArray{eltype_bound(arr)}, arr)
     end
 end
 
