@@ -62,12 +62,12 @@ end
 
 function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
     arg = rewriteable(:($root.parent), Arg, syms)
-    :($Adjoint($arg))
+    :(Adjoint($arg))
 end
 
 function rewriteable(root, ::Type{<:Transpose{<:Any, Arg}}, syms) where Arg
     arg = rewriteable(:($root.parent), Arg, syms)
-    :($Transpose($arg))
+    :(Transpose($arg))
 end
 
 function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
