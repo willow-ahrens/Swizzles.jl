@@ -1,7 +1,7 @@
 using Swizzles.Properties
 using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
-using Swizzles.GeneratedArrays
+using Swizzles.StylishArrays
 using Swizzles.ExtrudedArrays
 using Swizzles.ValArrays
 using Swizzles.NamedArrays
@@ -17,7 +17,7 @@ using Base.Cartesian
 
 
 
-struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: GeneratedArray{T, N}
+struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: StylishArray{T, N}
     op::Op
     init::Init
     arg::Arg

@@ -1,8 +1,8 @@
-using Swizzles.GeneratedArrays
-using Swizzles.GeneratedArrays: square, root, power
+using Swizzles.StylishArrays
+using Swizzles.StylishArrays: square, root, power
 using LinearAlgebra
 
-@testset "GeneratedArrays" begin
+@testset "StylishArrays" begin
     @testset "Squares" begin
         a = sqrt(prevfloat(typemax(Float64)))
         x = square(a)
@@ -31,7 +31,7 @@ using LinearAlgebra
         @test root(y + z) == Inf
     end
 
-    struct GenTest{T, N, Arr<:AbstractArray{T, N}} <: GeneratedArray{T, N}
+    struct GenTest{T, N, Arr<:AbstractArray{T, N}} <: StylishArray{T, N}
         parent::Arr
     end
     Base.size(arr::GenTest) = size(arr.parent)

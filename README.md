@@ -73,7 +73,7 @@ A .= Swizzle(+, 2, 1).(Beam(+, 2, 3, 4).(B) .* Beam(4, 1).(D) .* Beam(3, 1).(C))
 Swizzles.jl was created to provide a trait-based dispatch mechanism for tensor
 kernel selection and array implementation. Swizzles uses `BroadcastStyles` and
 `eachindex` to help select implementations, and provides an alternative abstract
-array supertype, `GeneratedArray`, for new array types to target. The language
+array supertype, `StylishArray`, for new array types to target. The language
 of `Swizzle` and `Broadcast` provides a high-level intermediate representation
 for tensor operations on which we can apply compiler techniques like symbolic
 programming and loop manipulation.

@@ -4,7 +4,7 @@ using StaticArrays
 using Swizzles.WrapperArrays
 using Swizzles.ShallowArrays
 using Swizzles.ArrayifiedArrays
-using Swizzles.GeneratedArrays
+using Swizzles.StylishArrays
 using Swizzles.ExtrudedArrays
 using Swizzles
 using Swizzles: SwizzledArray
@@ -86,7 +86,7 @@ permute an array so that
 `arr[i...] = parent(arr)[map(getindex, perms(arr), i)]
 interesting observation: perms[i] must be a permutation of axes(perms[i]).
 """
-struct PermutedArray{T, N, Perms <: Tuple{Vararg{AbstractVector, N}}, IPerms <: Tuple{Vararg{AbstractVector, N}}, Arg <: AbstractArray} <: GeneratedArray{T, N}
+struct PermutedArray{T, N, Perms <: Tuple{Vararg{AbstractVector, N}}, IPerms <: Tuple{Vararg{AbstractVector, N}}, Arg <: AbstractArray} <: StylishArray{T, N}
     perms::Perms
     iperms::IPerms
     arg::Arg

@@ -1,6 +1,6 @@
-module GeneratedArrays
+module StylishArrays
 
-abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
+abstract type StylishArray{T, N} <: AbstractArray{T, N} end
 
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess, BroadcastStyle, DefaultArrayStyle
 using Base.Broadcast: instantiate, broadcasted
@@ -9,7 +9,7 @@ using Swizzles
 using Swizzles.NullArrays
 using Swizzles.ScalarArrays
 
-export GeneratedArray, myidentity, Styled
+export StylishArray, myidentity, Styled
 
 
 
@@ -31,33 +31,33 @@ end
 
 
 """
-    GeneratedArray <: AbstractArray
+    StylishArray <: AbstractArray
 
 A convenience type for defining array types that are mostly implemented using
 copyto!(::Any, ::Broadcasted) and copy(::Broadcasted). Consult the [Interfaces
 chapter](@ref man-interfaces-broadcasting) on broadcasting for more info about
-broadcast. Many Base functions are implemented for GeneratedArrays in terms of
+broadcast. Many Base functions are implemented for StylishArrays in terms of
 `copyto!` including `map`, `getindex`, and `foreach`. Note that
-`copy(::GeneratedArray)` is not implemented in terms of `Broadcast`, as `copy`
+`copy(::StylishArray)` is not implemented in terms of `Broadcast`, as `copy`
 is intended to be a shallow copy function on arrays.
 
 See also: [`copy`](@ref), [`copyto!`](@ref)
 """
-abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
+abstract type StylishArray{T, N} <: AbstractArray{T, N} end
 
-#These two are more for intercept purposes than GeneratedArray purposes.
-Base.@propagate_inbounds Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
-Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
+#These two are more for intercept purposes than StylishArray purposes.
+Base.@propagate_inbounds Base.Broadcast.materialize(A::StylishArray) = identity.(A)
+Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::StylishArray) = dst .= A
 
 #Beware infinite recursion!
 
-Base.@propagate_inbounds Base.similar(src::GeneratedArray) = similar(Styled(src))
+Base.@propagate_inbounds Base.similar(src::StylishArray) = similar(Styled(src))
 
-#Base.@propagate_inbounds Base.copy(src::GeneratedArray) = copy(Styled(src))
+#Base.@propagate_inbounds Base.copy(src::StylishArray) = copy(Styled(src))
 
-Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
-Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
-Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::GeneratedArray) = _copyto!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::StylishArray, src::AbstractArray) = _copyto!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::StylishArray) = _copyto!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::StylishArray, src::StylishArray) = _copyto!(dst, src)
 Base.@propagate_inbounds function _copyto!(dst::AbstractArray, src)
     @boundscheck axes(dst) == axes(src) || error("I don't like it when copyto! has mismatched axes lololol")
     #dst .= myidentity.(reshape(arrayify(src), axes(dst)))
@@ -68,8 +68,8 @@ end
 
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I::Integer)::eltype(arr) = _getindex(arr, I)
-Base.@propagate_inbounds Base.getindex(arr::GeneratedArray, I...) = _getindex(arr, I...)
+Base.@propagate_inbounds Base.getindex(arr::StylishArray, I::Integer)::eltype(arr) = _getindex(arr, I)
+Base.@propagate_inbounds Base.getindex(arr::StylishArray, I...) = _getindex(arr, I...)
 
 Base.@propagate_inbounds function _getindex(arr, I...)
     src = Styled(view(arr, I...))
@@ -84,8 +84,8 @@ end
 
 
 #The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
-Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I::Integer) = _setindex!(arr, v, I)
-Base.@propagate_inbounds Base.setindex!(arr::GeneratedArray, v, I...) = _setindex!(arr, v, I...)
+Base.@propagate_inbounds Base.setindex!(arr::StylishArray, v, I::Integer) = _setindex!(arr, v, I)
+Base.@propagate_inbounds Base.setindex!(arr::StylishArray, v, I...) = _setindex!(arr, v, I...)
 
 Base.@propagate_inbounds function _setindex!(arr, v, I...)
     dst = view(arr, I...)
@@ -98,14 +98,14 @@ end
 
 
 
-Base.@propagate_inbounds function Base.map(f::F, arr::GeneratedArray, tail...) where {F}
+Base.@propagate_inbounds function Base.map(f::F, arr::StylishArray, tail...) where {F}
     src = @_ f.(arr, tail...)
     copyto!(similar(src), src)
 end
 
 
 
-Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
+Base.@propagate_inbounds function Base.foreach(f::F, arr::StylishArray, tail...) where {F}
     src = @_ f(arr, tail...)
     copyto!(NullArray(axes(src)), src)
     return nothing
@@ -113,97 +113,97 @@ end
 
 
 
-Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=:, kwargs...) where {Op}
+Base.@propagate_inbounds function Base.reduce(op::Op, arr::StylishArray; dims=:, kwargs...) where {Op}
     return _reduce(op, arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {Op}
+Base.@propagate_inbounds function _reduce(op::Op, arr::StylishArray, dims, nt::NamedTuple{()}) where {Op}
     res = copy(Reduce(op, dims)(arr))
     return dims == Colon() ? res[] : res
 end
-Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {Op}
+Base.@propagate_inbounds function _reduce(op::Op, arr::StylishArray, dims, nt::NamedTuple{(:init,)}) where {Op}
     res = copy(Reduce(op, dims)(nt.init, arr))
     return dims == Colon() ? res[] : res
 end
 
 
 
-Base.@propagate_inbounds function Base.mapreduce(f::F, op::Op, arr::GeneratedArray; dims=:, kwargs...) where {F, Op}
+Base.@propagate_inbounds function Base.mapreduce(f::F, op::Op, arr::StylishArray; dims=:, kwargs...) where {F, Op}
     return _mapreduce(f, op, arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {F, Op}
+Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::StylishArray, dims, nt::NamedTuple{()}) where {F, Op}
     res = copy(Reduce(op, dims)(@_ f.(arr)))
     return dims == Colon() ? res[] : res
 end
-Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {F, Op}
+Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::StylishArray, dims, nt::NamedTuple{(:init,)}) where {F, Op}
     res = copy(Reduce(op, dims)(nt.init, @_ f.(arr)))
     return dims == Colon() ? res[] : res
 end
 
 
 
-Base.@propagate_inbounds function Base.sum(arr::GeneratedArray; dims=:, kwargs...)
+Base.@propagate_inbounds function Base.sum(arr::StylishArray; dims=:, kwargs...)
     return _sum(arr, dims, kwargs.data)
 end
 
-Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{()})
+Base.@propagate_inbounds function _sum(arr::StylishArray, dims, nt::NamedTuple{()})
     res = copy(Sum(dims)(arr))
     return dims == Colon() ? res[] : res
 end
-Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
+Base.@propagate_inbounds function _sum(arr::StylishArray, dims, nt::NamedTuple{(:init,)})
     res = copy(Sum(dims)(nt.init, arr))
     return dims == Colon() ? res[] : res
 end
 
 
 
-Base.@propagate_inbounds Base.maximum(arr::GeneratedArray; kwargs...) = reduce(max, arr; kwargs...)
+Base.@propagate_inbounds Base.maximum(arr::StylishArray; kwargs...) = reduce(max, arr; kwargs...)
 
 
 
-Base.@propagate_inbounds Base.minimum(arr::GeneratedArray; kwargs...) = reduce(min, arr; kwargs...)
+Base.@propagate_inbounds Base.minimum(arr::StylishArray; kwargs...) = reduce(min, arr; kwargs...)
 
 
 
-Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::AbstractArray)
+Base.@propagate_inbounds function LinearAlgebra.dot(x::StylishArray, y::AbstractArray)
     res = copy(Sum()(@_ x .* y))
     return ndims(res) == 0 ? res[] : res
 end
 
-Base.@propagate_inbounds function LinearAlgebra.dot(x::AbstractArray, y::GeneratedArray)
+Base.@propagate_inbounds function LinearAlgebra.dot(x::AbstractArray, y::StylishArray)
     res = copy(Sum()(@_ x .* y))
     return ndims(res) == 0 ? res[] : res
 end
 
-Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::GeneratedArray)
+Base.@propagate_inbounds function LinearAlgebra.dot(x::StylishArray, y::StylishArray)
     res = copy(Sum()(@_ x .* y))
     return ndims(res) == 0 ? res[] : res
 end
 
 
 
-Base.@propagate_inbounds function LinearAlgebra.adjoint(x::GeneratedArray)
+Base.@propagate_inbounds function LinearAlgebra.adjoint(x::StylishArray)
     return Beam(2, 1)(@_ adjoint.(x))
 end
 
-Base.@propagate_inbounds function LinearAlgebra.transpose(x::GeneratedArray)
+Base.@propagate_inbounds function LinearAlgebra.transpose(x::StylishArray)
     return Beam(2, 1)(@_ transpose.(x))
 end
 
-Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray)
+Base.@propagate_inbounds function Base.permutedims(x::StylishArray)
     return Beam(2, 1)(x)
 end
 
-Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray, perm)
+Base.@propagate_inbounds function Base.permutedims(x::StylishArray, perm)
     return Focus(perm...)(x)
 end
 
 
 
-Ts = (:(GeneratedArray{<:Any, 1}), :(GeneratedArray{<:Any, 2}), :(AbstractArray{<:Any, 1}), :(AbstractArray{<:Any, 2}))
+Ts = (:(StylishArray{<:Any, 1}), :(StylishArray{<:Any, 2}), :(AbstractArray{<:Any, 1}), :(AbstractArray{<:Any, 2}))
 for (A, B) in Iterators.product(Ts, Ts)
-    if :(GeneratedArray{<:Any, 1}) in (A, B) || :(GeneratedArray{<:Any, 2}) in (A, B)
+    if :(StylishArray{<:Any, 1}) in (A, B) || :(StylishArray{<:Any, 2}) in (A, B)
         @eval begin
             Base.@propagate_inbounds function Base.:*(A::$A, B::$B)
                 res = copy(SumOut(2)(@_ A .* Beam(2, 3)(B)))
@@ -214,7 +214,7 @@ for (A, B) in Iterators.product(Ts, Ts)
 end
 
 for (Y, A, B) in Iterators.product(Ts, Ts, Ts)
-    if :(GeneratedArray{<:Any, 1}) in (Y, A, B) || :(GeneratedArray{<:Any, 2}) in (Y, A, B)
+    if :(StylishArray{<:Any, 1}) in (Y, A, B) || :(StylishArray{<:Any, 2}) in (Y, A, B)
         @eval begin
             Base.@propagate_inbounds function LinearAlgebra.mul!(Y::$Y, A::$A, B::$B)
                 res = copyto!(Y, SumOut(2)(@_ A .* Beam(2, 3)(B)))
@@ -307,11 +307,11 @@ end
     end
 end
 
-Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray; kwargs...)
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::StylishArray; kwargs...)
     norm(arr, 2; kwargs...)
 end
 
-Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real)
+Base.@propagate_inbounds function LinearAlgebra.norm(arr::StylishArray, p::Real)
     if p == 2
         return root(copy(Sum()(@_ square.(arr)))[])
     elseif p == 1

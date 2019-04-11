@@ -2,7 +2,7 @@ module ArrayifiedArrays
 
 using Swizzles.Properties
 using Swizzles.WrapperArrays
-using Swizzles.GeneratedArrays
+using Swizzles.StylishArrays
 using Swizzles.ScalarArrays
 using Swizzles
 
@@ -13,7 +13,7 @@ using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _br
 
 export ArrayifiedArray, arrayify, preprocess
 
-struct ArrayifiedArray{T, N, Arg} <: GeneratedArray{T, N}
+struct ArrayifiedArray{T, N, Arg} <: StylishArray{T, N}
     arg::Arg
     @inline function ArrayifiedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         return new{T, N, typeof(arg)}(arg)
