@@ -22,8 +22,9 @@ module NamedArrays
     end
 
     Base.parent(arr::NamedArray) = arr.arg
-    function WrapperArrays.adopt(arg::AbstractArray, arr::NamedArray)
-        NamedArray{eltype(arr), ndims(arr), typeof(arr), name(arr)}(arg)
+    function WrapperArrays.adopt(arg::AbstractArray, arr::NamedArray{T, N, Arg, name}) where {T, N, Arg, name}
+        arg === arr.arg || throw(ArgumentError("cannot change object identity of named array"))
+        NamedArray{T, N, Arg, name}(arg)
     end
 
     name(arr::NamedArray{<:Any, <:Any, <:Any, _name}) where {_name} = _name
