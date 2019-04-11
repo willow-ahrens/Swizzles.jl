@@ -3,7 +3,7 @@ module StylishArrays
 abstract type StylishArray{T, N} <: AbstractArray{T, N} end
 
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, preprocess, BroadcastStyle, DefaultArrayStyle
-using Base.Broadcast: instantiate, broadcasted
+using Base.Broadcast: instantiate
 using LinearAlgebra
 using Swizzles
 using Swizzles.NullArrays
@@ -22,7 +22,7 @@ end
 
 myidentity(x) = x
 @inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)), args...)
-#Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copy(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)))
+Base.@propagate_inbounds Base.copy(src::Styled) = copyto!(similar(src), src)
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style}
     @boundscheck axes(dst) == axes(src.arg) || error("TODO")
     copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
@@ -33,15 +33,15 @@ end
 """
     StylishArray <: AbstractArray
 
-A convenience type for defining array types that are mostly implemented using
-copyto!(::Any, ::Broadcasted) and copy(::Broadcasted). Consult the [Interfaces
-chapter](@ref man-interfaces-broadcasting) on broadcasting for more info about
-broadcast. Many Base functions are implemented for StylishArrays in terms of
-`copyto!` including `map`, `getindex`, and `foreach`. Note that
-`copy(::StylishArray)` is not implemented in terms of `Broadcast`, as `copy`
-is intended to be a shallow copy function on arrays.
+A convenience type for defining array types which are implemented using
+`similar(::Broadcasted)`, `copyto!(::Any, ::Broadcasted)` and
+`copy(::Broadcasted)`. Consult the [Interfaces chapter](@ref
+man-interfaces-broadcasting) on broadcasting for more info about broadcast. Many
+Base functions are implemented, ` including `map`, `getindex`, and `foreach`.
+Power users who wish to avoid broadcasting semantics can also intercept
+`copyto!(::Any, ::Styled)`, `copy(::Styled)`, and `similar(::Styled)`
 
-See also: [`copy`](@ref), [`copyto!`](@ref)
+See also: [`similar`](@ref), [`copy`](@ref), [`copyto!`](@ref)
 """
 abstract type StylishArray{T, N} <: AbstractArray{T, N} end
 
@@ -53,7 +53,7 @@ Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::StylishArray) = dst
 
 Base.@propagate_inbounds Base.similar(src::StylishArray) = similar(Styled(src))
 
-#Base.@propagate_inbounds Base.copy(src::StylishArray) = copy(Styled(src))
+Base.@propagate_inbounds Base.copy(src::StylishArray) = copy(Styled(src))
 
 Base.@propagate_inbounds Base.copyto!(dst::StylishArray, src::AbstractArray) = _copyto!(dst, src)
 Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::StylishArray) = _copyto!(dst, src)
@@ -83,7 +83,7 @@ end
 
 
 
-#The following nonsense means that generated arrays can override getindex or they can override copyto!(view)
+#The following nonsense means that stylish arrays can override getindex or they can override copyto!(view)
 Base.@propagate_inbounds Base.setindex!(arr::StylishArray, v, I::Integer) = _setindex!(arr, v, I)
 Base.@propagate_inbounds Base.setindex!(arr::StylishArray, v, I...) = _setindex!(arr, v, I...)
 
