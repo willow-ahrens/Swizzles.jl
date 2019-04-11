@@ -18,7 +18,7 @@ export Simplify
 
 
 """
-    reprexpr(root, T::Type)
+    rewriteable(root, T::Type)
 
 Given a root expression of type T, produce the most detailed constructor
 expression you can to create a new object that should be equal to root.
@@ -31,107 +31,79 @@ julia> A = [1 2 3 4; 5 6 7 8]'
  2  6
  3  7
  4  8
-julia> r = reprexpr(:A, typeof(A))
+julia> r = rewriteable(:A, typeof(A))
 :(LinearAlgebra.Adjoint(parent(A)::Array{Int64,2}))
 julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root, T) = :($root::$T)
+function rewriteable(root, T::Type)
+    syms = Dict{Symbolic, Any}()
+    return (Term(rewriteable(root, T, syms)), syms)
+end
 
-function reprexpr(root, ::Type{<:ValArray{<:Any, val}}) where {val}
+function rewriteable(root, T::Type, syms)
+    s = Symbolic(gensym())
+    syms[s] = root
+    return :($s::$T)
+end
+
+function rewriteable(root, ::Type{<:ValArray{<:Any, val}}, syms) where {val}
     ValArray(val)
 end
 
-function reprexpr(root, ::Type{<:Adjoint{<:Any, Arg}}) where Arg
-    arg = reprexpr(:($root.parent), Arg)
+function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
+    arg = rewriteable(:($root.parent), Arg, syms)
     :($Adjoint($arg))
 end
 
-function reprexpr(root, ::Type{<:Transpose{<:Any, Arg}}) where Arg
-    arg = reprexpr(:($root.parent), Arg)
+function rewriteable(root, ::Type{<:Transpose{<:Any, Arg}}, syms) where Arg
+    arg = rewriteable(:($root.parent), Arg, syms)
     :($Transpose($arg))
 end
 
-function reprexpr(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}) where {F, Args<:Tuple}
-    if isdefined(F, :instance)
-        f = F.instance
-        args = map(((i, arg),) -> reprexpr(:($root.args[$i]), arg), enumerate(Args.parameters))
-        :($(Antenna(f))($(args...)))
+function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
+    args = map(((i, arg),) -> rewriteable(:($root.args[$i]), arg, syms), enumerate(Args.parameters))
+    f = instance(F)
+    if f !== nothing
+        :($(Antenna(something(f)))($(args...)))
     else
-        :($root::$T)
+        f = rewriteable(:(root.f), F, syms)
+        :(Antenna($f)($(args...)))
     end
 end
 
-function reprexpr(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Arg}}) where {Op, mask, Init, Arg}
-    if isdefined(Op, :instance)
-        op = Op.instance
-        init = reprexpr(:($root.init), Init)
-        arg = reprexpr(:($root.arg), Arg)
-        :($(Swizzle(op, mask))($init, $arg))
+function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Arg}}, syms) where {Op, mask, Init, Arg}
+    init = rewriteable(:($root.init), Init, syms)
+    arg = rewriteable(:($root.arg), Arg, syms)
+    op = instance(Op)
+    if op !== nothing
+        :($(Swizzle(something(op), mask))($init, $arg))
     else
-        :($root::$T)
+        op = rewriteable(:(root.op), Op, syms)
+        :(Swizzle($op, $mask)($init, $arg))
     end
 end
 
 
 
-SymbolExpr = Union{Symbol, Expr}
 """
-Transforms a reprexpr into a datatype suitable for Rewrite.jl (currently Term with Symbolics)
+Transforms a Term (used for Rewrite.jl) into an evaluable julia expression
 """
-function expr_to_term(ex::SymbolExpr) :: Tuple{Term, Dict{Symbolic, SymbolExpr}}
-    sym_to_ex = Dict{Symbolic, SymbolExpr}()
-    ex = addSymbolics(ex, sym_to_ex)
-    (Term(ex), sym_to_ex)
-end;
-
-function addSymbolics(ex::Symbol,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: Symbolic
-    s = Symbolic(gensym())
-    sym_to_ex[s] = ex
-    return s
+function evaluable(term::Term, syms)
+    return evaluable(term.ex, syms)
 end
 
-function addSymbolics(ex::Expr,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: Union{Expr, Symbolic}
-    if @capture(ex, f_(args__))
-        return :($f(
-            $(map(arg->addSymbolics(arg, sym_to_ex), args)...)
-        ))
-    elseif @capture(ex, arg_::T_) && !(T isa Union{Symbol, Expr})
-        s = Symbolic(gensym())
-        sym_to_ex[s] = arg
-        return s
-    else
-        s = Symbolic(gensym())
-        sym_to_ex[s] = ex
-        return s
-    end
+function evaluable(ex::Expr, syms)
+    return Expr(ex.head, map(arg->evaluable(arg, syms), ex.args))
 end
 
-
-"""
-Transforms a Term (used for Rewrite.jl) into an SymbolExpr.
-"""
-function term_to_expr(term::Term,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    return removeSymbolics(term.ex, sym_to_ex)
+function evaluable(ex::Symbolic, syms)
+    return syms[ex]
 end
 
-function removeSymbolics(ex::Expr,
-                         sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    if @capture(ex, f_(args__))
-        return :($f(
-            $(map(arg->removeSymbolics(arg, sym_to_ex), args)...)
-        ))
-    end
-    throw(ArgumentError("non expr transformable: $ex"))
-end
-
-function removeSymbolics(s::Symbolic,
-                         sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    return sym_to_ex[s]
+function evaluable(ex, syms)
+    return ex
 end
 
 
@@ -202,7 +174,7 @@ Apply global rules to simplify the array expression `arr`.
 Currently only supports broadcast expressions.
 """
 @generated function simplify(arr)
-    expr = reprexpr(:arr, arr)
+    expr = rewriteable(:arr, arr)
     term, sym_to_ex = expr_to_term(expr)
     simple_term = Rewrite.with_context(DEFAULT_SPEC.context) do
         Rewrite.normalize(term, DEFAULT_SPEC.rules)
