@@ -11,6 +11,7 @@ using Swizzles
 using Swizzles.Properties
 using Swizzles.Antennae
 using Swizzles.ValArrays
+using Swizzles.NamedArrays
 using Swizzles: SwizzledArray
 
 
@@ -51,6 +52,12 @@ end
 
 function rewriteable(root, ::Type{<:ValArray{<:Any, val}}, syms) where {val}
     ValArray(val)
+end
+
+function rewriteable(root, ::Type{<:NamedArray{<:Any, <:Any, Arr, name}}, syms) where {Arr, name}
+    s = Symbolic(name)
+    syms[s] = :($root.arg)
+    return :($s::$Arr)
 end
 
 function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
