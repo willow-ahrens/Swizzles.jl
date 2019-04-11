@@ -107,6 +107,7 @@ Base.size(arr::PermutedArray) = size(arr.arg)
 Base.size(arr::PermutedArray, d::Int) = size(arr.arg, d)
 Base.axes(arr::PermutedArray) = axes(arr.arg)
 Base.axes(arr::PermutedArray, d::Int) = axes(arr.arg, d)
+(Base.getindex(arr::PermutedArray{T, 0, Tuple{}})::T) where {T} = arr.arg[]
 function Base.getindex(arr::PermutedArray{T, N}, i::Vararg{Any, N})::T where {T, N}
     arr.arg[ntuple(n->arr.perms[n][i[n]], Val(N))...]
 end
@@ -116,6 +117,7 @@ end
 (Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, i::Vararg{Any, N})::T) where {T, N} = arr.arg[i...]
 (Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.OneTo, N}}}, i::Integer)::T) where {T, N} = arr.arg[i]
 (Base.getindex(arr::PermutedArray{T, N, <:Tuple{Vararg{<:Base.Slice{<:Base.OneTo}, N}}}, i::Integer)::T) where {T, N} = arr.arg[i]
+(Base.setindex!(arr::PermutedArray{T, 0, Tuple{}}, x)::T) where {T} = arr.arg[] = x
 function Base.setindex!(arr::PermutedArray{T, N}, x, i::Vararg{Any, N})::T where {T, N}
     arr.arg[ntuple(n->arr.iperms[n][i[n]], Val(N))...] = x
 end
@@ -128,8 +130,6 @@ end
 
 
 
-#similar(bc::Broadcasted{<:PermuteStyle{S}}) where {S} = similar(convert(Broadcasted{S()}, bc))
-
 struct PermuteStyle{S<:BroadcastStyle} <: BroadcastStyle end
 PermuteStyle(style::S) where {S <: BroadcastStyle} = PermuteStyle{S}()
 PermuteStyle(style::S) where {S <: PermuteStyle} = style
@@ -140,13 +140,14 @@ Base.Broadcast.BroadcastStyle(::PermuteStyle{T}, ::PermuteStyle{S}) where {T, S<
 
 
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S<:Base.Broadcast.AbstractArrayStyle{0}}
-    return copy(convert(Broadcasted{S}, repermute(src).arg.arg))
+Base.@propagate_inbounds function Base.similar(bc::Broadcasted{PermuteStyle{S}}, args...) where {S}
+    src = repermute(bc)
+    return PermutedArray(src.perms, src.iperms, similar(convert(Broadcasted{S}, bc), args...))
 end
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{PermuteStyle{S}}) where {S <:Base.Broadcast.AbstractArrayStyle}
-    src = repermute(src)
-    return PermutedArray(src.perms, src.iperms, copy(src.arg))
+Base.@propagate_inbounds function Base.copy(bc::Broadcasted{PermuteStyle{S}}) where {S <: Base.Broadcast.AbstractArrayStyle}
+    res = copyto!(similar(bc), bc)
+    return ndims(res) == 0 ? res[] : res
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S}

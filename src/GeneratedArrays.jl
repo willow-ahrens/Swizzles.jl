@@ -22,7 +22,7 @@ end
 
 myidentity(x) = x
 @inline Base.similar(src::Styled{Style}, args...) where {Style} = similar(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)), args...)
-#Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copyto!(similar(src), src)
+#Base.@propagate_inbounds Base.copy(src::Styled{Style}) where {Style} = copy(Broadcasted{Style}(identity, (src.arg,), axes(src.arg)))
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Styled{Style}) where {Style}
     @boundscheck axes(dst) == axes(src.arg) || error("TODO")
     copyto!(dst, Broadcasted{Style}(myidentity, (src.arg,), axes(dst)))
@@ -45,10 +45,15 @@ See also: [`copy`](@ref), [`copyto!`](@ref)
 """
 abstract type GeneratedArray{T, N} <: AbstractArray{T, N} end
 
-#Beware infinite recursion!
-
+#These two are more for intercept purposes than GeneratedArray purposes.
 Base.@propagate_inbounds Base.Broadcast.materialize(A::GeneratedArray) = identity.(A)
 Base.@propagate_inbounds Base.Broadcast.materialize!(dst, A::GeneratedArray) = dst .= A
+
+#Beware infinite recursion!
+
+Base.@propagate_inbounds Base.similar(src::GeneratedArray) = similar(Styled(src))
+
+#Base.@propagate_inbounds Base.copy(src::GeneratedArray) = copy(Styled(src))
 
 Base.@propagate_inbounds Base.copyto!(dst::GeneratedArray, src::AbstractArray) = _copyto!(dst, src)
 Base.@propagate_inbounds Base.copyto!(dst::AbstractArray, src::GeneratedArray) = _copyto!(dst, src)
@@ -94,14 +99,14 @@ end
 
 
 Base.@propagate_inbounds function Base.map(f::F, arr::GeneratedArray, tail...) where {F}
-    src = broadcasted(f, arr, tail...)
+    src = @_ f.(arr, tail...)
     copyto!(similar(src), src)
 end
 
 
 
 Base.@propagate_inbounds function Base.foreach(f::F, arr::GeneratedArray, tail...) where {F}
-    src = broadcasted(f, arr, tail...)
+    src = @_ f(arr, tail...)
     copyto!(NullArray(axes(src)), src)
     return nothing
 end
@@ -113,10 +118,12 @@ Base.@propagate_inbounds function Base.reduce(op::Op, arr::GeneratedArray; dims=
 end
 
 Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {Op}
-    return Reduce(op, dims).(arr)
+    res = copy(Reduce(op, dims)(arr))
+    return dims == Colon() ? res[] : res
 end
 Base.@propagate_inbounds function _reduce(op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {Op}
-    return Reduce(op, dims).(nt.init, arr)
+    res = copy(Reduce(op, dims)(nt.init, arr))
+    return dims == Colon() ? res[] : res
 end
 
 
@@ -126,10 +133,12 @@ Base.@propagate_inbounds function Base.mapreduce(f::F, op::Op, arr::GeneratedArr
 end
 
 Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{()}) where {F, Op}
-    return Reduce(op, dims).(f.(arr))
+    res = copy(Reduce(op, dims)(@_ f.(arr)))
+    return dims == Colon() ? res[] : res
 end
 Base.@propagate_inbounds function _mapreduce(f::F, op::Op, arr::GeneratedArray, dims, nt::NamedTuple{(:init,)}) where {F, Op}
-    return Reduce(op, dims).(nt.init, f.(arr))
+    res = copy(Reduce(op, dims)(nt.init, @_ f.(arr)))
+    return dims == Colon() ? res[] : res
 end
 
 
@@ -139,10 +148,12 @@ Base.@propagate_inbounds function Base.sum(arr::GeneratedArray; dims=:, kwargs..
 end
 
 Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{()})
-    return Sum(dims).(arr)
+    res = copy(Sum(dims)(arr))
+    return dims == Colon() ? res[] : res
 end
 Base.@propagate_inbounds function _sum(arr::GeneratedArray, dims, nt::NamedTuple{(:init,)})
-    return Sum(dims).(nt.init, arr)
+    res = copy(Sum(dims)(nt.init, arr))
+    return dims == Colon() ? res[] : res
 end
 
 
@@ -156,33 +167,36 @@ Base.@propagate_inbounds Base.minimum(arr::GeneratedArray; kwargs...) = reduce(m
 
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::AbstractArray)
-    return Sum().(x .* y)
+    res = copy(Sum()(@_ x .* y))
+    return ndims(res) == 0 ? res[] : res
 end
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::AbstractArray, y::GeneratedArray)
-    return Sum().(x .* y)
+    res = copy(Sum()(@_ x .* y))
+    return ndims(res) == 0 ? res[] : res
 end
 
 Base.@propagate_inbounds function LinearAlgebra.dot(x::GeneratedArray, y::GeneratedArray)
-    return Sum().(x .* y)
+    res = copy(Sum()(@_ x .* y))
+    return ndims(res) == 0 ? res[] : res
 end
 
 
 
 Base.@propagate_inbounds function LinearAlgebra.adjoint(x::GeneratedArray)
-    return arrayify(Delay().(Beam(2, 1).(adjoint.(x))))
+    return Beam(2, 1)(@_ adjoint.(x))
 end
 
 Base.@propagate_inbounds function LinearAlgebra.transpose(x::GeneratedArray)
-    return arrayify(Delay().(Beam(2, 1).(transpose.(x))))
+    return Beam(2, 1)(@_ transpose.(x))
 end
 
 Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray)
-    return arrayify(Delay().(Beam(2, 1).(x)))
+    return Beam(2, 1)(x)
 end
 
 Base.@propagate_inbounds function Base.permutedims(x::GeneratedArray, perm)
-    return arrayify(Delay().(Focus(perm...).(x)))
+    return Focus(perm...)(x)
 end
 
 
@@ -192,7 +206,8 @@ for (A, B) in Iterators.product(Ts, Ts)
     if :(GeneratedArray{<:Any, 1}) in (A, B) || :(GeneratedArray{<:Any, 2}) in (A, B)
         @eval begin
             Base.@propagate_inbounds function Base.:*(A::$A, B::$B)
-                return SumOut(2).(A.*Beam(2, 3).(B))
+                res = copy(SumOut(2)(@_ A .* Beam(2, 3)(B)))
+                return ndims(res) == 0 ? res[] : res
             end
         end
     end
@@ -202,7 +217,8 @@ for (Y, A, B) in Iterators.product(Ts, Ts, Ts)
     if :(GeneratedArray{<:Any, 1}) in (Y, A, B) || :(GeneratedArray{<:Any, 2}) in (Y, A, B)
         @eval begin
             Base.@propagate_inbounds function LinearAlgebra.mul!(Y::$Y, A::$A, B::$B)
-                return Y .= SumOut(2).(A.*Beam(2, 3).(B))
+                res = copyto!(Y, SumOut(2)(@_ A .* Beam(2, 3)(B)))
+                return ndims(res) == 0 ? res[] : res
             end
         end
     end
@@ -297,17 +313,17 @@ end
 
 Base.@propagate_inbounds function LinearAlgebra.norm(arr::GeneratedArray, p::Real)
     if p == 2
-        return root.(Sum().(square.(arr)))
+        return root(copy(Sum()(@_ square.(arr)))[])
     elseif p == 1
-        return Sum().(norm.(arr))
+        return copy(Sum()(@_ norm.(arr)))[]
     elseif p == Inf
-        return Reduce(max).(norm.(arr))
+        return copy(Reduce(max)(@_ norm.(arr)))[]
     elseif p == 0
-        return Sum().(norm.(norm.(arr), 0))
+        return copy(Sum()(@_ norm.(norm.(arr), 0)))[]
     elseif p == -Inf
-        return Reduce(min).(norm.(arr))
+        return copy(Reduce(min)(@_ norm.(arr)))[]
     else
-        return root.(Sum().(power.(arr, p)))
+        return root(copy(Sum()(@_ power.(arr, p)))[])
     end
 end
 
@@ -315,7 +331,7 @@ Base.@propagate_inbounds function distance(x, y)
     return distance(x, y, 2)
 end
 Base.@propagate_inbounds function distance(x, y, p)
-    return norm(arrayify(broadcasted(-, x, y)), p)
+    return norm(arrayify(@_ x .- y), p)
 end
 
 end

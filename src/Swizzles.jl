@@ -8,6 +8,7 @@ export Swizzle, Focus
 export Pour, Beam
 export Reduce, Sum
 export Drop, SumOut
+export @_, @$
 export Delay, Intercept
 
 include("base.jl")
