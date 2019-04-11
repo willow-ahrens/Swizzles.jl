@@ -178,7 +178,7 @@
   Focus(nil, nil, 2).(A) == Beam(nil, 3).(A)
 
   @test Swizzle(+).(rand(3,3)) isa Float64
-  @test copy(Swizzle(+)(rand(3,3))) isa Array{Float64, 0}
+  @test copy(Swizzle(+)(rand(3,3))) isa AbstractArray{Float64, 0}
 
   A = reshape(1:27, 3, 3, 3)
 

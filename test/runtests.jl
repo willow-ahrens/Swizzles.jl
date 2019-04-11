@@ -10,7 +10,7 @@ using Test
     include("NamedArrays.jl")
     include("ArrayifiedArrays.jl")
     include("SimplifyStyles.jl")
-    include("GeneratedArrays.jl")
+    include("StylishArrays.jl")
     include("PermutedArrays.jl")
     include("util.jl")
 end

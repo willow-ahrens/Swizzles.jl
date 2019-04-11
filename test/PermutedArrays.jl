@@ -15,6 +15,7 @@ using Swizzles.PermutedArrays
     B = Permute(reverse(1:3))(reshape(1:9, 3, 3))
     @test_throws PermutationMismatch A * B
     A = Permute(1:3, reverse(1:3))(reshape(1:9, 3, 3))
+    A * B
     @test A * B == reshape(1:9, 3, 3) * reshape(1:9, 3, 3)
     @test Sum().(A) == sum(1:9)
 end

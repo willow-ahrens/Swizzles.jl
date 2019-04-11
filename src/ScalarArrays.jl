@@ -13,6 +13,7 @@ mutable struct ScalarArray{T} <: AbstractArray{T, 0}
         new{T}(val)
     end
 end
+ScalarArray(val::T) where {T} = ScalarArray{T}(val)
 
 Base.axes(::ScalarArray) = ()
 Base.size(::ScalarArray) = ()
