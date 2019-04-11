@@ -2,7 +2,8 @@ module ArrayifiedArrays
 
 using Swizzles.Properties
 using Swizzles.WrapperArrays
-using Swizzles.GeneratedArrays
+using Swizzles.StylishArrays
+using Swizzles.ScalarArrays
 using Swizzles
 
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
@@ -10,9 +11,9 @@ using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeU
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
 using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 
-export ArrayifiedArray, arrayify
+export ArrayifiedArray, arrayify, preprocess
 
-struct ArrayifiedArray{T, N, Arg} <: GeneratedArray{T, N}
+struct ArrayifiedArray{T, N, Arg} <: StylishArray{T, N}
     arg::Arg
     @inline function ArrayifiedArray{T, N, Arg}(arg::Arg) where {T, N, Arg}
         return new{T, N, typeof(arg)}(arg)
@@ -65,6 +66,12 @@ end
         end
     end
 end
+
+@inline Base.eltype(bc::Broadcasted) = combine_eltypes(bc.f, bc.args)
+@inline Base.similar(bc::Broadcasted) = similar(bc, eltype(bc))
+@inline Base.similar(bc::Broadcasted, args...) = similar(bc, eltype(bc), args...)
+@inline Base.similar(bc::Broadcasted{DefaultArrayStyle{0}}) = ScalarArray{eltype(bc)}()
+
 
 @inline function Properties.eltype_bound(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted})
     return combine_eltypes(arr.arg.f, arr.arg.args)

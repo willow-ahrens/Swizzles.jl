@@ -1,7 +1,7 @@
 using Swizzles.Properties
 using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
-using Swizzles.GeneratedArrays
+using Swizzles.StylishArrays
 using Swizzles.ExtrudedArrays
 using Swizzles.ValArrays
 using Swizzles.NamedArrays
@@ -10,14 +10,14 @@ using Swizzles.ScalarArrays
 using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
 using Base.Iterators: reverse, repeated, countfrom, flatten, product, take, peel, EltypeUnknown
 using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, preprocess, _broadcast_getindex, combine_eltypes, broadcast_shape
+using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, broadcast_shape, broadcast_unalias
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 using StaticArrays
 using Base.Cartesian
 
 
 
-struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: GeneratedArray{T, N}
+struct SwizzledArray{T, N, Op, mask, Init<:AbstractArray, Arg<:AbstractArray} <: StylishArray{T, N}
     op::Op
     init::Init
     arg::Arg
@@ -87,18 +87,38 @@ Base.@propagate_inbounds function WrapperArrays.adopt(arg::Arg, arr::SwizzledArr
     SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arg)
 end
 
-Base.dataids(arr::SwizzledArray) = (dataids(arr.op), dataids(arr.init), dataids(arr.arg))
-function Base.unaliascopy(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unaliascopy(arr.op)
-    init = unaliascopy(arr.init)
-    arg = unaliascopy(arr.arg)
-    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+Base.dataids(src::SwizzledArray) = (dataids(src.op), dataids(src.init), dataids(src.arg))
+function Base.unaliascopy(src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    init = unaliascopy(src.init)
+    arg = unaliascopy(src.arg)
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
 end
-function Base.unalias(dst, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    op = unalias(dst, arr.op)
-    init = unalias(dst, arr.init)
-    arg = unalias(dst, arr.arg)
-    SwizzledArray{T, N, typeof(op), mask, typeof(init), typeof(arg)}(op, init, arg)
+function Base.unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    init = unalias(dst, src.init)
+    arg = unalias(dst, src.arg)
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
+end
+function Broadcast.broadcast_unalias(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    init = broadcast_unalias(dst, src.init)
+    if ndims(src.arg) != 0
+        arg = unalias(dst, src.arg)
+    else
+        arg = src.arg
+    end
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
+end
+function Broadcast.broadcast_unalias(::Nothing, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return src
+end
+function ArrayifiedArrays.preprocess(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    init = src.init #preprocess that later
+    if ndims(src.arg) != 0
+        #arg = preprocess(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
+        arg = preprocess(nothing, src.arg)
+    else
+        arg = src.arg
+    end
+    SwizzledArray{T, N, Op, mask, typeof(init), typeof(arg)}(src.op, init, arg)
 end
 
 @inline function Base.size(arr::SwizzledArray)
@@ -156,46 +176,61 @@ Base.similar(::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tupl
 
 
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{Arr}}) where {Arr <: SwizzledArray}
-    arr = src.args[1]
-    dst = similar(src)
-    copyto!(dst, Broadcasted{DefaultArrayStyle{0}}(identity, (arr,)))
-    return dst[]
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}) where {T, N}
+    #A view of a Swizzle can be computed as a swizzle of a view (hiding the
+    #complexity of dropping view indices). Therefore, we convert first.
+    sub = sty.arg
+    src = convert(SwizzledArray, sub)
+    return Base.copyto!(dst, src)
 end
 
-Base.@propagate_inbounds function Base.copy(src::Broadcasted{DefaultArrayStyle{0}, <:Any, typeof(identity), <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
-    return Base.copy(Broadcasted{DefaultArrayStyle{0}}(identity, (convert(SwizzledArray, src.args[1]),)))
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SubArray{T, 0, <:SwizzledArray{T, 0}, <:Tuple{}}}) where {T}
+    #Zero-dimensional reswizzling case.
+    src = parent(sty.arg)
+    return Base.copyto!(dst, src)
 end
 
-for Identity = (typeof(identity), typeof(myidentity))
-    for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle, Style{Tuple})
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SwizzledArray})
+    @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
+    if eltype(sty.arg) <: eltype(dst)
+        src = preprocess(dst, sty.arg)
+        arg = src.arg
+        op = src.op
+        init = src.init
+        @inbounds begin
+            index = swizzleindex(dst, src)
+            drive = eachindex(arg, index)
+            if op === nothing
+                assign!(dst, index, arg, drive)
+            else
+                dst .= init
+                increment!(op, dst, index, arg, drive)
+            end
+        end
+        return dst
+    else
+        #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
+        copyto!(dst, copy(sty))
+    end
+end
+
+#Broadcast Optimizations
+for Style = (AbstractArrayStyle{0}, AbstractArrayStyle, DefaultArrayStyle{0}, DefaultArrayStyle)
+    for Identity = (typeof(identity), typeof(myidentity))
         @eval begin
-            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {T, N}
-                #A view of a Swizzle can be computed as a swizzle of a view (hiding the
-                #complexity of dropping view indices). Therefore, we convert first.
-                return Base.copyto!(dst, convert(SwizzledArray, src.args[1]))
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SubArray{T, <:Any, <:SwizzledArray{T, N}, <:Tuple{Vararg{Any, N}}}}}) where {S<:$Style, T, N}
+                if axes(dst) == axes(bc.args[1]) && eltype(bc.args[1]) <: eltype(dst)
+                    copyto!(dst, Styled{S}(bc.args[1]))
+                else
+                    dst .= copy(bc.args[1])
+                end
             end
 
-            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{<:$Style, <:Any, $Identity, <:Tuple{SwizzledArray}})
-                if axes(dst) == axes(src.args[1]) && eltype(src.args[1]) <: eltype(dst)
-                    arg = ArrayifiedArrays.preprocess(dst, src.args[1].arg)
-                    arr = adopt(arg, src.args[1])
-                    op = arr.op
-                    init = arr.init
-                    @inbounds begin
-                        index = swizzleindex(dst, arr)
-                        drive = eachindex(arg, index)
-                        if op === nothing
-                            assign!(dst, index, arg, drive)
-                        else
-                            dst .= init
-                            increment!(op, dst, index, arg, drive)
-                        end
-                    end
-                    return dst
+            Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, bc::Broadcasted{S, <:Any, $Identity, <:Tuple{SwizzledArray}}) where {S<:$Style}
+                if axes(dst) == axes(bc.args[1]) && eltype(bc.args[1]) <: eltype(dst)
+                    copyto!(dst, Styled{S}(bc.args[1]))
                 else
-                    #if the destination is unsuitable for directly accumulating the swizzle, we just give up and copy it.
-                    dst .= copy(src)
+                    dst .= copy(bc.args[1])
                 end
             end
         end
@@ -341,11 +376,6 @@ end
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, N, i}, ::Vararg{Any, N})::T) where {T, N, i} = i
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, 1, i}, ::Integer)::T) where {T, i} = i
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, <:Any, i}, ::Integer)::T) where {T, i} = i
-
-#function Base.Broadcast.preprocess(dest, arr::SwizzledArray{T, N, Op, mask, Arg}) where {T, N, Arg, Op, mask}
-#    arg = preprocess(dest, arr.arg)
-#    SwizzledArray{T, N, Op, mask, typeof(arg)}(arr.op, arg)
-#end
 
 """
     `childstyle(::Type{<:AbstractArray}, ::BroadcastStyle)`

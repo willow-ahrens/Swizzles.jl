@@ -1,5 +1,6 @@
 using StaticArrays: SVector, setindex
 using AbstractTrees
+using MacroTools
 
 struct Nil end
 
@@ -86,7 +87,24 @@ Delay() = Delay(nothing)
 
 Base.Broadcast.broadcasted(::BroadcastStyle, ::Delay, bc) = Delay(bc)
 
-Base.Broadcast.materialize(uw::Delay) = uw.value
+Base.Broadcast.materialize(d::Delay) = d.value
+
+macro _(ex)
+    return :(Delay().($(esc(ex))))
+end
+
+struct Insert{F}
+  f::F
+end
+
+@inline Base.Broadcast.broadcasted(::BroadcastStyle, i::Insert, bc) = i.f(bc)
+
+macro :($$)(ex)
+    @assert @capture(ex, f_(args__))
+    return :(Insert($(esc(f))).($(map(esc, args)...)))
+end
+
+
 
 abstract type Intercept end
 
