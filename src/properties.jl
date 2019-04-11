@@ -1,7 +1,7 @@
 module Properties
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
-export return_type, initial
+export return_type, initial, instance
 export Guard, Assume
 
 """
@@ -58,6 +58,28 @@ julia> initial_value(+, 1.0)
 @inline initial_value(::typeof(max_fast), x::Number) = Some(typemin(x))
 @inline initial_value(::typeof(min), x::Number) = Some(typemax(x))
 @inline initial_value(::typeof(min_fast), x::Number) = Some(typemax(x))
+
+
+
+"""
+    instance(T::Type)
+
+Return an instance of the type if there is only one instance.
+Return `nothing` otherwise.
+
+# Examples
+```jldoctest
+julia> instance(IndexCartesian)
+Some(IndexCartesian())
+julia> instance(AbstractArray)
+nothing
+julia> instance(Nothing)
+Some(nothing)
+```
+"""
+@inline function instance(T::Type)
+    isdefined(T, :instance) ? Some(T.instance) : nothing
+end
 
 
 

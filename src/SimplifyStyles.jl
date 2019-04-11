@@ -8,19 +8,19 @@ using Rewrite
 using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
+using Swizzles.Properties
 using Swizzles.Antennae
 using Swizzles.ValArrays
+using Swizzles.NamedArrays
 using Swizzles: SwizzledArray
 
 
 export Simplify
 
 
-SymbolExpr = Union{Symbol, Expr}  # Type alias for convenience
-
 
 """
-    reprexpr(root::Union{Symbol, Expr}, T::Type) :: Expr
+    rewriteable(root, T::Type)
 
 Given a root expression of type T, produce the most detailed constructor
 expression you can to create a new object that should be equal to root.
@@ -33,110 +33,85 @@ julia> A = [1 2 3 4; 5 6 7 8]'
  2  6
  3  7
  4  8
-julia> r = reprexpr(:A, typeof(A))
+julia> r = rewriteable(:A, typeof(A))
 :(LinearAlgebra.Adjoint(parent(A)::Array{Int64,2}))
 julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root::SymbolExpr, T) :: Expr = :($root::$T)
-
-function reprexpr(root::SymbolExpr, ::Type{<:ValArray{<:Any, val}}) where {val}
-    val_arr = ValArray(val)
-    :($val_arr)
+function rewriteable(root, T::Type)
+    syms = Dict{Symbolic, Any}()
+    return (Term(rewriteable(root, T, syms)), syms)
 end
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Adjoint{<:Any, Arg}}) :: Expr where Arg
-    arg_expr = reprexpr(:($root.parent), Arg)
-    :($Adjoint($arg_expr))
-end
-
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Transpose{<:Any, Arg}}) :: Expr where Arg
-    arg_expr = reprexpr(:($root.parent), Arg)
-    :($Transpose($arg_expr))
-end
-
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}) :: Expr where {F, Args<:Tuple}
-    antenna = Antenna(F.instance)
-    arg_exprs = tuple_reprexpr(:($root.args), Args)
-
-    :($antenna($(arg_exprs...)))
-end
-
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:SwizzledArray{<:Any, <:Any, Op, Mask, Init, Arg}}) :: Expr where {Op, Mask, Init, Arg}
-    swizzle = Swizzle(Op.instance, Mask)
-    init_expr = reprexpr(:($root.init), Init)
-    arg_expr = reprexpr(:($root.arg), Arg)
-
-    :($swizzle($init_expr, $arg_expr))
-end
-
-function tuple_reprexpr(root::SymbolExpr,
-                        ::Type{TType}) :: Array{Expr, 1} where TType<:Tuple
-    [reprexpr(:($root[$idx]), EType)
-         for (idx, EType) in enumerate(TType.parameters)]
-end
-
-
-"""
-Transforms a SymbolExpr into a Term (used for Rewrite.jl)
-"""
-function expr_to_term(ex::SymbolExpr) :: Tuple{Term, Dict{Symbolic, SymbolExpr}}
-    sym_to_ex = Dict{Symbolic, SymbolExpr}()
-    ex = addSymbolics(ex, sym_to_ex)
-    (Term(ex), sym_to_ex)
-end;
-
-function addSymbolics(ex::Symbol,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: Symbolic
+function rewriteable(root, T::Type, syms)
     s = Symbolic(gensym())
-    sym_to_ex[s] = ex
-    return s
+    syms[s] = root
+    return :($s::$T)
 end
 
-function addSymbolics(ex::Expr,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: Union{Expr, Symbolic}
-    if @capture(ex, f_(args__))
-        return :($f(
-            $(map(arg->addSymbolics(arg, sym_to_ex), args)...)
-        ))
-    elseif @capture(ex, arg_::T_) && !(T isa Union{Symbol, Expr})
-        s = Symbolic(gensym())
-        sym_to_ex[s] = arg
-        return s
+function rewriteable(root, ::Type{<:ValArray{<:Any, val}}, syms) where {val}
+    ValArray(val)
+end
+
+function rewriteable(root, ::Type{<:NamedArray{<:Any, <:Any, Arr, name}}, syms) where {Arr, name}
+    s = Symbolic(name)
+    syms[s] = :($root.arg)
+    return :($s::$Arr)
+end
+
+function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
+    arg = rewriteable(:($root.parent), Arg, syms)
+    :($Adjoint($arg))
+end
+
+function rewriteable(root, ::Type{<:Transpose{<:Any, Arg}}, syms) where Arg
+    arg = rewriteable(:($root.parent), Arg, syms)
+    :($Transpose($arg))
+end
+
+function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
+    args = map(((i, arg),) -> rewriteable(:($root.args[$i]), arg, syms), enumerate(Args.parameters))
+    f = instance(F)
+    if f !== nothing
+        :($(Antenna(something(f)))($(args...)))
     else
-        s = Symbolic(gensym())
-        sym_to_ex[s] = ex
-        return s
+        f = rewriteable(:(root.f), F, syms)
+        :(Antenna($f)($(args...)))
+    end
+end
+
+function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Arg}}, syms) where {Op, mask, Init, Arg}
+    init = rewriteable(:($root.init), Init, syms)
+    arg = rewriteable(:($root.arg), Arg, syms)
+    op = instance(Op)
+    if op !== nothing
+        :($(Swizzle(something(op), mask))($init, $arg))
+    else
+        op = rewriteable(:(root.op), Op, syms)
+        :(Swizzle($op, $mask)($init, $arg))
     end
 end
 
 
+
 """
-Transforms a Term (used for Rewrite.jl) into an SymbolExpr.
+Transforms a Term (used for Rewrite.jl) into an evaluable julia expression
 """
-function term_to_expr(term::Term,
-                      sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    return removeSymbolics(term.ex, sym_to_ex)
+function evaluable(term::Term, syms)
+    return evaluable(term.ex, syms)
 end
 
-function removeSymbolics(ex::Expr,
-                         sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    if @capture(ex, f_(args__))
-        return :($f(
-            $(map(arg->removeSymbolics(arg, sym_to_ex), args)...)
-        ))
-    end
-    throw(ArgumentError("non expr transformable: $ex"))
+function evaluable(ex::Expr, syms)
+    return Expr(ex.head, map(arg->evaluable(arg, syms), ex.args)...)
 end
 
-function removeSymbolics(s::Symbolic,
-                         sym_to_ex::Dict{Symbolic, SymbolExpr}) :: SymbolExpr
-    return sym_to_ex[s]
+function evaluable(ex::Symbolic, syms)
+    return syms[ex]
+end
+
+function evaluable(ex, syms)
+    return ex
 end
 
 
@@ -207,12 +182,11 @@ Apply global rules to simplify the array expression `arr`.
 Currently only supports broadcast expressions.
 """
 @generated function simplify(arr)
-    expr = reprexpr(:arr, arr)
-    term, sym_to_ex = expr_to_term(expr)
+    term, syms = rewriteable(:arr, arr)
     simple_term = Rewrite.with_context(DEFAULT_SPEC.context) do
         Rewrite.normalize(term, DEFAULT_SPEC.rules)
     end
-    simple_expr = term_to_expr(simple_term, sym_to_ex)
+    simple_expr = evaluable(simple_term, syms)
 
     return quote
         $simple_expr
