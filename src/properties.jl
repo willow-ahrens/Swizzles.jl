@@ -1,7 +1,7 @@
 module Properties
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
-export return_type, initial
+export return_type, initial, instance
 export Guard, Assume
 
 """

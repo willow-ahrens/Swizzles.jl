@@ -8,6 +8,7 @@ using Rewrite
 using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
+using Swizzles.Properties
 using Swizzles.Antennae
 using Swizzles.ValArrays
 using Swizzles: SwizzledArray
@@ -95,7 +96,7 @@ function evaluable(term::Term, syms)
 end
 
 function evaluable(ex::Expr, syms)
-    return Expr(ex.head, map(arg->evaluable(arg, syms), ex.args))
+    return Expr(ex.head, map(arg->evaluable(arg, syms), ex.args)...)
 end
 
 function evaluable(ex::Symbolic, syms)
@@ -174,12 +175,11 @@ Apply global rules to simplify the array expression `arr`.
 Currently only supports broadcast expressions.
 """
 @generated function simplify(arr)
-    expr = rewriteable(:arr, arr)
-    term, sym_to_ex = expr_to_term(expr)
+    term, syms = rewriteable(:arr, arr)
     simple_term = Rewrite.with_context(DEFAULT_SPEC.context) do
         Rewrite.normalize(term, DEFAULT_SPEC.rules)
     end
-    simple_expr = term_to_expr(simple_term, sym_to_ex)
+    simple_expr = evaluable(simple_term, syms)
 
     return quote
         $simple_expr

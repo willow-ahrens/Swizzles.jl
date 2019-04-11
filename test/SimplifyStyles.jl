@@ -1,16 +1,17 @@
 using Swizzles
+using Swizzles.Properties
 using Swizzles.SimplifyStyles
 using Swizzles.ValArrays
-using Swizzles.SimplifyStyles: reprexpr
+using Swizzles.SimplifyStyles: rewriteable, evaluable
 using LinearAlgebra
 using Base.Broadcast: broadcasted
 
 
-@testset "reprexpr" begin
+@testset "rewriteable" begin
 
-    # Checks faithfulness, i.e. (reprexpr |> eval) == eval
-    @generated function test_eval_reprexpr_is_id(val)
-        expr = reprexpr(:val, val)
+    # Checks faithfulness, i.e. (rewriteable |> evaluable |> eval) == eval
+    @generated function test_evaluable_rewriteable_is_id(val)
+        expr = evaluable(rewriteable(:val, val)...)
         return quote
             oVal = $expr
             @test typeof(val) === typeof(oVal)
@@ -18,22 +19,22 @@ using Base.Broadcast: broadcasted
         end
     end
 
-    test_eval_reprexpr_is_id(42)
-    test_eval_reprexpr_is_id(6. * 9.)
+    test_evaluable_rewriteable_is_id(42)
+    test_evaluable_rewriteable_is_id(6. * 9.)
 
     A = [1 2 3; 4 5 6]
-    test_eval_reprexpr_is_id(A)
-    test_eval_reprexpr_is_id(A')
-    test_eval_reprexpr_is_id(transpose(A))
-    test_eval_reprexpr_is_id(transpose(A'))
-    test_eval_reprexpr_is_id(transpose(A)')
+    test_evaluable_rewriteable_is_id(A)
+    test_evaluable_rewriteable_is_id(A')
+    test_evaluable_rewriteable_is_id(transpose(A))
+    test_evaluable_rewriteable_is_id(transpose(A'))
+    test_evaluable_rewriteable_is_id(transpose(A)')
 
     B = [300 200 100]
     C = [1000]
     D = 10000
-    test_eval_reprexpr_is_id(broadcasted(+, A, B, C, D))
-    test_eval_reprexpr_is_id(broadcasted(*, A, B, C, D))
-    test_eval_reprexpr_is_id(
+    test_evaluable_rewriteable_is_id(broadcasted(+, A, B, C, D))
+    test_evaluable_rewriteable_is_id(broadcasted(*, A, B, C, D))
+    test_evaluable_rewriteable_is_id(
         broadcasted(+,
             broadcasted(+, A, B),
             broadcasted(-, B, C),
@@ -45,14 +46,14 @@ using Base.Broadcast: broadcasted
 
     # Check that Antennae are being used.
     bd = broadcasted(+, A, B)
-    @test reprexpr(:bd, typeof(bd)).args[1] isa Swizzles.Antennae.Antenna
+    @test rewriteable(:bd, typeof(bd))[1].ex.args[1] isa Swizzles.Antennae.Antenna
 
-    test_eval_reprexpr_is_id(Swizzle(+, 1)(A))
-    test_eval_reprexpr_is_id(Swizzle(*, 1)(A) |> lift_vals)
-    @test reprexpr(
+    test_evaluable_rewriteable_is_id(Swizzle(+, 1)(A))
+    test_evaluable_rewriteable_is_id(Swizzle(*, 1)(A) |> lift_vals)
+    @test rewriteable(
             :sw,
             Swizzle(*, 1)(A) |> lift_vals |> typeof
-          ).args[2] == ValArray(1)
+          )[1].ex.args[2] == ValArray(1)
 end
 
 @testset "Simplify" begin
