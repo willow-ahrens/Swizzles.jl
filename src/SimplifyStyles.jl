@@ -16,11 +16,9 @@ using Swizzles: SwizzledArray
 export Simplify
 
 
-SymbolExpr = Union{Symbol, Expr}  # Type alias for convenience
-
 
 """
-    reprexpr(root::Union{Symbol, Expr}, T::Type) :: Expr
+    reprexpr(root, T::Type)
 
 Given a root expression of type T, produce the most detailed constructor
 expression you can to create a new object that should be equal to root.
@@ -39,49 +37,46 @@ julia> eval(Main, r) == A
 true
 ```
 """
-reprexpr(root::SymbolExpr, T) :: Expr = :($root::$T)
+reprexpr(root, T) = :($root::$T)
 
-function reprexpr(root::SymbolExpr, ::Type{<:ValArray{<:Any, val}}) where {val}
-    val_arr = ValArray(val)
-    :($val_arr)
+function reprexpr(root, ::Type{<:ValArray{<:Any, val}}) where {val}
+    ValArray(val)
 end
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Adjoint{<:Any, Arg}}) :: Expr where Arg
-    arg_expr = reprexpr(:($root.parent), Arg)
-    :($Adjoint($arg_expr))
+function reprexpr(root, ::Type{<:Adjoint{<:Any, Arg}}) where Arg
+    arg = reprexpr(:($root.parent), Arg)
+    :($Adjoint($arg))
 end
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Transpose{<:Any, Arg}}) :: Expr where Arg
-    arg_expr = reprexpr(:($root.parent), Arg)
-    :($Transpose($arg_expr))
+function reprexpr(root, ::Type{<:Transpose{<:Any, Arg}}) where Arg
+    arg = reprexpr(:($root.parent), Arg)
+    :($Transpose($arg))
 end
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}) :: Expr where {F, Args<:Tuple}
-    antenna = Antenna(F.instance)
-    arg_exprs = tuple_reprexpr(:($root.args), Args)
-
-    :($antenna($(arg_exprs...)))
+function reprexpr(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}) where {F, Args<:Tuple}
+    if isdefined(F, :instance)
+        f = F.instance
+        args = map(((i, arg),) -> reprexpr(:($root.args[$i]), arg), enumerate(Args.parameters))
+        :($(Antenna(f))($(args...)))
+    else
+        :($root::$T)
+    end
 end
 
-function reprexpr(root::SymbolExpr,
-                  ::Type{<:SwizzledArray{<:Any, <:Any, Op, Mask, Init, Arg}}) :: Expr where {Op, Mask, Init, Arg}
-    swizzle = Swizzle(Op.instance, Mask)
-    init_expr = reprexpr(:($root.init), Init)
-    arg_expr = reprexpr(:($root.arg), Arg)
-
-    :($swizzle($init_expr, $arg_expr))
-end
-
-function tuple_reprexpr(root::SymbolExpr,
-                        ::Type{TType}) :: Array{Expr, 1} where TType<:Tuple
-    [reprexpr(:($root[$idx]), EType)
-         for (idx, EType) in enumerate(TType.parameters)]
+function reprexpr(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Arg}}) where {Op, mask, Init, Arg}
+    if isdefined(Op, :instance)
+        op = Op.instance
+        init = reprexpr(:($root.init), Init)
+        arg = reprexpr(:($root.arg), Arg)
+        :($(Swizzle(op, mask))($init, $arg))
+    else
+        :($root::$T)
+    end
 end
 
 
+
+SymbolExpr = Union{Symbol, Expr}
 """
 Transforms a SymbolExpr into a Term (used for Rewrite.jl)
 """
