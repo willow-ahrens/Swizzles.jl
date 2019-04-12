@@ -3,9 +3,9 @@ using Swizzles.Properties
 using Swizzles.SimplifyStyles
 using Swizzles.NamedArrays
 using Swizzles.ValArrays
-using Swizzles.SimplifyStyles: rewriteable, evaluable
+using Swizzles.SimplifyStyles: rewriteable, evaluable, simplify
 using LinearAlgebra
-using Base.Broadcast: broadcasted
+using Base.Broadcast: broadcasted, materialize
 
 @testset "rewriteable" begin
 
@@ -79,8 +79,14 @@ using Base.Broadcast: broadcasted
     end
 end
 
-@testset "Simplify" begin
-    A, B = [1 2 3; 4 5 6], [100 200 300]
-    @test Simplify().(A) == A
-    @test Simplify().(A .+ B) == A .+ B
+@testset "simplify" begin
+    A = [1 2 3]
+    # test remove init rule
+    @test Swizzle(+)(0, A) |> lift_vals |> simplify == Swizzle(+)(A)
+
+    @testset "Simplify()" begin
+        A, B = [1 2 3; 4 5 6], [100 200 300]
+        @test Simplify().(A) == A
+        @test Simplify().(A .+ B) == A .+ B
+    end
 end

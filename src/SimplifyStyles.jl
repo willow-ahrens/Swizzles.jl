@@ -88,8 +88,9 @@ function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init,
     if op !== nothing
         :($(Swizzle(something(op), mask))($init, $arg))
     else
+        # TODO: Change to work with VirtualArrays.
         op = rewriteable(:(root.op), Op, syms)
-        :(Swizzle($op, $mask)($init, $arg))
+        :($Swizzle($op, $mask)($init, $arg))
     end
 end
 
@@ -155,6 +156,10 @@ function antenna_rule(rule::PatternRule) :: PatternRule
     return PatternRule(antenna_term(rule.left), antenna_term(rule.right))
 end
 
+struct ArbRule <: Rule
+    attempt_transform
+end
+Rewrite.normalize(term::Term, arule::ArbRule) = arule.attempt_transform(term)
 
 """
 Returns the default SimplificationSpec.
@@ -162,14 +167,34 @@ Returns the default SimplificationSpec.
 function default_spec()
     @vars x y z
 
-    equalities = Array{Rule, 1}([
+    pointwise_rules = Array{Rule, 1}([
         PatternRule(@term(x * (y + z)), @term(x * y + x * z))
     ])
-    append!(equalities, map(antenna_rule, equalities))
 
-    properties = []
+    arb_rules = Array{ArbRule, 1}([
+        ArbRule(term -> begin
+            @vars swz init arr
+            for σ in match(@term(swz(init, arr)), term)
+                # TODO: Need access to eltype of arr, for now we just do a hack
+                σ[swz] isa Swizzle || continue
+                σ[init] isa ValArray || continue
 
-    return SimplificationSpec(Rules(equalities), Context(properties))
+                op = σ[swz].op
+                val = typeof(σ[init]).parameters[2]
+                Some(val) === initial(op, typeof(val)) || continue
+
+                return replace(@term(swz(arr)), σ)
+            end
+            return term
+        end)
+    ])
+
+    rules = Array{Rule, 1}([])
+    append!(rules, pointwise_rules)
+    append!(rules, map(antenna_rule, pointwise_rules))
+    append!(rules, arb_rules)
+
+    return SimplificationSpec(Rules(rules), Context([]))
 end
 
 DEFAULT_SPEC = default_spec();
@@ -220,8 +245,9 @@ julia> Simplify().(A .+ B)
 ```
 """
 struct Simplify end
-#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_names(b))
-Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
+Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_vals(b))
+Base.broadcasted(::Simplify, s::SwizzledArray) = simplify(lift_vals(s))
+#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
 Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 
 
