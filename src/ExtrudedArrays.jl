@@ -8,13 +8,17 @@ module ExtrudedArrays
     using Swizzles.ShallowArrays
     using Swizzles.Properties
     using Swizzles: combinetuple
+    using Swizzles: maptuple
 
     export ExtrudedArray
     export keeps, kept, lift_keeps
     export Keep, Extrude
+    export keep, extrude
 
     struct Keep end
     struct Extrude end
+    const keep = Keep()
+    const extrude = Extrude()
 
     Base.:|(::Keep, ::Keep) = Keep()
     Base.:|(::Keep, ::Extrude) = Keep()
@@ -31,22 +35,28 @@ module ExtrudedArrays
     kept(::Extrude) = false
     kept(k::Bool) = k
 
-    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, keeps} <: ShallowArray{T, N, Arg}
+    struct ExtrudedArray{T, N, Arg<:AbstractArray{T, N}, Keeps<:Tuple{Vararg{Any, N}}} <: ShallowArray{T, N, Arg}
         arg::Arg
-        function ExtrudedArray{T, N, Arg, keeps}(arg::Arg) where {T, N, keeps, Arg}
-            @assert keeps isa Tuple{Vararg{Bool, N}}
+        keeps::Keeps
+        function ExtrudedArray{T, N, Arg, Keeps}(arg::Arg, keeps::Keeps) where {T, N, Arg, Keeps}
+            @assert keeps isa Tuple{Vararg{Any, N}}
             @assert all(ntuple(n -> kept(keeps[n]) || size(arg, n) == 1, N)) "$(size(arg)) $(keeps)"
-            return new{T, N, Arg, keeps}(arg)
+            return new{T, N, Arg, Keeps}(arg, keeps)
         end
     end
 
     function ExtrudedArray(arg)
         arr = arrayify(arg)
-        return ExtrudedArray{eltype(arr), ndims(arr), typeof(arr), keeps(arr)}(arr)
+        _keeps = keeps(arr)
+        return ExtrudedArray(arg, _keeps)
+    end
+    function ExtrudedArray(arg, keeps)
+        arr = arrayify(arg)
+        return ExtrudedArray{eltype(arr), ndims(arr), typeof(arr), typeof(keeps)}(arr, keeps)
     end
 
     Base.parent(arr::ExtrudedArray) = arr.arg
-    WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), keeps(arr)}(arg)
+    WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), typeof(arr.keeps)}(arg, arr.keeps)
 
     #keeps is a complicated function. It returns a tuple where each element of
     #the tuple specifies whether the corresponding dimension is intended to have
@@ -60,9 +70,26 @@ module ExtrudedArrays
     keeps(::Tuple{}) = (Keep(),)
     keeps(::Tuple{Any}) = (Extrude(),)
     keeps(::Tuple) = (Keep(),)
-    keeps(::ExtrudedArray{<:Any, <:Any, <:Any, _keeps}) where {_keeps} = _keeps
+    keeps(arr::ExtrudedArray) = arr.keeps
     keeps(ext::Extruded) = ext.keeps
     keeps(bc::Broadcasted) = combinetuple(|, map(keeps, bc.args)...)
+
+
+
+    import Base.Broadcast: newindex, _newindex, newindexer, extrude
+    Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::CartesianIndex) = CartesianIndex(Base.Broadcast._newindex(I.I, keeps(arg), maptuple(first, axes(arg)...)))
+    Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::Integer) = CartesianIndex(Base.Broadcast._newindex((I,), keeps(arg), maptuple(first, axes(arg)...)))
+    Base.Broadcast.extrude(x::ExtrudedArray) = Extruded(x.arg, keeps(x), maptuple(first, axes(x.arg)...))
+    #Base.Broadcast.extrude(x::AbstractArray) = Extruded(x, keeps(x), map(first, axes(x)))
+    @inline Base.Broadcast.newindexer(A::ExtrudedArray) = (keeps(A), maptuple(first, axes(A)...))
+    @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Keep}, idefault) = i
+    @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Extrude}, idefault) = idefault[i]
+    @inline Base.Broadcast._newindex(I, keep::Tuple{Keep, Vararg{Any}}, Idefault) =
+        (I[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
+    @inline Base.Broadcast._newindex(I, keep::Tuple{Extrude, Vararg{Any}}, Idefault) =
+        (Idefault[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
+
+
 
     #=
     Properties.return_type(typeof(keeps), T::Type) = Tuple{Vararg{Union{Bool, Extrude, Keep}}}
@@ -110,7 +137,7 @@ module ExtrudedArrays
     =#
 
 
-    lift_keeps(x) = ExtrudedArray(x)
+    lift_keeps(x) = ExtrudedArray(x, maptuple(k-> kept(k) ? Keep() : Extrude(), keeps(x)...))
     lift_keeps(x::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_keeps(x.arg))
     lift_keeps(x::StaticArray) = x
     lift_keeps(x::Tuple) = x
