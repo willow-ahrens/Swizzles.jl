@@ -45,7 +45,7 @@ Base.@propagate_inbounds  Base.setindex!(arr::ShallowArray, val, inds...) = seti
 
 Base.eachindex(arr::ShallowArray) = eachindex(parent(arr))
 
-@inline childstyle(::Type{<:ShallowArray}, S) = S
+@inline WrapperArrays.childstyle(::Type{<:ShallowArray}, S::BroadcastStyle) = S
 
 @inline function Broadcast.BroadcastStyle(Arr::Type{<:ShallowArray{<:Any, <:Any, Arg}}) where {Arg}
     childstyle(Arr, BroadcastStyle(Arg))

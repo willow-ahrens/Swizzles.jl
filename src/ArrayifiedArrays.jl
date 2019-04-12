@@ -1,17 +1,18 @@
 module ArrayifiedArrays
 
 using Swizzles.Properties
+using Swizzles.ScalarArrays
 using Swizzles.WrapperArrays
 using Swizzles.StylishArrays
-using Swizzles.ScalarArrays
+
 using Swizzles
 
-using Base: checkbounds_indices, throw_boundserror, tail, dataids, unaliascopy, unalias
-using Base.Iterators: repeated, countfrom, flatten, product, take, peel, EltypeUnknown
-using Base.Broadcast: Broadcasted, BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle, Unknown, ArrayConflict
-using Base.Broadcast: materialize, materialize!, instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
+using Base: dataids, unaliascopy, unalias
+using Base.Broadcast: Broadcasted, Extruded
+using Base.Broadcast: BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle
+using Base.Broadcast: instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 
-export ArrayifiedArray, arrayify, preprocess
+export ArrayifiedArray, arrayify, preprocess_broadcasts
 
 struct ArrayifiedArray{T, N, Arg} <: StylishArray{T, N}
     arg::Arg
@@ -71,7 +72,6 @@ end
 @inline Base.similar(bc::Broadcasted) = similar(bc, eltype(bc))
 @inline Base.similar(bc::Broadcasted, args...) = similar(bc, eltype(bc), args...)
 @inline Base.similar(bc::Broadcasted{DefaultArrayStyle{0}}) = ScalarArray{eltype(bc)}()
-
 
 @inline function Properties.eltype_bound(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted})
     return combine_eltypes(arr.arg.f, arr.arg.args)
@@ -133,23 +133,32 @@ Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.
 
 @inline Base.Broadcast.broadcastable(arr::ArrayifiedArray) = broadcastable(arr.arg)
 
+
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
-@inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
-@inline function preprocess(dst, arr)
+@inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess_broadcasts(dst, arr)))
+@inline Base.Broadcast.preprocess(dst, ext::Extruded) = Extruded(broadcast_unalias(dst, preprocess_broadcasts(dst, ext.x)), ext.keeps, ext.defaults) #make broadcast safe for double-preprocessing
+@inline preprocess_broadcasts(dst, bc::Broadcasted) = Base.Broadcast.preprocess(dst, bc)
+@inline function preprocess_broadcasts(dst, arr)
     if iswrapper(arr)
-        adopt(preprocess(dst, parent(arr)), arr)
+        adopt(preprocess_broadcasts(dst, parent(arr)), arr)
     else
         arr
     end
 end
-@inline function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
+@inline function preprocess_broadcasts(dst, arr::ArrayifiedArray{T, N}) where {T, N}
     if arr.arg isa AbstractArray
-        return arr
+        return preprocess_broadcasts(dst, arr)
     end
     arg = Base.Broadcast.preprocess(dst, arr.arg)
     return ArrayifiedArray{T, N, typeof(arg)}(arg)
 end
 
+
+
 @inline Base.Broadcast.BroadcastStyle(::Type{ArrayifiedArray{T, N, Arg}}) where {T, N, Arg} = BroadcastStyle(Arg)
+
+
+
+
 
 end
