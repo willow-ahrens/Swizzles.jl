@@ -1,7 +1,7 @@
 module Properties
 using Base.FastMath: add_fast, mul_fast, min_fast, max_fast
 
-export return_type, initial, instance
+export return_type, initial, eltype_bound, instance
 export Guard, Assume
 
 """
@@ -31,33 +31,6 @@ false
 @inline initial(::typeof(max_fast), T::Type{<:Number}) = Some(typemin(T))
 @inline initial(::typeof(min), T::Type{<:Number}) = Some(typemax(T))
 @inline initial(::typeof(min_fast), T::Type{<:Number}) = Some(typemax(T))
-
-"""
-    initial_value(op, x)
-
-Return the default initial value for the reduction operator `op` on the value
-`x`. Return `nothing` if you such a value does not exist.
-
-See also: [`zero`](@ref), [`oneunit`](@ref).
-
-# Examples
-```jldoctest
-julia> initial_value(+, 1)
-0
-julia> initial_value(+, 1.0)
--0.0
-```
-"""
-@inline initial_value(f::F, x) where {F} = initial(f, typeof(x))
-
-@inline initial_value(::typeof(+), x::Number) = Some(zero(x))
-@inline initial_value(::typeof(add_fast), x::Number) = Some(zero(x))
-@inline initial_value(::typeof(*), x::Number) = Some(oneunit(x))
-@inline initial_value(::typeof(mul_fast), x::Number) = Some(oneunit(x))
-@inline initial_value(::typeof(max), x::Number) = Some(typemin(x))
-@inline initial_value(::typeof(max_fast), x::Number) = Some(typemin(x))
-@inline initial_value(::typeof(min), x::Number) = Some(typemax(x))
-@inline initial_value(::typeof(min_fast), x::Number) = Some(typemax(x))
 
 
 
