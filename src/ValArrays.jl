@@ -45,7 +45,7 @@ end
 end
 @inline lift_vals(ext::Extruded) = Extruded(lift_vals(ext.x), ext.keeps, ext.defaults)
 @inline lift_vals(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_vals, bc.args))
-@inline lift_vals(arr::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_vals(arr.arg))
+@inline lift_vals(arr::ArrayifiedArray) = arrayify(lift_vals(arr.arg))
 
 
 end

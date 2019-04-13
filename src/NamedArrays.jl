@@ -43,8 +43,8 @@ module NamedArrays
         arr = arrayify(obj)
         return NamedArray(arr, name(arr, stuff))
     end
-    function lift_names(arr::ArrayifiedArray{T, N}, stuff) where {T, N}
-        return ArrayifiedArray{T, N}(lift_names(arr.arg, stuff))
+    function lift_names(arr::ArrayifiedArray, stuff)
+        return arrayify(lift_names(arr.arg, stuff))
     end
     lift_names(ext::Extruded, stuff) = Extruded(lift_names(ext.x, stuff), ext.keeps, ext.defaults)
     lift_names(bc::Broadcasted{Style}, stuff) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, stuff), bc.args), bc.axes)

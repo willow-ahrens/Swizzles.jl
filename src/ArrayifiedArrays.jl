@@ -117,15 +117,11 @@ Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broa
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}, I::CartesianIndex) = _broadcast_getindex(arr.arg, I)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}, I::Int...) = _broadcast_getindex(arr.arg, CartesianIndex(I))
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray{<:Any, <:Any, <:Broadcasted}) = _broadcast_getindex(arr.arg, 1)
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::Int) = getindex(arr.arg, I)
-Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::CartesianIndex) = getindex(arr.arg, I)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray, I::Int...) = getindex(arr.arg, I...)
 Base.@propagate_inbounds Base.getindex(arr::ArrayifiedArray) = getindex(arr.arg)
 
-Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I...) = setindex(arr.arg, x, I...)
 Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int) = setindex(arr.arg, x, I)
-Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::CartesianIndex) = setindex(arr.arg, x, I)
 Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x, I::Int...) = setindex(arr.arg, x, I...)
 Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.arg, x)
 

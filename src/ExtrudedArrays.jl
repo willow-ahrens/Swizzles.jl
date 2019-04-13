@@ -165,7 +165,7 @@ end
 lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, maptuple(lift_keeps, bc.args...), bc.axes)
 lift_keeps(ext::Extruded) = stable_extrude(lift_keeps(ext.x))
 lift_keeps(arr::ExtrudedArray) = ExtrudedArray(lift_keeps(ext.x))
-lift_keeps(arr::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_keeps(arr.arg))
+lift_keeps(arr::ArrayifiedArray) = arrayify(lift_keeps(arr.arg))
 function lift_keeps(x)
     if ndims(x) == 0
         return x
