@@ -156,9 +156,8 @@ function stabilize_extrudes_broadcasts(arr::AbstractArray)
         arr
     end
 end
-function stabilize_extrudes_broadcasts(arr::ArrayifiedArray{T, N}) where {T, N}
-    arg = stabilize_extrudes_broadcasts(arr.arg)
-    return ArrayifiedArray{T, N, typeof(arg)}(arg)
+function stabilize_extrudes_broadcasts(arr::ArrayifiedArray)
+    return arrayify(stabilize_extrudes_broadcasts(arr.arg))
 end
 
 #Add ExtrudedArrays to a broadcast/lazyarray expression so that the keeps of every recognizeable node can be determined from the types.
