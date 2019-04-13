@@ -23,15 +23,15 @@ foo(x) = x
         @test typeof(x) == typeof(y)
     end
 
-    bc  = Broadcasted(+, ((1, 2, 3), [1, 2, 3]'))
-    bc′ = Broadcasted(+, ((1, 2, 3), ExtrudedArray([1, 2, 3]', (extrude, keep))))
+    bc  = Broadcasted(+, ((1, 2, 3), identity.([1, 2, 3]')))
+    bc′ = Broadcasted(+, ((1, 2, 3), ExtrudedArray(identity.([1, 2, 3]'), (extrude, keep))))
     @test typeof(lift_keeps(bc)) == typeof(bc′)
     #@test inferkeeps(typeof(lift_keeps(bc))) == (true, true)
     @test keeps(bc) == (keep, true)
     #@test_throws MethodError inferkeeps(typeof(bc))
 
-    bc  = Broadcasted(+, ((1, 2, 3), [1]'))
-    bc′ = Broadcasted(+, ((1, 2, 3), ExtrudedArray([1]', (extrude, extrude))))
+    bc  = Broadcasted(+, ((1, 2, 3), identity.([1]')))
+    bc′ = Broadcasted(+, ((1, 2, 3), ExtrudedArray(identity.([1]'), (extrude, extrude))))
     @test typeof(lift_keeps(bc)) == typeof(bc′)
     #@test inferkeeps(typeof(lift_keeps(bc))) == (true, false)
     @test keeps(bc) == (keep, false)
@@ -79,17 +79,24 @@ foo(x) = x
     @test keeps(bc) == (extrude,)
     #@test inferkeeps(typeof(bc)) == (false,)
 
-    bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), [1, 2, 3]'))))
-    bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), ExtrudedArray([1, 2, 3]', (extrude, keep))))))
+    bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), identity.([1, 2, 3]')))))
+    bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), ExtrudedArray(identity.([1, 2, 3]'), (extrude, keep))))))
     @test typeof(lift_keeps(bc)) == typeof(bc′)
     #@test inferkeeps(typeof(lift_keeps(bc))) == (true, true)
     @test keeps(bc) == (true, true)
     #@test_throws MethodError inferkeeps(typeof(bc))
 
-    bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), [1, 2, 3]'))))
-    bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), ExtrudedArray([1, 2, 3]', (extrude, keep))))))
+    bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), identity.([1, 2, 3]')))))
+    bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), ExtrudedArray(identity.([1, 2, 3]'), (extrude, keep))))))
     @test typeof(lift_keeps(bc)) == typeof(bc′)
     #@test inferkeeps(typeof(lift_keeps(bc))) == (true, false)
     @test keeps(bc) == (true, false)
+    #@test_throws MethodError inferkeeps(typeof(bc))
+
+    a  = [1, 2, 3]'
+    a′ = ExtrudedArray([1, 2, 3], (keep,))'
+    @test typeof(lift_keeps(a)) == typeof(a′)
+    #@test inferkeeps(typeof(lift_keeps(bc))) == (true, false)
+    @test keeps(a) == (false, true)
     #@test_throws MethodError inferkeeps(typeof(bc))
 end
