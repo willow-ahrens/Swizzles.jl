@@ -51,7 +51,7 @@ Some(nothing)
 ```
 """
 @inline function instance(T::Type)
-    if isbitstype(T) && sizeof(T)==0 && hasproperty(T, :instance)
+    if isbitstype(T) && sizeof(T)==0 && :instance in propertynames(T)
         return Some(T.instance)
     else
         return nothing
