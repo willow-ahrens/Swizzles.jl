@@ -12,6 +12,7 @@ using Swizzles.Properties
 using Swizzles.Antennae
 using Swizzles.ValArrays
 using Swizzles.Virtuals
+using Swizzles.NamedArrays
 using Swizzles: SwizzledArray
 
 
@@ -52,6 +53,12 @@ end
 
 function rewriteable(root, ::Type{<:ValArray{<:Any, val}}, syms) where {val}
     ValArray(val)
+end
+
+function rewriteable(root, ::Type{<:NamedArray{<:Any, <:Any, Arr, name}}, syms) where {Arr, name}
+    s = Symbolic(name)
+    syms[s] = :($root.arg)
+    return :($s::$Arr)
 end
 
 function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
@@ -127,6 +134,8 @@ function veval(ex::Expr)
     end
 end
 
+
+
 """
 Stores rules for simplification.
 """
@@ -167,26 +176,45 @@ function antenna_rule(rule::PatternRule) :: PatternRule
     return PatternRule(antenna_term(rule.left), antenna_term(rule.right))
 end
 
+struct ArbRule <: Rule
+    attempt_transform
+end
+Rewrite.normalize(term::Term, arule::ArbRule) = arule.attempt_transform(term)
 
 """
 Returns the default SimplificationSpec.
 """
 function default_spec()
     @vars x y z
-    @vars swz
 
     pointwise_rules = Array{Rule, 1}([
         PatternRule(@term(x * (y + z)), @term(x * y + x * z))
     ])
-    append!(equalities, map(antenna_rule, pointwise_rules))
-    other_rules = Array{Rule, 1}([
-        PatternRule(@term(swz(init, arg)), @term((swz::Swizzle)(arg)) if swz isa Swizzle && isnilpotent(swz.op, init) )
+
+    arb_rules = Array{ArbRule, 1}([
+        ArbRule(term -> begin
+            @vars swz init arr
+            for σ in match(@term(swz(init, arr)), term)
+                # TODO: Need access to eltype of arr, for now we just do a hack
+                σ[swz] isa Swizzle || continue
+                σ[init] isa ValArray || continue
+
+                op = σ[swz].op
+                val = typeof(σ[init]).parameters[2]
+                Some(val) === initial(op, typeof(val)) || continue
+
+                return replace(@term(swz(arr)), σ)
+            end
+            return term
+        end)
     ])
-    append!(equalities, other_rules)
 
-    properties = []
+    rules = Array{Rule, 1}([])
+    append!(rules, pointwise_rules)
+    append!(rules, map(antenna_rule, pointwise_rules))
+    append!(rules, arb_rules)
 
-    return SimplificationSpec(Rules(equalities), Context(properties))
+    return SimplificationSpec(Rules(rules), Context([]))
 end
 
 DEFAULT_SPEC = default_spec();
@@ -237,8 +265,9 @@ julia> Simplify().(A .+ B)
 ```
 """
 struct Simplify end
-#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_names(b))
-Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
+Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_vals(b))
+Base.broadcasted(::Simplify, s::SwizzledArray) = simplify(lift_vals(s))
+#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
 Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 
 

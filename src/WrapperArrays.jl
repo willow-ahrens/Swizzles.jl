@@ -2,7 +2,9 @@ module WrapperArrays
 
 import LinearAlgebra
 
-export iswrapper, adopt, storage
+export iswrapper, adopt, storage, childstyle
+
+using Base.Broadcast: BroadcastStyle
 
 #=
     This file defines
@@ -99,5 +101,15 @@ iswrapper(::PermutedDimsArray) = true
 function adopt(arg::Arg, arr::PermutedDimsArray{<:Any,N,perm,iperm}) where {T,N,perm,iperm,Arg<:AbstractArray{T, N}}
     return PermutedDimsArray{T,N,perm,iperm,Arg}(arg)
 end
+
+"""
+    `childstyle(::Type{<:AbstractArray}, ::BroadcastStyle)`
+
+Broadcast styles are used to determine behavior of objects under broadcasting.
+To customize the broadcasting behavior of a wrapper array, one can first declare
+how the broadcast style should behave under broadcasting after the wrapper array
+is applied by overriding the `childstyle` method.
+"""
+@inline childstyle(Arr::Type{<:AbstractArray}, ::BroadcastStyle) = BroadcastStyle(Arr)
 
 end

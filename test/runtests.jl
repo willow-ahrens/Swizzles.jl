@@ -8,6 +8,7 @@ using Test
     include("ExtrudedArrays.jl")
     include("ValArrays.jl")
     include("NamedArrays.jl")
+    include("Virtuals.jl")
     include("ArrayifiedArrays.jl")
     include("SimplifyStyles.jl")
     include("StylishArrays.jl")

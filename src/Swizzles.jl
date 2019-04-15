@@ -19,15 +19,20 @@ using Swizzles.Properties
 
 include("Antennae.jl")
 include("ScalarArrays.jl")
-include("WrapperArrays.jl")
 include("NullArrays.jl")
+
+include("WrapperArrays.jl")
+include("ShallowArrays.jl")
+
 include("StylishArrays.jl")
 include("ArrayifiedArrays.jl")
-include("ShallowArrays.jl")
+
+include("Virtuals.jl")
+
 include("ExtrudedArrays.jl")
-include("MatchedArrays.jl")
-include("ValArrays.jl")
 include("NamedArrays.jl")
+include("ValArrays.jl")
+
 include("SwizzledArrays.jl")
 include("EachindexArrays.jl")
 include("PermutedArrays.jl")

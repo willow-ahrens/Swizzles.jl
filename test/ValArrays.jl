@@ -29,4 +29,6 @@ foo(x) = x
 
     @test Sum(2, 3).(B .* (A1 .+ C .+ A0) .+ A1) == Sum(2, 3).(B .* (1 .+ C .+ 0) .+ 1)
     @test typeof(Sum(2, 3).(B .* (A1 .+ C .+ A0))) == typeof(Sum(2, 3).(B .* (1 .+ C .+ 0)))
+    @test typeof(Delay().(Sum(2, 3).(A0, B .* (A1 .+ C .+ A0) .+ A1))) ==
+        typeof(lift_vals(Delay().(Sum(2, 3).(B .* (1 .+ C .+ 0) .+ 1))))
 end

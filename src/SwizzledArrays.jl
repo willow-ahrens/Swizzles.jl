@@ -1,4 +1,5 @@
 using Swizzles.Properties
+using Swizzles.Virtuals
 using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles.StylishArrays
@@ -110,11 +111,11 @@ end
 function Broadcast.broadcast_unalias(::Nothing, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     return src
 end
-function ArrayifiedArrays.preprocess(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+function ArrayifiedArrays.preprocess_broadcasts(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     init = src.init #preprocess that later
     if ndims(src.arg) != 0
-        #arg = preprocess(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
-        arg = preprocess(nothing, src.arg)
+        #arg = preprocess_broadcasts(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
+        arg = preprocess_broadcasts(nothing, src.arg)
     else
         arg = src.arg
     end
@@ -193,7 +194,7 @@ end
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SwizzledArray})
     @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
     if eltype(sty.arg) <: eltype(dst)
-        src = preprocess(dst, sty.arg)
+        src = preprocess_broadcasts(dst, sty.arg)
         arg = src.arg
         op = src.op
         init = src.init
@@ -377,15 +378,6 @@ Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, N, i}, ::Vararg{
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, 1, i}, ::Integer)::T) where {T, i} = i
 Base.@propagate_inbounds (Base.getindex(arr::ConstantIndices{T, <:Any, i}, ::Integer)::T) where {T, i} = i
 
-"""
-    `childstyle(::Type{<:AbstractArray}, ::BroadcastStyle)`
-
-Broadcast styles are used to determine behavior of objects under broadcasting.
-To customize the broadcasting behavior of a wrapper array, one can first declare
-how the broadcast style should behave under broadcasting after the wrapper array
-is applied by overriding the `childstyle` method.
-"""
-@inline childstyle(Arr::Type{<:AbstractArray}, ::BroadcastStyle) = BroadcastStyle(Arr)
 
 @inline childstyle(Arr::Type{<:SwizzledArray}, ::DefaultArrayStyle) = DefaultArrayStyle{ndims(Arr)}()
 @inline childstyle(Arr::Type{<:SwizzledArray}, ::BroadcastStyle) = DefaultArrayStyle{ndims(Arr)}()
@@ -396,33 +388,32 @@ is applied by overriding the `childstyle` method.
     childstyle(Arr, BroadcastStyle(parent(Arr)))
 end
 
-
-
-@inline function Swizzles.ExtrudedArrays.keeps(arr::SwizzledArray)
+@inline function ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
-    arr_keeps = masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
+    arr_keeps = masktuple(d->extrude, d->arg_keeps[d], Val(mask(arr)))
     init_keeps = keeps(arr.init)
     return combinetuple(|, arr_keeps, init_keeps)
 end
 
-#=
-function Swizzles.ExtrudedArrays.inferkeeps(Arr::Type{<:SwizzledArray})
-    arg_keeps = inferkeeps(parent(Arr))
-    masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(Arr)))
-end
-=#
-
-function Swizzles.ExtrudedArrays.lift_keeps(arr::SwizzledArray)
-    return adopt(lift_keeps(parent(arr)), arr)
+function ExtrudedArrays.stabilize_extrudes_broadcasts(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(arr.op, stabilize_extrudes_broadcasts(arr.init), stabilize_extrudes_broadcasts(arr.arg)) #FIXME this doesn't stabilize the swizzle though
 end
 
-function Swizzles.ValArrays.lift_vals(arr::SwizzledArray)
-    lifted_init = lift_vals(arr.init)
-    lifted_arg = lift_vals(arr.arg)
-    dims = typeof(arr).parameters[4]
-    return Swizzle(arr.op, dims)(lifted_init, lifted_arg)
+function ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(arr.op, lift_keeps(arr.init), lift_keeps(arr.arg))
 end
 
-function Swizzles.NamedArrays.lift_names(arr::SwizzledArray, stuff)
-    return adopt(lift_names(parent(arr), stuff), arr)
+function ValArrays.lift_vals(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(arr.op, lift_vals(arr.init), lift_vals(arr.arg))
+end
+
+function NamedArrays.lift_names(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(arr.op, lift_names(arr.init), lift_names(arr.arg))
+end
+
+function Virtuals.virtualize(root, ::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg}
+    init = virtualize(:($root.init), Init)
+    arg = virtualize(:($root.arg), Arg)
+    op = virtualize(:($root.op), Op)
+    return SwizzledArray{T, N, Op, mask}(op, init, arg)
 end
