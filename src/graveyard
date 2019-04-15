@@ -232,5 +232,31 @@ function reprexpr(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Ar
         :($(Swizzle(op, mask))($init, $arg))
     else
         :($root::$T)
+
+"""
+    type_bound(ex)
+
+Return your best guess of the type resulting from evaluating expression `ex`
+
+See also: [`typeof`](@ref).
+"""
+virtualize(ex) = typeof(ex)
+type_bound(ex::Symbol) = Any
+function type_bound(ex::Expr)
+    if @capture(ex, a_::T_) && T isa Type
+        t = type(a)
+        return t <: T ? t : T
+        return VirtualArray(a, T)
+    elseif @capture(ex, f_(args__))
+        if !(f isa Union{Symbol, Expr})
+            return return_type(f, map(type, args)...)
+        else
+            F = type(f)
+            if instance(F) !== nothing
+                return return_type(something(instance(f)), map(type, args)...)
+            else
+                return Any
+            end
+        end
     end
 end

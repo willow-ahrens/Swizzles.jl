@@ -61,6 +61,10 @@ end
 @inline jointuple(x, y) = (x..., y...)
 @inline jointuple(x, y, z...) = (x..., jointuple(y, z...)...)
 
+@inline maptuple(f::F) where {F} = ()
+@inline maptuple(f::F, x) where {F} = (f(x),)
+@inline maptuple(f::F, x, y, z...) where {F} = (f(x), maptuple(f, y, z...)...)
+
 @inline ziptuple(args::Tuple{}...) = ()
 @inline ziptuple(args::Tuple...) = (map(first, args), ziptuple(map(Base.tail, args)...)...)
 
