@@ -173,10 +173,10 @@ function lift_keeps(arr::AbstractArray)
     end
 end
 
-function Virtuals.virtualize(root, ::Type{Keep})
+function Virtuals.virtual(root, ::Type{Keep})
     return keep
 end
-function Virtuals.virtualize(root, ::Type{Extrude})
+function Virtuals.virtual(root, ::Type{Extrude})
     return extrude
 end
 function Virtuals.virtualize(root, ::Type{ExtrudedArray{T, N, Arg, Keeps}}) where {T, N, Arg, Keeps}
@@ -190,5 +190,10 @@ Base.:|(::Virtual{Bool}, ::Keep) = keep
 Base.:|(::Extrude, y::Virtual{Bool}) = y
 Base.:|(x::Virtual{Bool}, ::Extrude) = x
 Base.:|(x::Virtual{Bool}, ::Virtual{Bool}) = Virtual{Bool}(:($(x.ex) | $(y.ex)))
+
+keeps(::Virtual{Tuple{}}) = (keep,)
+keeps(::Virtual{Tuple{Any}}) = (extrude,)
+keeps(::Virtual{<:Tuple}) = (keep,)
+
 
 end
