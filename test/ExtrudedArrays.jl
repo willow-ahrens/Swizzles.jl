@@ -66,7 +66,7 @@ foo(x) = x
     bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), identity.([1, 2, 3]')))))
     bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1, 2, 3), ExtrudedArray(identity.([1, 2, 3]'), (extrude, keep))))))
     @test typeof(lift_keeps(bc)) == typeof(bc′)
-    @test keeps(bc) == (keep, true)
+    @test keeps(bc) == (true, keep)
 
     bc  = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), identity.([1, 2, 3]')))))
     bc′ = Delay().(Swizzle(+, (2, 1)).(Broadcasted(+, ((1,), ExtrudedArray(identity.([1, 2, 3]'), (extrude, keep))))))
