@@ -4,8 +4,8 @@ module NamedArrays
     using Base.Broadcast: Broadcasted, Extruded
     using Base.Broadcast: newindexer
     using Swizzles.WrapperArrays
-    using Swizzles.ArrayifiedArrays
     using Swizzles.ShallowArrays
+    using Swizzles.ArrayifiedArrays
     using Swizzles.Properties
 
     export NamedArray, name, lift_names
@@ -40,10 +40,12 @@ module NamedArrays
 
     lift_names(obj) = lift_names(obj, Dict())
     function lift_names(obj, stuff)
-        arr = ArrayifiedArray(obj)
+        arr = arrayify(obj)
         return NamedArray(arr, name(arr, stuff))
     end
-    lift_names(arr::AbstractArray, stuff) = NamedArray(arr, name(arr, stuff))
-    lift_names(arr::ArrayifiedArray{T, N}, stuff) where {T, N} = ArrayifiedArray{T, N}(lift_names(arr.arg, stuff))
+    function lift_names(arr::ArrayifiedArray, stuff)
+        return arrayify(lift_names(arr.arg, stuff))
+    end
+    lift_names(ext::Extruded, stuff) = Extruded(lift_names(ext.x, stuff), ext.keeps, ext.defaults)
     lift_names(bc::Broadcasted{Style}, stuff) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, stuff), bc.args), bc.axes)
 end

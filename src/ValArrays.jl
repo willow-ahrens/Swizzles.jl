@@ -1,8 +1,10 @@
 module ValArrays
 
-using Swizzles.ArrayifiedArrays
 using Swizzles.WrapperArrays
-using Base.Broadcast: Broadcasted, BroadcastStyle
+using Swizzles.ArrayifiedArrays
+
+using Base.Broadcast: Broadcasted, Extruded
+
 
 export ValArray
 export lift_vals
@@ -34,7 +36,6 @@ Base.size(::ValArray) = ()
     end
     return x
 end
-@inline lift_vals(arr::ArrayifiedArray{T, N}) where {T, N} = ArrayifiedArray{T, N}(lift_vals(arr.arg))
 @inline function lift_vals(arr::AbstractArray)
     if iswrapper(arr)
         return adopt(lift_vals(parent(arr)), arr)
@@ -42,6 +43,9 @@ end
         return arr
     end
 end
+@inline lift_vals(ext::Extruded) = Extruded(lift_vals(ext.x), ext.keeps, ext.defaults)
 @inline lift_vals(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_vals, bc.args))
+@inline lift_vals(arr::ArrayifiedArray) = arrayify(lift_vals(arr.arg))
+
 
 end

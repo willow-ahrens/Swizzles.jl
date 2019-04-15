@@ -18,17 +18,21 @@ include("properties.jl")
 using Swizzles.Properties
 
 include("ScalarArrays.jl")
-include("WrapperArrays.jl")
 include("NullArrays.jl")
+
+include("WrapperArrays.jl")
+include("ShallowArrays.jl")
+
 include("StylishArrays.jl")
 include("ArrayifiedArrays.jl")
-include("ShallowArrays.jl")
-include("ExtrudedArrays.jl")
-include("ValArrays.jl")
-include("NamedArrays.jl")
-include("SwizzledArrays.jl")
-include("EachindexArrays.jl")
 
+include("ExtrudedArrays.jl")
+include("NamedArrays.jl")
+include("ValArrays.jl")
+
+include("SwizzledArrays.jl")
+
+include("EachindexArrays.jl")
 include("PermutedArrays.jl")
 
 
