@@ -113,7 +113,9 @@ function evaluable(ex, syms)
     return ex
 end
 
-
+struct UndefinedSyms end
+evaluable(ex) = evaluable(ex, UndefinedSyms())
+Base.getindex(::UndefinedSyms, sym) = gensym()
 
 """
 Virtually evaluate a Term (used for Rewrite.jl)
@@ -192,14 +194,13 @@ function default_spec()
         ArbRule(term -> begin
             @vars swz init arr
             for σ in match(@term(swz(init, arr)), term)
-                # TODO: Need access to eltype of arr, for now we just do a hack
                 σ[swz] isa Swizzle || continue
                 σ[init] isa ValArray || continue
 
-                op = σ[swz].op
-                val = typeof(σ[init]).parameters[2]
-                Some(val) === initial(op, typeof(val)) || continue
-
+                z = σ[init][]
+                f = σ[swz].op
+                T = eltype(veval(evaluable(σ[arr])))
+                Some(z) === initial(f, T) || continue
                 return replace(@term(swz(arr)), σ)
             end
             return term
