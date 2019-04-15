@@ -11,7 +11,7 @@ using Swizzles
 using Swizzles.Properties
 using Swizzles.Antennae
 using Swizzles.ValArrays
-using Swizzles.NamedArrays
+using Swizzles.Virtuals
 using Swizzles: SwizzledArray
 
 
@@ -54,12 +54,6 @@ function rewriteable(root, ::Type{<:ValArray{<:Any, val}}, syms) where {val}
     ValArray(val)
 end
 
-function rewriteable(root, ::Type{<:NamedArray{<:Any, <:Any, Arr, name}}, syms) where {Arr, name}
-    s = Symbolic(name)
-    syms[s] = :($root.arg)
-    return :($s::$Arr)
-end
-
 function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
     arg = rewriteable(:($root.parent), Arg, syms)
     :(Adjoint($arg))
@@ -76,8 +70,7 @@ function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) w
     if f !== nothing
         :($(Antenna(something(f)))($(args...)))
     else
-        f = rewriteable(:(root.f), F, syms)
-        :(Antenna($f)($(args...)))
+        return :($root::T)
     end
 end
 
@@ -88,9 +81,7 @@ function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init,
     if op !== nothing
         :($(Swizzle(something(op), mask))($init, $arg))
     else
-        # TODO: Change to work with VirtualArrays.
-        op = rewriteable(:(root.op), Op, syms)
-        :($Swizzle($op, $mask)($init, $arg))
+        return :($root::T)
     end
 end
 
@@ -115,6 +106,26 @@ function evaluable(ex, syms)
     return ex
 end
 
+
+
+"""
+Virtually evaluate a Term (used for Rewrite.jl)
+"""
+function veval(term::Term, syms)
+    return veval(evaluable(term))
+end
+
+function veval(ex::Expr)
+    if @capture(ex, _ex::_T)
+        @assert T isa Type
+        return virtualize(ex, T)
+    elseif @capture(ex, f_(args__))
+        #TODO should we check anything here?
+        return f(map(veval, args)...)
+    else
+        ArgumentError("Cannot virtually evaluate expression $ex")
+    end
+end
 
 """
 Stores rules for simplification.
@@ -156,45 +167,26 @@ function antenna_rule(rule::PatternRule) :: PatternRule
     return PatternRule(antenna_term(rule.left), antenna_term(rule.right))
 end
 
-struct ArbRule <: Rule
-    attempt_transform
-end
-Rewrite.normalize(term::Term, arule::ArbRule) = arule.attempt_transform(term)
 
 """
 Returns the default SimplificationSpec.
 """
 function default_spec()
     @vars x y z
+    @vars swz
 
     pointwise_rules = Array{Rule, 1}([
         PatternRule(@term(x * (y + z)), @term(x * y + x * z))
     ])
-
-    arb_rules = Array{ArbRule, 1}([
-        ArbRule(term -> begin
-            @vars swz init arr
-            for σ in match(@term(swz(init, arr)), term)
-                # TODO: Need access to eltype of arr, for now we just do a hack
-                σ[swz] isa Swizzle || continue
-                σ[init] isa ValArray || continue
-
-                op = σ[swz].op
-                val = typeof(σ[init]).parameters[2]
-                Some(val) === initial(op, typeof(val)) || continue
-
-                return replace(@term(swz(arr)), σ)
-            end
-            return term
-        end)
+    append!(equalities, map(antenna_rule, pointwise_rules))
+    other_rules = Array{Rule, 1}([
+        PatternRule(@term(swz(init, arg)), @term((swz::Swizzle)(arg)) if swz isa Swizzle && isnilpotent(swz.op, init) )
     ])
+    append!(equalities, other_rules)
 
-    rules = Array{Rule, 1}([])
-    append!(rules, pointwise_rules)
-    append!(rules, map(antenna_rule, pointwise_rules))
-    append!(rules, arb_rules)
+    properties = []
 
-    return SimplificationSpec(Rules(rules), Context([]))
+    return SimplificationSpec(Rules(equalities), Context(properties))
 end
 
 DEFAULT_SPEC = default_spec();
@@ -245,9 +237,8 @@ julia> Simplify().(A .+ B)
 ```
 """
 struct Simplify end
-Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_vals(b))
-Base.broadcasted(::Simplify, s::SwizzledArray) = simplify(lift_vals(s))
-#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
+#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_names(b))
+Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
 Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 
 

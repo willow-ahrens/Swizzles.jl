@@ -51,7 +51,11 @@ Some(nothing)
 ```
 """
 @inline function instance(T::Type)
-    isdefined(T, :instance) ? Some(T.instance) : nothing
+    try
+        return Some(T.instance)
+    catch Error
+         return nothing
+    end
 end
 
 
