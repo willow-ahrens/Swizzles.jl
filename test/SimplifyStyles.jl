@@ -3,7 +3,7 @@ using Swizzles.Properties
 using Swizzles.SimplifyStyles
 using Swizzles.NamedArrays
 using Swizzles.ValArrays
-using Swizzles.SimplifyStyles: rewriteable, evaluable, simplify
+using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, simplify
 using LinearAlgebra
 using Base.Broadcast: broadcasted, materialize
 
@@ -88,5 +88,14 @@ end
         A, B = [1 2 3; 4 5 6], [100 200 300]
         @test Simplify().(A) == A
         @test Simplify().(A .+ B) == A .+ B
+    end
+
+    @testset "veval()" begin
+        for x in [@_((1, 2, 3) .+ [1, 2, 3]'),
+                  @_(0 .+ [1, 2, 3] .+ [1 2 3; 4 5 6; 7 8 9]),
+                  Swizzle(+)(@_(0 .+ [1, 2, 3] .+ [1 2 3; 4 5 6; 7 8 9])),
+                  Swizzle(+, 1)(@_(0 .+ [1, 2, 3] .+ [1 2 3; 4 5 6; 7 8 9]))]
+            @test kept.(keeps(veval(evaluable(rewriteable(:root, typeof(lift_keeps(x)))...)))) == kept.(keeps(x))
+        end
     end
 end

@@ -63,12 +63,12 @@ end
 
 function rewriteable(root, ::Type{<:Adjoint{<:Any, Arg}}, syms) where Arg
     arg = rewriteable(:($root.parent), Arg, syms)
-    :(Adjoint($arg))
+    :($Adjoint($arg))
 end
 
 function rewriteable(root, ::Type{<:Transpose{<:Any, Arg}}, syms) where Arg
     arg = rewriteable(:($root.parent), Arg, syms)
-    :(Transpose($arg))
+    :($Transpose($arg))
 end
 
 function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
@@ -118,21 +118,18 @@ end
 """
 Virtually evaluate a Term (used for Rewrite.jl)
 """
-function veval(term::Term, syms)
-    return veval(evaluable(term))
-end
-
-function veval(ex::Expr)
-    if @capture(ex, _ex::_T)
+function veval(ex::Union{Expr, Symbol})
+    if @capture(ex, x_::T_)
         @assert T isa Type
-        return virtualize(ex, T)
+        return virtualize(x, T)
     elseif @capture(ex, f_(args__))
         #TODO should we check anything here?
         return f(map(veval, args)...)
     else
-        ArgumentError("Cannot virtually evaluate expression $ex")
+        throw(ArgumentError("Cannot virtually evaluate expression $ex"))
     end
 end
+veval(x) = x
 
 
 

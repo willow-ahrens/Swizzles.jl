@@ -13,6 +13,9 @@ struct Virtual{T}
 end
 
 Base.ndims(::Virtual{T}) where {T} = ndims(T)
+Base.ndims(::Type{Virtual{T}}) where {T} = ndims(T)
+Base.axes(::Virtual{T}) where {T} = ndims(T) == 0 ? () : error() #FIXME return virtual axes!
+Base.Broadcast.broadcastable(x::Virtual{<:Union{AbstractArray,Number,Ref,Tuple,Broadcasted}}) = x
 
 struct VirtualArray{T, N, Data<:AbstractArray{T, N}} <: AbstractArray{T, N}
     ex
