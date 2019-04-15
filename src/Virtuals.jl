@@ -13,9 +13,10 @@ struct Virtual{T}
 end
 
 function virtual(root, Data::Type)
-    try
-        return Data.instance
-    catch Error
+    ins = instance(Data)
+    if ins !== nothing
+        return something(ins)
+    else
         return Virtual{Data}(root)
     end
 end
@@ -40,9 +41,10 @@ function virtualtuple(root, Data::Type{<:Tuple})
 end
 
 function virtualize(root, Data::Type)
-    try
-        return Data.instance
-    catch Error
+    ins = instance(Data)
+    if ins !== nothing
+        return something(ins)
+    else
         return Virtual{Data}(root)
     end
 end
