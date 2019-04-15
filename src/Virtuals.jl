@@ -1,20 +1,25 @@
 module Virtuals
 
+using Base.Broadcast: Broadcasted, Extruded
+using LinearAlgebra
+
+using Swizzles.ArrayifiedArrays
+using Swizzles.Properties
+
+export Virtual, VirtualArray, virtualize
+
 struct Virtual{T}
     ex
-    t::T
 end
+
+Base.ndims(::Virtual{T}) where {T} = ndims(T)
 
 struct VirtualArray{T, N, Data<:AbstractArray{T, N}} <: AbstractArray{T, N}
     ex
 end
 
-function virtualize(root, Data::AbstractArray{T, N})
+function virtualize(root, Data::AbstractArray{T, N}) where {T, N}
     return VirtualArray{T, N, Data}(root)
-end
-
-function virtualize(root, Data::Type{<:ValArray})
-    return Data()
 end
 
 function virtualize(root, ::Type{<:Adjoint{T, Arg}}) where {T, Arg}
@@ -33,10 +38,18 @@ function virtualize(root, ::Type{<:ArrayifiedArray{T, N, Arg}}) where {T, N, Arg
 end
 
 function virtualize(root, Data::Type)
-    if hasproperty(Data, :instance)
+    try
         return Data.instance
-    else
+    catch Error
         return Virtual{Data}(root)
+    end
+end
+
+function virtualize(root, Data::Type{<:AbstractArray{T, N}}) where {T, N}
+    try
+        return Data.instance
+    catch Error
+        return VirtualArray{T, N, Data}(root)
     end
 end
 
@@ -45,18 +58,18 @@ function virtualize(root, Data::Type{<:Tuple})
     return (data...,)
 end
 
-function virtualize(root, ::Type{<:Broadcasted{Style, Axes, F, Args}}, syms) where {Style, Axes, F, Args}
+function virtualize(root, ::Type{<:Broadcasted{Style, Axes, F, Args}}) where {Style, Axes, F, Args}
     f = virtualize(:($root.f), F)
     args = virtualize(:($root.args), Args)
     axes = virtualize(:($root.axes), Axes)
     return Broadcasted{Style}(f, args, axes)
 end
 
-function virtualize(root, T::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}, syms) where {Op, mask, Init, Arg}
-    init = virtualize(:($root.init), Init)
+function virtualize(root, ::Type{<:Extruded{Arg, Keeps, Defaults}}) where {Arg, Keeps, Defaults}
     arg = virtualize(:($root.arg), Arg)
-    op = virtualize(:($root.op), Op)
-    return SwizzledArray{T, N, Op, mask}(op, init, arg)
+    keeps = virtualize(:($root.keeps), Keeps)
+    defaults = virtualize(:($root.defaults), Defaults)
+    return Extruded(arg, keeps, defaults)
 end
 
 end

@@ -2,6 +2,7 @@ module ValArrays
 
 using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
+using Swizzles.Virtuals
 
 using Base.Broadcast: Broadcasted, Extruded
 
@@ -47,5 +48,8 @@ end
 @inline lift_vals(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, map(lift_vals, bc.args))
 @inline lift_vals(arr::ArrayifiedArray) = arrayify(lift_vals(arr.arg))
 
+function Virtuals.virtualize(root, ::Type{ValArray{T, c}}) where {T, c}
+    return ValArray{T, c}()
+end
 
 end

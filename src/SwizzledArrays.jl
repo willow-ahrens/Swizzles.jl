@@ -1,4 +1,5 @@
 using Swizzles.Properties
+using Swizzles.Virtuals
 using Swizzles.WrapperArrays
 using Swizzles.ArrayifiedArrays
 using Swizzles.StylishArrays
@@ -389,7 +390,7 @@ end
 
 @inline function ExtrudedArrays.keeps(arr::SwizzledArray)
     arg_keeps = keeps(arr.arg)
-    arr_keeps = masktuple(d->Extrude(), d->arg_keeps[d], Val(mask(arr)))
+    arr_keeps = masktuple(d->extrude, d->arg_keeps[d], Val(mask(arr)))
     init_keeps = keeps(arr.init)
     return combinetuple(|, arr_keeps, init_keeps)
 end
@@ -408,4 +409,11 @@ end
 
 function NamedArrays.lift_names(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     return SwizzledArray{T, N, Op, mask}(arr.op, lift_names(arr.init), lift_names(arr.arg))
+end
+
+function Virtuals.virtualize(root, ::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg}
+    init = virtualize(:($root.init), Init)
+    arg = virtualize(:($root.arg), Arg)
+    op = virtualize(:($root.op), Op)
+    return SwizzledArray{T, N, Op, mask}(op, init, arg)
 end
