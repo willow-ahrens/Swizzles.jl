@@ -51,10 +51,10 @@ Some(nothing)
 ```
 """
 @inline function instance(T::Type)
-    try
+    if isbitstype(T) && sizeof(T)==0 && hasproperty(T, :instance)
         return Some(T.instance)
-    catch Error
-         return nothing
+    else
+        return nothing
     end
 end
 
