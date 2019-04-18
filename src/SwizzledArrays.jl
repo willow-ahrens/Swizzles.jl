@@ -395,8 +395,8 @@ end
     return combinetuple(|, arr_keeps, init_keeps)
 end
 
-function ExtrudedArrays.stabilize_extrudes_broadcasts(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    return SwizzledArray{T, N, Op, mask}(arr.op, stabilize_extrudes_broadcasts(arr.init), stabilize_extrudes_broadcasts(arr.arg)) #FIXME this doesn't stabilize the swizzle though
+function ExtrudedArrays.freeze_extrudes(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(arr.op, freeze_extrudes(arr.init), freeze_extrudes(arr.arg)) #FIXME this doesn't stabilize the swizzle though
 end
 
 function ExtrudedArrays.lift_keeps(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
