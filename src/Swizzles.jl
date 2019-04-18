@@ -132,6 +132,9 @@ end
     end
 end
 
+@inline mask(::Swizzle{<:Any, _mask}) where {_mask} = _mask
+@inline mask(::Type{<:Swizzle{<:Any, _mask}}) where {_mask} = _mask
+
 """
     `Focus(mask...)`
     `Focus(mask)`
