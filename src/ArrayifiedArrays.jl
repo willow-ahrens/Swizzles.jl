@@ -12,7 +12,7 @@ using Base.Broadcast: Broadcasted, Extruded
 using Base.Broadcast: BroadcastStyle, Style, DefaultArrayStyle, AbstractArrayStyle
 using Base.Broadcast: instantiate, broadcastable, _broadcast_getindex, combine_eltypes, extrude, broadcast_unalias
 
-export ArrayifiedArray, arrayify, preprocess_broadcasts
+export ArrayifiedArray, arrayify, preprocess
 
 struct ArrayifiedArray{T, N, Arg} <: StylishArray{T, N}
     arg::Arg
@@ -131,19 +131,19 @@ Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.
 
 
 #This should do the same thing as Broadcast preprocess does, but apply the ArrayifiedArrays preprocess first
-@inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess_broadcasts(dst, arr)))
-@inline Base.Broadcast.preprocess(dst, ext::Extruded) = Extruded(broadcast_unalias(dst, preprocess_broadcasts(dst, ext.x)), ext.keeps, ext.defaults) #make broadcast safe for double-preprocessing
-@inline preprocess_broadcasts(dst, bc::Broadcasted) = Base.Broadcast.preprocess(dst, bc)
-@inline function preprocess_broadcasts(dst, arr)
+@inline Base.Broadcast.preprocess(dst, arr::AbstractArray) = extrude(broadcast_unalias(dst, preprocess(dst, arr)))
+@inline Base.Broadcast.preprocess(dst, ext::Extruded) = Extruded(broadcast_unalias(dst, preprocess(dst, ext.x)), ext.keeps, ext.defaults) #make broadcast safe for double-preprocessing
+@inline preprocess(dst, bc::Broadcasted) = Base.Broadcast.preprocess(dst, bc)
+@inline function preprocess(dst, arr)
     if iswrapper(arr)
-        adopt(preprocess_broadcasts(dst, parent(arr)), arr)
+        adopt(preprocess(dst, parent(arr)), arr)
     else
         arr
     end
 end
-@inline function preprocess_broadcasts(dst, arr::ArrayifiedArray{T, N}) where {T, N}
+@inline function preprocess(dst, arr::ArrayifiedArray{T, N}) where {T, N}
     if arr.arg isa AbstractArray
-        return preprocess_broadcasts(dst, arr)
+        return preprocess(dst, arr)
     end
     arg = Base.Broadcast.preprocess(dst, arr.arg)
     return ArrayifiedArray{T, N, typeof(arg)}(arg)

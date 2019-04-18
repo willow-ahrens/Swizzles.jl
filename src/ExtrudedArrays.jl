@@ -19,7 +19,7 @@ export ExtrudedArray
 export keeps, kept
 export Keep, Extrude
 export keep, extrude
-export lift_keeps, stabilize_extrudes_broadcasts
+export lift_keeps, freeze_extrudes
 
 struct Keep end
 struct Extrude end
@@ -125,28 +125,28 @@ Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::Integer)
 
 
 
-stable_extrude(x) = Extruded(x, maptuple(k-> kept(k) ? keep : extrude, keeps(x)...), maptuple(first, axes(x)...))
+static_extrude(x) = Extruded(x, maptuple(k-> kept(k) ? keep : extrude, keeps(x)...), maptuple(first, axes(x)...))
 
 #Add stable Extrudes to all internal broadcast expressions so that the broadcast_getindex does not need dynamic checks.
-stabilize_extrudes(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, maptuple(stabilize_extrudes, bc.args...), bc.axes)
-stabilize_extrudes(ext::Extruded) = stable_extrude(stabilize_extrudes_broadcasts(ext.x)) #FIXME avoid recomputation in redundant passes
-stabilize_extrudes(x) = stable_extrude(stabilize_extrudes_broadcasts(x))
-stabilize_extrudes_broadcasts(bc::Broadcasted) = stabilize_extrudes(bc)
-stabilize_extrudes_broadcasts(x) = x
-function stabilize_extrudes_broadcasts(arr::AbstractArray)
+_freeze_extrudes(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, maptuple(_freeze_extrudes, bc.args...), bc.axes)
+_freeze_extrudes(ext::Extruded) = static_extrude(freeze_extrudes(ext.x)) #FIXME avoid recomputation in redundant passes
+_freeze_extrudes(x) = static_extrude(freeze_extrudes(x))
+freeze_extrudes(bc::Broadcasted) = _freeze_extrudes(bc)
+freeze_extrudes(x) = x
+function freeze_extrudes(arr::AbstractArray)
     if iswrapper(arr)
-        adopt(stabilize_extrudes_broadcasts(parent(arr)), arr)
+        adopt(freeze_extrudes(parent(arr)), arr)
     else
         arr
     end
 end
-function stabilize_extrudes_broadcasts(arr::ArrayifiedArray)
-    return arrayify(stabilize_extrudes_broadcasts(arr.arg))
+function freeze_extrudes(arr::ArrayifiedArray)
+    return arrayify(freeze_extrudes(arr.arg))
 end
 
 #Add ExtrudedArrays to a broadcast/lazyarray expression so that the keeps of every recognizeable node can be determined from the types.
 lift_keeps(bc::Broadcasted{Style}) where {Style} = Broadcasted{Style}(bc.f, maptuple(lift_keeps, bc.args...), bc.axes)
-lift_keeps(ext::Extruded) = stable_extrude(lift_keeps(ext.x))
+lift_keeps(ext::Extruded) = static_extrude(lift_keeps(ext.x))
 lift_keeps(arr::ExtrudedArray) = ExtrudedArray(lift_keeps(ext.x))
 lift_keeps(arr::ArrayifiedArray) = arrayify(lift_keeps(arr.arg))
 function lift_keeps(x)
