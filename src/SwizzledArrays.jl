@@ -111,11 +111,11 @@ end
 function Broadcast.broadcast_unalias(::Nothing, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     return src
 end
-function ArrayifiedArrays.preprocess_broadcasts(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
+function ArrayifiedArrays.preprocess(dst, src::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     init = src.init #preprocess that later
     if ndims(src.arg) != 0
-        #arg = preprocess_broadcasts(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
-        arg = preprocess_broadcasts(nothing, src.arg)
+        #arg = preprocess(nothing, unalias(dst, src.arg)) #FIXME for some reason, calling mightalias screws up vectorization. I do not understand.
+        arg = preprocess(nothing, src.arg)
     else
         arg = src.arg
     end
@@ -194,7 +194,7 @@ end
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, sty::Styled{<:AbstractArrayStyle, <:SwizzledArray})
     @boundscheck axes(dst) == axes(sty.arg) || error("TODO")
     if eltype(sty.arg) <: eltype(dst)
-        src = preprocess_broadcasts(dst, sty.arg)
+        src = preprocess(dst, sty.arg)
         arg = src.arg
         op = src.op
         init = src.init
