@@ -13,7 +13,7 @@ using Swizzles.Antennae
 using Swizzles.ValArrays
 using Swizzles.Virtuals
 using Swizzles.NamedArrays
-using Swizzles: SwizzledArray
+using Swizzles: SwizzledArray, mask, masktuple
 
 
 export Simplify
@@ -81,12 +81,12 @@ function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) w
     end
 end
 
-function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, mask, Init, Arg}}, syms) where {Op, mask, Init, Arg}
+function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, _mask, Init, Arg}}, syms) where {Op, _mask, Init, Arg}
     init = rewriteable(:($root.init), Init, syms)
     arg = rewriteable(:($root.arg), Arg, syms)
     op = instance(Op)
     if op !== nothing
-        :($(Swizzle(something(op), mask))($init, $arg))
+        :($(Swizzle(something(op), _mask))($init, $arg))
     else
         return :($root::T)
     end
@@ -191,6 +191,7 @@ function default_spec()
     ])
 
     arb_rules = Array{ArbRule, 1}([
+        # Remove init when possible
         ArbRule(term -> begin
             @vars swz init arr
             for σ in match(@term(swz(init, arr)), term)
@@ -201,7 +202,34 @@ function default_spec()
                 f = σ[swz].op
                 T = eltype(veval(evaluable(σ[arr])))
                 Some(z) === initial(f, T) || continue
-                return replace(@term(swz(arr)), σ)
+                return replace(@term( swz(arr) ), σ)
+            end
+            return term
+        end),
+        # Collapse nested Swizzles
+        ArbRule(term -> begin
+            @vars swz1 init1 swz2 arr
+            #Core.println(match(@term( swz1(swz2(arr))        ), term) |> typeof)
+            for σ in union(
+                match(@term( swz1(init1, swz2(arr)) ), term),
+                match(@term( swz1(swz2(arr))        ), term)
+            )
+                σ[swz1] isa Swizzle || continue
+                σ[swz2] isa Swizzle || continue
+
+                op1, op2 = σ[swz1].op, σ[swz2].op
+                isnothing(op1) || isnothing(op2) || op1 === op2 || continue
+                op = isnothing(op1) ? op2 : op1
+
+                mask1 = mask(σ[swz1])
+                mask2 = mask(σ[swz2])
+                mask′ = masktuple(i -> nil, i -> mask2[i], mask1)
+
+                if haskey(σ, init1)
+                    return replace(@term( Swizzle(op, mask′)(init1, arr) ), σ)
+                else
+                    return replace(@term( Swizzle(op, mask′)(arr) ), σ)
+                end
             end
             return term
         end)

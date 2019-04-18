@@ -1,6 +1,9 @@
+using Random
+
 using Swizzles
 using Swizzles.Properties
 using Swizzles.SimplifyStyles
+using Swizzles.ExtrudedArrays
 using Swizzles.NamedArrays
 using Swizzles.ValArrays
 using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, simplify
@@ -80,9 +83,31 @@ using Base.Broadcast: broadcasted, materialize
 end
 
 @testset "simplify" begin
-    A = [1 2 3]
-    # test remove init rule
-    @test Swizzle(+)(0, A) |> lift_vals |> simplify == Swizzle(+)(A)
+    @testset "remove identity inits" begin
+        A = [1 2 3]
+        @test Swizzle(+)(0, A) |> lift_vals |> simplify |> typeof == Swizzle(+)(A) |> typeof
+
+        #= TODO: Fix identity checking to factor in casting.
+        A = [1. 2. 3.]
+        @test Swizzle(+)(0, A) |> lift_vals |> simplify |> typeof == Swizzle(+)(A) |> typeof
+        =#
+    end
+
+    @testset "merge nested Swizzles" begin
+        A = rand(MersenneTwister(0), 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2)
+
+        @test Swizzle(+)(Swizzle(+)(A)) |>
+                lift_vals |>
+                simplify == Swizzle(+)(A)
+
+        @test Swizzle(+)(9001, Swizzle(+)(A)) |>
+                lift_vals |>
+                simplify == Swizzle(+)(9001, A)
+
+        s1 = Swizzle(+, 7, 100, 1, 2, 4, 3)
+        s2 = Swizzle(+, 8, 9, 2, 1, 3, 6, 4)
+        @test s1(s2(A)) |> lift_vals |> simplify |> copy ≈ s1(s2(A)) |> copy
+    end
 
     @testset "Simplify()" begin
         A, B = [1 2 3; 4 5 6], [100 200 300]
