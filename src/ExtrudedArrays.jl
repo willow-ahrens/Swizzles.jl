@@ -64,8 +64,8 @@ function ExtrudedArray(arg::ExtrudedArray, keeps)
     return ExtrudedArray(arg.arg, keeps)
 end
 
-Base.parent(arr::ExtrudedArray) = arr.arg
-WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), typeof(arr.keeps)}(arg, arr.keeps)
+@inline Base.parent(arr::ExtrudedArray) = arr.arg
+@inline WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), typeof(arr.keeps)}(arg, arr.keeps)
 
 #keeps returns a tuple where each element of the tuple specifies whether the
 #corresponding dimension is intended to have size 1, possibly using the traits

@@ -20,7 +20,6 @@ See also: [`parent`](@ref), [`adopt`](@ref)
 abstract type ShallowArray{T, N, Arg} <: AbstractArray{T, N} end
 
 Base.parent(arr::ShallowArray) = throw(MethodError(parent, (arr)))
-
 iswrapper(arr::ShallowArray) = true
 
 IndexStyle(arr::ShallowArray) = IndexStyle(parent(arr))
@@ -41,7 +40,7 @@ Base.axes(arr::ShallowArray{<:Any, <:Any, <:AbstractArray}) = axes(parent(arr))
 
 Base.@propagate_inbounds Base.getindex(arr::ShallowArray, inds...) = getindex(parent(arr), inds...)
 
-Base.@propagate_inbounds  Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
+Base.@propagate_inbounds Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
 
 Base.eachindex(arr::ShallowArray) = eachindex(parent(arr))
 
