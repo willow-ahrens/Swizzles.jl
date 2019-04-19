@@ -112,16 +112,16 @@ end
 
 import Base.Broadcast
 
-Base.Broadcast.extrude(x::Extruded) = x
+@inline Base.Broadcast.extrude(x::Extruded) = x
 Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::CartesianIndex) = CartesianIndex(Base.Broadcast._newindex(I.I, keeps(arg), maptuple(first, axes(arg)...)))
 Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::Integer) = CartesianIndex(Base.Broadcast._newindex((I,), keeps(arg), maptuple(first, axes(arg)...)))
 @inline Base.Broadcast.newindexer(A::ExtrudedArray) = (keeps(A), maptuple(first, axes(A)...))
 @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Keep}, idefault) = i
 @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Extrude}, idefault) = idefault[i]
-@inline Base.Broadcast._newindex(I, keep::Tuple{Keep, Vararg{Any}}, Idefault) =
-    (I[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
-@inline Base.Broadcast._newindex(I, keep::Tuple{Extrude, Vararg{Any}}, Idefault) =
-    (Idefault[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
+@inline Base.Broadcast._newindex(I, keeps::Tuple{Keep, Vararg{Any}}, Idefault) =
+    (I[1], Base.Broadcast._newindex(tail(I), tail(keeps), tail(Idefault))...)
+@inline Base.Broadcast._newindex(I, keeps::Tuple{Extrude, Vararg{Any}}, Idefault) =
+    (Idefault[1], Base.Broadcast._newindex(tail(I), tail(keeps), tail(Idefault))...)
 
 
 
