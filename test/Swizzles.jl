@@ -1,6 +1,11 @@
+using Swizzles: mask
+
 @testset "Swizzles" begin
 
   A = [1 2 3; 4 5 6; 7 8 9]
+
+  @test mask(Swizzle(+, 1, 3, 5)) === (1, 3, 5)
+  @test mask(typeof(Swizzle(+, 10, 8, 6, 4, 2))) === (10, 8, 6, 4, 2)
 
   @test_throws DimensionMismatch Pour(max, (1, nil)).(A, [1, 2, 3, 4]) == [3; 6; 9]
 
