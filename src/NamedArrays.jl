@@ -24,7 +24,7 @@ function NamedArray(arg, name)
 end
 
 Base.parent(arr::NamedArray) = arr.arg
-function WrapperArrays.adopt(arg::AbstractArray, arr::NamedArray{T, N, Arg, name}) where {T, N, Arg, name}
+function WrapperArrays.adopt(arr::NamedArray{T, N, Arg, name}, arg::AbstractArray) where {T, N, Arg, name}
     arg === arr.arg || throw(ArgumentError("cannot change object identity of named array"))
     NamedArray{T, N, Arg, name}(arg)
 end

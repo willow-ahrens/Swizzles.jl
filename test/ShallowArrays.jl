@@ -13,7 +13,7 @@ function SimpleShallowArray(arg)
 end
 SimpleShallowArray(arg::Tuple) = SimpleShallowArray{eltype(arg), 1, typeof(arg)}(arg)
 Base.parent(arr::SimpleShallowArray) = arr.arg
-WrapperArrays.adopt(arg, arr::SimpleShallowArray) = SimpleShallowArray(arg)
+WrapperArrays.adopt(arr::SimpleShallowArray, arg) = SimpleShallowArray(arg)
 Base.size(arr::SimpleShallowArray{<:Any, <:Any, <:Tuple}) = length(arr.arg)
 Base.axes(arr::SimpleShallowArray{<:Any, <:Any, <:Tuple}) = (Base.OneTo(length(arr.arg)),)
 

@@ -136,7 +136,7 @@ Base.@propagate_inbounds Base.setindex!(arr::ArrayifiedArray, x) = setindex(arr.
 @inline preprocess(dst, bc::Broadcasted) = Base.Broadcast.preprocess(dst, bc)
 @inline function preprocess(dst, arr)
     if iswrapper(arr)
-        adopt(preprocess(dst, parent(arr)), arr)
+        adopt(arr, preprocess(dst, parent(arr)))
     else
         arr
     end

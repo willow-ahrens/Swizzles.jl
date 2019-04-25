@@ -84,7 +84,7 @@ end
 Base.parent(arr::SwizzledArray) = arr.arg
 Base.parent(::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg} = Arg
 WrapperArrays.iswrapper(arr::SwizzledArray) = true
-Base.@propagate_inbounds function WrapperArrays.adopt(arg::Arg, arr::SwizzledArray{T, N, Op, mask, Init}) where {T, N, Op, mask, Init, Arg}
+Base.@propagate_inbounds function WrapperArrays.adopt(arr::SwizzledArray{T, N, Op, mask, Init}, arg::Arg) where {T, N, Op, mask, Init, Arg}
     SwizzledArray{T, N, Op, mask, Init, Arg}(arr.op, arr.init, arg)
 end
 

@@ -28,16 +28,16 @@ using Base.Broadcast: BroadcastStyle
 =#
 
 """
-    adopt(arg, child)
+    adopt(child, arg)
 
 Wrap `arg` in an analogous wrapper array to `child`. This function should
 create an array with the same semantics as `child`. Generally, if `p` is
-mostly the same array as `parent(x)`, it should hold that `adopt(p, x)` is
+mostly the same array as `parent(x)`, it should hold that `adopt(x, p)` is
 mostly the same array as `x`.
 
 See also: [`parent`](@ref), [`iswrapper`](@ref)
 """
-adopt(arg, arr) = throw(MethodError(adopt, (arg, arr)))
+adopt(arr, arg) = throw(MethodError(adopt, (arr, arg)))
 
 """
     storage(arr)
@@ -71,31 +71,31 @@ iswrapper(arr) = arr !== parent(arr)
 iswrapper(::Array) = false
 
 iswrapper(::LinearAlgebra.Transpose) = true
-adopt(arg::AbstractVecOrMat, arr::LinearAlgebra.Transpose) = LinearAlgebra.transpose(arg)
+adopt(arr::LinearAlgebra.Transpose, arg::AbstractVecOrMat) = LinearAlgebra.transpose(arg)
 
 iswrapper(::LinearAlgebra.Adjoint) = true
-adopt(arg::AbstractVecOrMat, arr::LinearAlgebra.Adjoint) = LinearAlgebra.adjoint(arg)
+adopt(arr::LinearAlgebra.Adjoint, arg::AbstractVecOrMat) = LinearAlgebra.adjoint(arg)
 
 iswrapper(::SubArray) = true
-adopt(arg, arr::SubArray) = SubArray(arg, parentindices(arr))
+adopt(arr::SubArray, arg) = SubArray(arg, parentindices(arr))
 
 iswrapper(::LinearAlgebra.LowerTriangular) = true
-adopt(arg, arr::LinearAlgebra.LowerTriangular) = LinearAlgebra.LowerTriangular(arg)
+adopt(arr::LinearAlgebra.LowerTriangular, arg) = LinearAlgebra.LowerTriangular(arg)
 
 iswrapper(::LinearAlgebra.UnitLowerTriangular) = true
-adopt(arg, arr::LinearAlgebra.UnitLowerTriangular) = LinearAlgebra.UnitLowerTriangular(arg)
+adopt(arr::LinearAlgebra.UnitLowerTriangular, arg) = LinearAlgebra.UnitLowerTriangular(arg)
 
 iswrapper(::LinearAlgebra.UpperTriangular) = true
-adopt(arg, arr::LinearAlgebra.UpperTriangular) = LinearAlgebra.UpperTriangular(arg)
+adopt(arr::LinearAlgebra.UpperTriangular, arg) = LinearAlgebra.UpperTriangular(arg)
 
 iswrapper(::LinearAlgebra.UnitUpperTriangular) = true
-adopt(arg, arr::LinearAlgebra.UnitUpperTriangular) = LinearAlgebra.UnitUpperTriangular(arg)
+adopt(arr::LinearAlgebra.UnitUpperTriangular, arg) = LinearAlgebra.UnitUpperTriangular(arg)
 
 iswrapper(::LinearAlgebra.Diagonal) = true
-adopt(arg, arr::LinearAlgebra.Diagonal) = LinearAlgebra.Diagonal(arg)
+adopt(arr::LinearAlgebra.Diagonal, arg) = LinearAlgebra.Diagonal(arg)
 
 iswrapper(::Base.ReshapedArray) = true
-adopt(arg, arr::Base.ReshapedArray) = reshape(arg, arr.dims)
+adopt(arr::Base.ReshapedArray, arg) = reshape(arg, arr.dims)
 
 iswrapper(::PermutedDimsArray) = true
 function adopt(arg::Arg, arr::PermutedDimsArray{<:Any,N,perm,iperm}) where {T,N,perm,iperm,Arg<:AbstractArray{T, N}}
