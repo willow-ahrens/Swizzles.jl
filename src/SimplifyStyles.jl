@@ -1,6 +1,6 @@
 module SimplifyStyles
 
-using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted
+using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted, Style, AbstractArrayStyle, DefaultArrayStyle, result_style
 
 using LinearAlgebra
 using MacroTools
@@ -8,16 +8,15 @@ using Rewrite
 using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
-using Swizzles.Properties
 using Swizzles.Antennae
+using Swizzles.ExtrudedArrays
+using Swizzles.NamedArrays
+using Swizzles.Properties
 using Swizzles.ValArrays
 using Swizzles.Virtuals
-using Swizzles.NamedArrays
 using Swizzles: SwizzledArray, mask, masktuple
 
-
 export Simplify
-
 
 
 """
@@ -190,7 +189,12 @@ function default_spec()
         PatternRule(@term(x * (y + z)), @term(x * y + x * z))
     ])
 
-    arb_rules = Array{ArbRule, 1}([
+    antenna_rules = map(antenna_rule, pointwise_rules)
+    append!(antenna_rules, Array{Rule, 1}([
+        PatternRule(@term( $(Antenna(identity))(x) ), @term( x ))
+    ]))
+
+    swizzle_rules = Array{Rule, 1}([
         # Remove init when possible
         ArbRule(term -> begin
             @vars swz init arr
@@ -209,7 +213,6 @@ function default_spec()
         # Collapse nested Swizzles
         ArbRule(term -> begin
             @vars swz1 init1 swz2 arr
-            #Core.println(match(@term( swz1(swz2(arr))        ), term) |> typeof)
             for σ in union(
                 match(@term( swz1(init1, swz2(arr)) ), term),
                 match(@term( swz1(swz2(arr))        ), term)
@@ -237,8 +240,8 @@ function default_spec()
 
     rules = Array{Rule, 1}([])
     append!(rules, pointwise_rules)
-    append!(rules, map(antenna_rule, pointwise_rules))
-    append!(rules, arb_rules)
+    append!(rules, antenna_rules)
+    append!(rules, swizzle_rules)
 
     return SimplificationSpec(Rules(rules), Context([]))
 end
@@ -253,9 +256,12 @@ Apply global rules to simplify the array expression `arr`.
 Currently only supports broadcast expressions.
 """
 @generated function simplify(arr)
+    # TODO: Enable custom specs
+    spec = DEFAULT_SPEC
+
     term, syms = rewriteable(:arr, arr)
-    simple_term = Rewrite.with_context(DEFAULT_SPEC.context) do
-        Rewrite.normalize(term, DEFAULT_SPEC.rules)
+    simple_term = Rewrite.with_context(spec.context) do
+        Rewrite.normalize(term, spec.rules)
     end
     simple_expr = evaluable(simple_term, syms)
 
@@ -290,11 +296,36 @@ julia> Simplify().(A .+ B)
  104  205  306
 ```
 """
-struct Simplify end
-Base.broadcasted(::Simplify, b::Broadcasted) = simplify(lift_vals(b))
-Base.broadcasted(::Simplify, s::SwizzledArray) = simplify(lift_vals(s))
-#Base.broadcasted(::Simplify, b::Broadcasted) = simplify(b)
-Base.broadcasted(::Simplify, x) = broadcasted(Simplify(), broadcasted(identity, x))
 
+struct Simplify end
+struct SimplifyStyle{S<:BroadcastStyle} <: BroadcastStyle end
+
+SimplifyStyle(style::S) where {S <: BroadcastStyle} = SimplifyStyle{S}()
+SimplifyStyle(style::S) where {S <: SimplifyStyle} = style
+Base.Broadcast.BroadcastStyle(::SimplifyStyle{T}, ::S) where {T, S<:AbstractArrayStyle} = SimplifyStyle(result_style(T(), S()))
+Base.Broadcast.BroadcastStyle(::SimplifyStyle{T}, ::S) where {T, S<:DefaultArrayStyle} = SimplifyStyle(result_style(T(), S()))
+Base.Broadcast.BroadcastStyle(::SimplifyStyle{T}, ::S) where {T, S<:Style{Tuple}} = SimplifyStyle(result_style(T(), S()))
+Base.Broadcast.BroadcastStyle(::SimplifyStyle{T}, ::SimplifyStyle{S}) where {T, S<:BroadcastStyle} = SimplifyStyle(result_style(T(), S()))
+
+function Base.Broadcast.broadcasted(::Simplify, b::Broadcasted{S}) where {S}
+    Broadcasted{SimplifyStyle{S}}(b.f, b.args)
+end
+function Base.Broadcast.broadcasted(::Simplify, x)
+    broadcasted(Simplify(), broadcasted(identity, x))
+end
+
+Base.@propagate_inbounds function Base.copy(bc::Broadcasted{SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
+    bc = Broadcasted{S}(bc.f, bc.args)
+    sbc = bc |> lift_vals |> lift_keeps |> simplify
+    copy(sbc)
+end
+
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray,
+                                               src::Broadcasted{<:SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
+    bc = Broadcasted{S}(src.f, src.args)
+    sbc = bc |> lift_vals |> lift_keeps |> simplify
+    println(sbc)
+    copyto!(dst, sbc)
+end
 
 end

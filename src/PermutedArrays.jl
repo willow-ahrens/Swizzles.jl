@@ -150,7 +150,7 @@ Base.@propagate_inbounds function Base.copy(bc::Broadcasted{PermuteStyle{S}}) wh
     return ndims(res) == 0 ? res[] : res
 end
 
-Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S}
+Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray, src::Broadcasted{PermuteStyle{S}}) where {S <: Base.Broadcast.AbstractArrayStyle}
     pdst = repermute(dst)
     psrc = repermute(src)
     pdst.perms == psrc.perms || PermutationMismatch("TODO")
