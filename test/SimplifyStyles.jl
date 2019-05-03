@@ -6,7 +6,7 @@ using Swizzles.SimplifyStyles
 using Swizzles.ExtrudedArrays
 using Swizzles.NamedArrays
 using Swizzles.ValArrays
-using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, simplify
+using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, normalize, simplify_and_copy
 using LinearAlgebra
 using Base.Broadcast: broadcasted, materialize
 
@@ -82,10 +82,20 @@ using Base.Broadcast: broadcasted, materialize
     end
 end
 
-@testset "simplify" begin
+@testset "Simplify and friends" begin
+    # Helper function
+    @generated function normalize_helper(arr)
+        normal_term, syms = normalize(:arr, arr)
+        normal_expr = evaluable(normal_term, syms)
+        return :($normal_expr)
+    end
+
     @testset "remove identity inits" begin
         A = [1 2 3]
-        @test Swizzle(+)(0, A) |> lift_vals |> simplify |> typeof == Swizzle(+)(A) |> typeof
+        @test Swizzle(+)(0, A) |>
+                lift_vals |>
+                normalize_helper |>
+                typeof == Swizzle(+)(A) |> typeof
 
         #= TODO: Fix identity checking to factor in casting.
         A = [1. 2. 3.]
@@ -93,21 +103,23 @@ end
         =#
     end
 
+
     @testset "merge nested Swizzles" begin
         A = rand(MersenneTwister(0), 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2)
 
         @test Swizzle(+)(Swizzle(+)(A)) |>
                 lift_vals |>
-                simplify == Swizzle(+)(A)
+                normalize_helper == Swizzle(+)(A)
 
         @test Swizzle(+)(9001, Swizzle(+)(A)) |>
                 lift_vals |>
-                simplify == Swizzle(+)(9001, A)
+                normalize_helper == Swizzle(+)(9001, A)
 
         s1 = Swizzle(+, 7, 100, 1, 2, 4, 3)
         s2 = Swizzle(+, 8, 9, 2, 1, 3, 6, 4)
-        @test s1(s2(A)) |> lift_vals |> simplify |> copy ≈ s1(s2(A)) |> copy
+        @test simplify_and_copy(s1(s2(A)) |> lift_vals, nothing) ≈ s1(s2(A)) |> copy
     end
+
 
     @testset "Simplify()" begin
         A, B = [1 2 3; 4 5 6], [100 200 300]

@@ -135,9 +135,9 @@ veval(x) = x
 
 
 """
-Stores rules for simplification.
+Stores rules for rewriting.
 """
-struct SimplificationSpec
+struct RewriteSpec
     rules::Rules
     context::Context
 end
@@ -165,7 +165,7 @@ end
 
 
 """
-Helper function that converts a vaniall rule to one that uses Antennas.
+Helper function that converts a vanilla rule to one that uses Antennas.
 """
 function antenna_rule(rule::PatternRule) :: PatternRule
     if !isempty(rule.ps)
@@ -179,10 +179,8 @@ struct ArbRule <: Rule
 end
 Rewrite.normalize(term::Term, arule::ArbRule) = arule.attempt_transform(term)
 
-"""
-Returns the default SimplificationSpec.
-"""
-function default_spec()
+# Build RewriteSpec for normalization.
+NORMALIZE_SPEC = begin
     @vars x y z
 
     pointwise_rules = Array{Rule, 1}([
@@ -238,47 +236,94 @@ function default_spec()
         end)
     ])
 
-    rules = Array{Rule, 1}([])
-    append!(rules, pointwise_rules)
-    append!(rules, antenna_rules)
-    append!(rules, swizzle_rules)
-
-    return SimplificationSpec(Rules(rules), Context([]))
+    rules = vcat(pointwise_rules, antenna_rules, swizzle_rules)
+    RewriteSpec(Rules(rules), Context([]))
 end
 
-DEFAULT_SPEC = default_spec();
+"""
+    normalize(arr) :: Term
 
+Normalizes the rewriteable expr generated from arr, using root as the root expr.
+Returns the normalized Term and the syms Dict used to make the Term evaluable.
+"""
+function normalize(root, T::Type)
+    term, syms = rewriteable(root, T)
+    normal_term = Rewrite.with_context(NORMALIZE_SPEC.context) do
+        Rewrite.normalize(term, NORMALIZE_SPEC.rules)
+    end
+    return normal_term, syms
+end
 
 """
-    simplify(arr)
+    COPY_MATCHERS
 
-Apply global rules to simplify the array expression `arr`.
-Currently only supports broadcast expressions.
+An array of functions which take in a normalized array term destined for a copy
+and returns either Some(matched_kernel_expression) or nothing.
 """
-@generated function simplify(arr)
-    # TODO: Enable custom specs
-    spec = DEFAULT_SPEC
+COPY_MATCHERS = begin
+    # TODO: Add basic gemm matcher
+    Array{Rule, 1}([])
+end
 
-    term, syms = rewriteable(:arr, arr)
-    simple_term = Rewrite.with_context(spec.context) do
-        Rewrite.normalize(term, spec.rules)
-    end
-    simple_expr = evaluable(simple_term, syms)
+"""
+    COPY_MATCHERS
 
-    return quote
-        $simple_expr
+An array of functions which take in a normalized array term destined for a
+copyto! and returns either Some(matched_kernel_expression) or nothing.
+"""
+COPYTO_MATCHERS = begin
+    # TODO: Add basic gemm matcher
+    Array{Rule, 1}([])
+end
+
+"""
+    simplify_and_copy(arr, has_dst)
+
+Does the following:
+
+    1. Apply rules to normalize the array expression `arr`
+
+    2. Try to match the normalized expression against a repository of fast
+       kernels.
+
+    3. Execute the matched implementation or copy the normalized expression.
+       Depending on whether dst is something or nothing, copyto! or copy will
+       get called respectively.
+"""
+@generated function simplify_and_copy(arr, dst::Union{Some{<:Any}, Nothing})
+    normal_term, syms = normalize(:arr, arr)
+
+    matchers = (dst <: Nothing) ? COPYTO_MATCHERS : COPY_MATCHERS
+    for matcher in matchers
+        some_matched_term = matcher(normal_term)
+        if !isnothing(some_matched_term)
+            matched_term = something(some_matched_term)
+            matched_expr = evaluable(matched_term, syms)
+            return matched_expr
+        end
     end
+
+    normal_expr = evaluable(normal_term, syms)
+    return ((dst <: Nothing) ?
+                :(copy($normal_expr))
+              : :(copyto!($dst, $normal_expr)))
 end
 
 
 """
     Simplify
 
-Simplify is an abstract type which when passed as the first expression of
-broadcasted returns a simplified version of the second Broadcasted expression.
+Simplify is an abstract type which when passed as the first argument of
+broadcasted returns the second argument stylized with a SimplifyStyle.
 
-Due to the way the dot syntactic sugar for broadcasts works, this also
-allows Simplify to intercept broadcasted expressions. See the example below.
+On copy, a Broadcasted with a SimplifyStyle will be simplified. Simplification
+consists of two stages:
+
+    1. The expression in question is converted into normal form.
+
+    2. The normalized expression is matched against a repository of fast
+       implementations. If no fast implementation is found, the normalized
+       expression in executed.
 
 # Example
 ```jldoctest
@@ -316,16 +361,15 @@ end
 
 Base.@propagate_inbounds function Base.copy(bc::Broadcasted{SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
     bc = Broadcasted{S}(bc.f, bc.args)
-    sbc = bc |> lift_vals |> lift_keeps |> simplify
-    copy(sbc)
+    lbc = bc |> lift_names |> lift_vals |> lift_keeps
+    simplify_and_copy(lbc, nothing)
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray,
                                                src::Broadcasted{<:SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
     bc = Broadcasted{S}(src.f, src.args)
-    sbc = bc |> lift_vals |> lift_keeps |> simplify
-    println(sbc)
-    copyto!(dst, sbc)
+    sbc = lift_names(bc, Dict(dst="dst")) |> lift_vals |> lift_keeps
+    simplify_and_copy(lbc, Some(dst))
 end
 
 end
