@@ -125,6 +125,22 @@ end
         A, B = [1 2 3; 4 5 6], [100 200 300]
         @test Simplify().(A) == A
         @test Simplify().(A .+ B) == A .+ B
+
+        C  = [100 200; 300 400; 500 600]
+        D  = [-1 -2; -3 -4]
+        D′ = copy(D)
+
+        @test Simplify().(Beam(1,2).(D)) == D
+
+        D .+= Simplify().(Beam(1,2).(D))
+        D′ .+= Simplify().(Beam(1,2).(D′))
+        @test D == D′
+
+        D  = [-1 -2; -3 -4]
+        D′ = copy(D)
+        D  .+=              Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C))
+        D′ .+= Simplify().( Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C)) )
+        @test D == D′
     end
 
     @testset "veval()" begin

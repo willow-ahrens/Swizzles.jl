@@ -40,7 +40,7 @@ function name(obj, stuff)
     end
 end
 
-lift_names(obj) = lift_names(obj, Dict())
+lift_names(obj) = lift_names(obj, IdDict())
 function lift_names(obj, stuff)
     arr = arrayify(obj)
     return NamedArray(arr, name(arr, stuff))

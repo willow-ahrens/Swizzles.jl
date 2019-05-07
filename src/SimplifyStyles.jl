@@ -241,7 +241,7 @@ NORMALIZE_SPEC = begin
 end
 
 """
-    normalize(arr) :: Term
+    normalize(root, T::Type) :: Tuple{Term, Dict}
 
 Normalizes the rewriteable expr generated from arr, using root as the root expr.
 Returns the normalized Term and the syms Dict used to make the Term evaluable.
@@ -306,7 +306,7 @@ Does the following:
     normal_expr = evaluable(normal_term, syms)
     return ((dst <: Nothing) ?
                 :(copy($normal_expr))
-              : :(copyto!($dst, $normal_expr)))
+              : :(copyto!(something(dst), $normal_expr)))
 end
 
 
@@ -361,15 +361,16 @@ end
 
 Base.@propagate_inbounds function Base.copy(bc::Broadcasted{SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
     bc = Broadcasted{S}(bc.f, bc.args)
-    lbc = bc |> lift_names |> lift_vals |> lift_keeps
+    lbc = bc |> lift_vals |> lift_keeps |> lift_names
     simplify_and_copy(lbc, nothing)
 end
 
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray,
                                                src::Broadcasted{<:SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
     bc = Broadcasted{S}(src.f, src.args)
-    sbc = lift_names(bc, Dict(dst="dst")) |> lift_vals |> lift_keeps
-    simplify_and_copy(lbc, Some(dst))
+    sbc = lift_names(bc |> lift_vals |> lift_keeps,
+                     IdDict{Any, Any}(dst => Symbol("dst")))
+    simplify_and_copy(sbc, Some(dst))
 end
 
 end
