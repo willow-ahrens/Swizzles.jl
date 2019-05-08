@@ -52,14 +52,6 @@ using Base.Broadcast: broadcasted, materialize
         test_evaluable_rewriteable_is_id(Swizzle(*, 1)(A) |> lift_vals)
     end
 
-    @testset "rewriteable uses Antennae" begin
-        A = [1 2 3; 4 5 6]
-        B = [300 200 100]
-
-        bd = broadcasted(+, A, B)
-        @test rewriteable(:bd, typeof(bd))[1].ex.args[1] isa Swizzles.Antennae.Antenna
-    end
-
     @testset "rewriteable uses ValArrays" begin
         A = [1 2 3; 4 5 6]
         @test rewriteable(
@@ -102,7 +94,6 @@ end
         @test Swizzle(+)(0, A) |> lift_vals |> simplify |> typeof == Swizzle(+)(A) |> typeof
         =#
     end
-
 
     @testset "merge nested Swizzles" begin
         A = rand(MersenneTwister(0), 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2)

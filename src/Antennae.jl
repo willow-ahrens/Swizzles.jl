@@ -5,12 +5,12 @@ export Antenna
 
 using Base.Broadcast: broadcasted
 
-struct Antenna{F}
-    f::F
+struct Antenna
+    f
 end
 
 (a::Antenna)(args...) = broadcasted(a.f, args...)
 
-@inline Properties.initial(a::Antenna{F}, T) where {F} = Ref(initial(a.f, eltype(T)))
+@inline Properties.initial(a::Antenna, T) = Ref(initial(a.f, eltype(T)))
 
 end

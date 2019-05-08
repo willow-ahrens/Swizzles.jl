@@ -72,9 +72,10 @@ end
 
 function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
     args = map(((i, arg),) -> rewriteable(:($root.args[$i]), arg, syms), enumerate(Args.parameters))
-    f = instance(F)
-    if f !== nothing
-        :($(Antenna(something(f)))($(args...)))
+    some_f = instance(F)
+    if !isnothing(some_f)
+        f = something(some_f)
+        :($Antenna($f)($(args...)))
     else
         return :($root::T)
     end
@@ -83,9 +84,10 @@ end
 function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, _mask, Init, Arg}}, syms) where {Op, _mask, Init, Arg}
     init = rewriteable(:($root.init), Init, syms)
     arg = rewriteable(:($root.arg), Arg, syms)
-    op = instance(Op)
-    if op !== nothing
-        :($(Swizzle(something(op), _mask))($init, $arg))
+    some_op = instance(Op)
+    if !isnothing(some_op)
+        op = something(some_op)
+        :($Swizzle($op, $_mask)($init, $arg))
     else
         return :($root::T)
     end
@@ -124,8 +126,7 @@ function veval(ex::Union{Expr, Symbol})
         @assert T isa Type
         return virtualize(x, T)
     elseif @capture(ex, f_(args__))
-        #TODO should we check anything here?
-        return f(map(veval, args)...)
+        return veval(f)(map(veval, args)...)
     else
         throw(ArgumentError("Cannot virtually evaluate expression $ex"))
     end
@@ -157,7 +158,7 @@ function antenna_expr(ex::Expr) :: Expr
         elseif f isa Symbol
             throw(ArgumentError("nonbroadcastable term: $ex"))
         else # return Antenna(f)(b_t(arg1), b_t(arg2), b_t(arg3))
-            return Expr(:call, Antenna(f), map(antenna_expr, args)...)
+            return Expr(:call, :($Antenna($f)), map(antenna_expr, args)...)
         end
     end
     throw(ArgumentError("can't convert to antenna version: $ex"))
@@ -195,41 +196,40 @@ NORMALIZE_SPEC = begin
     swizzle_rules = Array{Rule, 1}([
         # Remove init when possible
         ArbRule(term -> begin
-            @vars swz init arr
-            for σ in match(@term(swz(init, arr)), term)
-                σ[swz] isa Swizzle || continue
-                σ[init] isa ValArray || continue
+            @vars _op _mask _init _arr
+            for σ in match(@term(Swizzle(_op, _mask)(_init, _arr)), term)
+                op, mask, init, arr = map(
+                    _v -> σ[_v], (_op, _mask, _init, _arr))
 
-                z = σ[init][]
-                f = σ[swz].op
-                T = eltype(veval(evaluable(σ[arr])))
-                Some(z) === initial(f, T) || continue
-                return replace(@term( swz(arr) ), σ)
+                init isa ValArray || continue
+                init_val = init[]
+                T = eltype(veval(evaluable(arr)))
+
+                Some(init_val) === initial(op, T) || continue
+                return @term( Swizzle(op, mask)(arr) )
             end
             return term
         end),
         # Collapse nested Swizzles
         ArbRule(term -> begin
-            @vars swz1 init1 swz2 arr
+            @vars _op1 _mask1 _op2 _mask2 _arr
+            @vars _init1 # optional
             for σ in union(
-                match(@term( swz1(init1, swz2(arr)) ), term),
-                match(@term( swz1(swz2(arr))        ), term)
+                match(@term( Swizzle(_op1, _mask1)(_init1, Swizzle(_op2, _mask2)(_arr)) ), term),
+                match(@term( Swizzle(_op1, _mask1)(        Swizzle(_op2, _mask2)(_arr)) ), term)
             )
-                σ[swz1] isa Swizzle || continue
-                σ[swz2] isa Swizzle || continue
+                op1, mask1, op2, mask2, arr = map(
+                    _v -> σ[_v], (_op1, _mask1, _op2, _mask2, _arr))
 
-                op1, op2 = σ[swz1].op, σ[swz2].op
                 isnothing(op1) || isnothing(op2) || op1 === op2 || continue
                 op = isnothing(op1) ? op2 : op1
-
-                mask1 = mask(σ[swz1])
-                mask2 = mask(σ[swz2])
                 mask′ = masktuple(i -> nil, i -> mask2[i], mask1)
 
-                if haskey(σ, init1)
-                    return replace(@term( Swizzle(op, mask′)(init1, arr) ), σ)
+                if haskey(σ, _init1)
+                    init1 = σ[_init1]
+                    return @term( Swizzle(op, mask′)(init1, arr) )
                 else
-                    return replace(@term( Swizzle(op, mask′)(arr) ), σ)
+                    return @term( Swizzle(op, mask′)(arr) )
                 end
             end
             return term
