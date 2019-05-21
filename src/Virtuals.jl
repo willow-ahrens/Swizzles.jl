@@ -35,6 +35,11 @@ struct VirtualArray{T, N, Data<:AbstractArray{T, N}} <: AbstractArray{T, N}
     ex
 end
 
+function Base.show(io::IO, arr::VirtualArray{T, N, D}) where {T, N, D}
+    print(io, "VirtualArray{$T, $N, $D}")
+    nothing
+end
+
 function virtualtuple(root, Data::Type{<:Tuple})
     data = map(((i, Datum),) -> virtualize(:($root[$i]), Datum), enumerate(Data.parameters))
     return (data...,)

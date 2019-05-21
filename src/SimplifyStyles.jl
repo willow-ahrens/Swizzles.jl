@@ -3,18 +3,20 @@ module SimplifyStyles
 using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted, Style, AbstractArrayStyle, DefaultArrayStyle, result_style
 
 using LinearAlgebra
+using LinearAlgebra.BLAS
 using MacroTools
 using Rewrite
 using Rewrite: Rule, PatternRule, Property
 
 using Swizzles
 using Swizzles.Antennae
+using Swizzles.ArrayifiedArrays
 using Swizzles.ExtrudedArrays
 using Swizzles.NamedArrays
 using Swizzles.Properties
 using Swizzles.ValArrays
 using Swizzles.Virtuals
-using Swizzles: SwizzledArray, mask, masktuple
+using Swizzles: Swizzle, SwizzledArray, mask, masktuple, imasktuple
 
 export Simplify
 
@@ -70,8 +72,9 @@ function rewriteable(root, ::Type{<:Transpose{<:Any, Arg}}, syms) where Arg
     :($Transpose($arg))
 end
 
-function rewriteable(root, ::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
-    args = map(((i, arg),) -> rewriteable(:($root.args[$i]), arg, syms), enumerate(Args.parameters))
+function rewriteable(root, T::Type{<:Broadcasted{<:Any, <:Any, F, Args}}, syms) where {F, Args<:Tuple}
+    args = map(((i, arg),) -> rewriteable(:($root.args[$i]), arg, syms),
+               enumerate(Args.parameters))
     some_f = instance(F)
     if !isnothing(some_f)
         f = something(some_f)
@@ -93,6 +96,29 @@ function rewriteable(root, T::Type{<:SwizzledArray{<:Any, <:Any, Op, _mask, Init
     end
 end
 
+function rewriteable(root, ::Type{<:ArrayifiedArray{<:Any, <:Any, Arg}}, syms) where {Arg}
+    rewriteable(:($root.arg), Arg, syms)
+end
+
+"""
+Utility function for making a rewritten term nicer before printing.
+"""
+prettify(t::Term) = Term(prettify(t.ex))
+
+function prettify(ex)
+    if @capture(ex, f_(args__))
+        pargs = map(prettify, args)
+        if f === Swizzle
+            return Expr(:Swizzle, pargs...)
+        elseif f === Antenna
+            return Expr(:Antenna, pargs...)
+        end
+        return Expr(:call, prettify(f), pargs...)
+    elseif @capture(ex, x_::t_)
+        return prettify(x)
+    end
+    return ex
+end
 
 
 """
@@ -190,11 +216,11 @@ NORMALIZE_SPEC = begin
 
     antenna_rules = map(antenna_rule, pointwise_rules)
     append!(antenna_rules, Array{Rule, 1}([
-        PatternRule(@term( $(Antenna(identity))(x) ), @term( x ))
+        PatternRule(@term( Antenna(identity)(x) ), @term( x ))
     ]))
 
     swizzle_rules = Array{Rule, 1}([
-        # Remove init when possible
+        # Remove zero and nothing inits
         ArbRule(term -> begin
             @vars _op _mask _init _arr
             for σ in match(@term(Swizzle(_op, _mask)(_init, _arr)), term)
@@ -205,11 +231,12 @@ NORMALIZE_SPEC = begin
                 init_val = init[]
                 T = eltype(veval(evaluable(arr)))
 
-                Some(init_val) === initial(op, T) || continue
+                isnothing(init_val) || Some(init_val) === initial(op, T) || continue
                 return @term( Swizzle(op, mask)(arr) )
             end
             return term
         end),
+
         # Collapse nested Swizzles
         ArbRule(term -> begin
             @vars _op1 _mask1 _op2 _mask2 _arr
@@ -255,15 +282,81 @@ function normalize(root, T::Type)
 end
 
 """
+    reindex_masks(masks...) :: Tuple
+
+A helper function that reindexes a list of masks in a canonical fashion.
+# Examples
+```jldoctest
+julia> reindex_masks((100, 300), (200, 300))
+((1, 2), (3, 2))
+```
+"""
+function reindex_masks(masks...) :: Tuple
+    idx_dict = Dict{Any, Int}()
+    get_idx(key) = haskey(idx_dict, key) ?
+                        idx_dict[key] : (idx_dict[key] = length(idx_dict) + 1)
+
+    map(_mask -> map(get_idx, _mask), masks)
+end
+
+"""
     COPY_MATCHERS
 
 An array of functions which take in a normalized array term destined for a copy
 and returns either Some(matched_kernel_expression) or nothing.
 """
-COPY_MATCHERS = begin
-    # TODO: Add basic gemm matcher
-    Array{Rule, 1}([])
-end
+COPY_MATCHERS = Array{Function, 1}([
+    # gemm(tA, tB, A, B)
+    term -> begin
+        Core.println("gemming...")
+
+        io = IOBuffer()
+        dump(io, term |> prettify; maxdepth=9)
+        Core.println(String(take!(io)))
+
+        @vars _mask_out _mask_in1 _mask_in2 _arr1 _arr2
+        for σ in match(
+            @term(
+                Swizzle(+, _mask_out)(
+                    Antenna(*)(
+                        Swizzle(nothing, _mask_in1)(_arr1),
+                        Swizzle(nothing, _mask_in2)(_arr2)
+                    )
+                )
+            ),
+            term
+        )
+            mask_out, mask_in1, mask_in2, arr1, arr2 = map(
+                _v -> σ[_v],
+                (_mask_out, _mask_in1, _mask_in2, _arr1, _arr2))
+
+            # Check dimensions of masks are ok.
+            (length(mask_out) == 2 &&
+                findfirst(isequal(2), mask_in1) !== nothing &&
+                findfirst(isequal(2), mask_in2) !== nothing &&
+                findfirst(isequal(3), mask_in1) === nothing &&
+                findfirst(isequal(3), mask_in2) === nothing) || continue
+
+            imask1 = imasktuple(_ -> nil, identity, mask_in1, 2)
+            imask2 = imasktuple(_ -> nil, identity, mask_in2, 2)
+
+            gemm_patterns = Dict(
+                ((1, 2), (1, 3), (3, 2)) => @term( BLAS.gemm('N', 'N', arr1, arr2) ),
+                ((1, 2), (3, 1), (3, 2)) => @term( BLAS.gemm('Y', 'N', arr1, arr2) ),
+                ((1, 2), (1, 3), (2, 3)) => @term( BLAS.gemm('N', 'Y', arr1, arr2) ),
+                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm('Y', 'Y', arr1, arr2) ),
+
+                ((1, 2), (3, 2), (1, 3)) => @term( BLAS.gemm('N', 'N', arr2, arr1) ),
+                ((1, 2), (3, 2), (3, 1)) => @term( BLAS.gemm('Y', 'N', arr2, arr1) ),
+                ((1, 2), (2, 3), (1, 3)) => @term( BLAS.gemm('N', 'Y', arr2, arr1) ),
+                ((1, 2), (2, 3), (3, 1)) => @term( BLAS.gemm('Y', 'Y', arr2, arr1) )
+            )
+            rmasks = reindex_masks(mask_out, imask1, imask2)
+            haskey(gemm_patterns, rmasks) || continue
+            return gemm_patterns[rmasks]
+        end
+    end
+])
 
 """
     COPY_MATCHERS
@@ -273,7 +366,23 @@ copyto! and returns either Some(matched_kernel_expression) or nothing.
 """
 COPYTO_MATCHERS = begin
     # TODO: Add basic gemm matcher
-    Array{Rule, 1}([])
+    Array{Function, 1}([])
+end
+
+"""
+    match_term(term::Term, dst::Union{Type{<:Some}, Type{Nothing}}, syms)
+
+Tries to match the term. Returns nothing if not possible.
+"""
+function match_term(term::Term, dst::Union{Type{<:Some}, Type{Nothing}}, syms)
+    matchers = (dst <: Nothing) ? COPY_MATCHERS : COPYTO_MATCHERS
+    for matcher in matchers
+        matched_term = matcher(term)
+        if !isnothing(matched_term)
+            matched_expr = evaluable(matched_term, syms)
+            return matched_expr
+        end
+    end
 end
 
 """
@@ -293,15 +402,14 @@ Does the following:
 @generated function simplify_and_copy(arr, dst::Union{Some{<:Any}, Nothing})
     normal_term, syms = normalize(:arr, arr)
 
-    matchers = (dst <: Nothing) ? COPYTO_MATCHERS : COPY_MATCHERS
-    for matcher in matchers
-        some_matched_term = matcher(normal_term)
-        if !isnothing(some_matched_term)
-            matched_term = something(some_matched_term)
-            matched_expr = evaluable(matched_term, syms)
-            return matched_expr
-        end
+    Core.println("matching...")
+    matched_expr = match_term(normal_term, dst, syms)
+    Core.println("done matching.")
+    if !isnothing(matched_expr)
+        Core.println("SOMETHING MATCHED!!!!")
+        return matched_expr
     end
+    Core.println("nothing matched.")
 
     normal_expr = evaluable(normal_term, syms)
     return ((dst <: Nothing) ?

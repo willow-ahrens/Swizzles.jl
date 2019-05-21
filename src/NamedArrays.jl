@@ -32,24 +32,24 @@ end
 name(arr::NamedArray{<:Any, <:Any, <:Any, _name}) where {_name} = _name
 name(::Type{<:NamedArray{<:Any, <:Any, <:Any, _name}}) where {_name} = _name
 
-function name(obj, stuff)
-    if haskey(stuff, obj)
-        return stuff[obj]
+function name(obj, dict)
+    if haskey(dict, obj)
+        return dict[obj]
     else
-        stuff[obj] = Symbol("obj$(length(stuff) + 1)")
+        dict[obj] = Symbol("obj$(length(dict) + 1)")
     end
 end
 
 lift_names(obj) = lift_names(obj, IdDict())
-function lift_names(obj, stuff)
+function lift_names(obj, dict)
     arr = arrayify(obj)
-    return NamedArray(arr, name(arr, stuff))
+    return NamedArray(arr, name(arr, dict))
 end
-function lift_names(arr::ArrayifiedArray, stuff)
-    return arrayify(lift_names(arr.arg, stuff))
+function lift_names(arr::ArrayifiedArray, dict)
+    return arrayify(lift_names(arr.arg, dict))
 end
-lift_names(ext::Extruded, stuff) = Extruded(lift_names(ext.x, stuff), ext.keeps, ext.defaults)
-lift_names(bc::Broadcasted{Style}, stuff) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, stuff), bc.args), bc.axes)
+lift_names(ext::Extruded, dict) = Extruded(lift_names(ext.x, dict), ext.keeps, ext.defaults)
+lift_names(bc::Broadcasted{Style}, dict) where {Style} = Broadcasted{Style}(bc.f, map(arg->lift_names(arg, dict), bc.args), bc.axes)
 
 function Virtuals.virtualize(root, ::Type{NamedArray{T, N, Arg, name}}) where {T, N, Arg, name}
     arg = virtualize(:($root.arg), Arg)

@@ -74,10 +74,15 @@ end
 @inline mask(::SwizzledArray{<:Any, <:Any, <:Any, _mask}) where {_mask} = _mask
 
 
-
 function Base.show(io::IO, arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
     print(io, SwizzledArray)
-    print(io, "{$T, $N, $Op, $mask}($(arr.op), $(arr.init), $(arr.arg))")
+    print(io, "{$T, $N, $Op, $mask}(")
+        show(arr.op)
+        print(", ")
+        show(arr.init)
+        print(", ")
+        show(arr.arg)
+    print(")")
     nothing
 end
 
@@ -407,9 +412,15 @@ function ValArrays.lift_vals(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op
     return SwizzledArray{T, N, Op, mask}(arr.op, lift_vals(arr.init), lift_vals(arr.arg))
 end
 
-function NamedArrays.lift_names(arr::SwizzledArray{T, N, Op, mask}) where {T, N, Op, mask}
-    return SwizzledArray{T, N, Op, mask}(arr.op, lift_names(arr.init), lift_names(arr.arg))
+function NamedArrays.lift_names(arr::SwizzledArray{T, N, Op, mask}, dict) where {T, N, Op, mask}
+    return SwizzledArray{T, N, Op, mask}(
+        arr.op,
+        lift_names(arr.init, dict),
+        lift_names(arr.arg, dict)
+    )
 end
+
+NamedArrays.lift_names(arr::ValArray, dict) = arr
 
 function Virtuals.virtualize(root, ::Type{<:SwizzledArray{T, N, Op, mask, Init, Arg}}) where {T, N, Op, mask, Init, Arg}
     init = virtualize(:($root.init), Init)

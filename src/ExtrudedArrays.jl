@@ -100,6 +100,7 @@ function keeps(arr::Transpose)
         throw(ArgumentError("TODO"))
     end
 end
+keeps(arr::ShallowArray) = keeps(arr.arg)
 keeps(arr::ExtrudedArray) = arr.keeps
 keeps(ext::Extruded) = ext.keeps
 keeps(bc::Broadcasted) = combinetuple(|, map(keeps, bc.args)...)

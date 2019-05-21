@@ -1,3 +1,4 @@
+using LinearAlgebra.BLAS
 using Random
 
 using Swizzles
@@ -6,10 +7,11 @@ using Swizzles.SimplifyStyles
 using Swizzles.ExtrudedArrays
 using Swizzles.NamedArrays
 using Swizzles.ValArrays
-using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, normalize, simplify_and_copy
+using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, normalize,
+                               match_term, simplify_and_copy
 using LinearAlgebra
 using Base.Broadcast: broadcasted, materialize
-
+#=
 @testset "rewriteable" begin
 
     @testset "rewriteable faithfulness" begin
@@ -72,7 +74,7 @@ using Base.Broadcast: broadcasted, materialize
 
         @test lb |> get_evaluable_rewriteable |> materialize == materialize(bc)
     end
-end
+end=#
 
 @testset "Simplify and friends" begin
     # Helper function
@@ -82,6 +84,19 @@ end
         return :($normal_expr)
     end
 
+    @generated function match_term_helper(arr, dst)
+        normal_term, syms = normalize(:arr, arr)
+        normal_expr = evaluable(normal_term, syms)
+
+        matched_expr = match_term(normal_term, dst, syms)
+        if !isnothing(matched_expr)
+            return :($matched_expr)
+        end
+
+        return :($normal_expr)
+    end
+
+    #=
     @testset "remove identity inits" begin
         A = [1 2 3]
         @test Swizzle(+)(0, A) |>
@@ -109,31 +124,39 @@ end
         s1 = Swizzle(+, 7, 100, 1, 2, 4, 3)
         s2 = Swizzle(+, 8, 9, 2, 1, 3, 6, 4)
         @test simplify_and_copy(s1(s2(A)) |> lift_vals, nothing) ≈ s1(s2(A)) |> copy
-    end
+    end=#
 
+    #=
+    @testset "gemm(tA, tB, A, B) matcher" begin
+        A, B = [1 2 3; 4 5 6], [100 200; 300 400; 500 600]
+        @test (Swizzle(+, 1, 2).(Beam(1, 3).(A) .* Beam(3, 2).(B)) |>
+                lift_vals |>
+                arr -> match_term_helper(arr, nothing)).args[1] === gemm
+    end=#
 
     @testset "Simplify()" begin
         A, B = [1 2 3; 4 5 6], [100 200 300]
-        @test Simplify().(A) == A
-        @test Simplify().(A .+ B) == A .+ B
+        #@test Simplify().(A) == A
+        #@test Simplify().(A .+ B) == A .+ B
 
         C  = [100 200; 300 400; 500 600]
         D  = [-1 -2; -3 -4]
         D′ = copy(D)
 
-        @test Simplify().(Beam(1,2).(D)) == D
+        #@test Simplify().(Beam(1,2).(D)) == D
 
-        D .+= Simplify().(Beam(1,2).(D))
-        D′ .+= Simplify().(Beam(1,2).(D′))
-        @test D == D′
+        #D .+= Simplify().(Beam(1,2).(D))
+        #D′ .+= Simplify().(Beam(1,2).(D′))
+        #@test D == D′
 
         D  = [-1 -2; -3 -4]
         D′ = copy(D)
-        D  .+=              Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C))
-        D′ .+= Simplify().( Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C)) )
+        D  +=              Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C))
+        D′ += Simplify().( Swizzle(+, 1, 3).(Beam(1, 2).(A) .* Beam(2, 3).(C)) )
         @test D == D′
     end
 
+    #=
     @testset "veval()" begin
         for x in [@_((1, 2, 3) .+ [1, 2, 3]'),
                   @_(0 .+ [1, 2, 3] .+ [1 2 3; 4 5 6; 7 8 9]),
@@ -142,5 +165,5 @@ end
             @test kept.(keeps(veval(evaluable(rewriteable(:root, typeof(lift_keeps(x)))...)))) == kept.(keeps(x))
             @test eltype(veval(evaluable(rewriteable(:root, typeof(x))...))) == eltype(x)
         end
-    end
+    end=#
 end
