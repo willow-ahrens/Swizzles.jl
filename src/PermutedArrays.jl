@@ -96,7 +96,7 @@ PermutedArray(perms, iperms, arg) = PermutedArray{eltype(arg), ndims(arg), typeo
 
 Base.parent(arr::PermutedArray) = arr.arg
 WrapperArrays.iswrapper(arr::PermutedArray) = true
-WrapperArrays.adopt(arg, arr::PermutedArray) = PermutedArray(arr.perms, arr.iperms, arg)
+WrapperArrays.adopt(arr::PermutedArray, arg) = PermutedArray(arr.perms, arr.iperms, arg)
 
 Base.Broadcast.BroadcastStyle(::Type{<:PermutedArray{<:Any, <:Any, <:Any, <:Any, Arg}}) where {Arg} = PermuteStyle(BroadcastStyle(Arg))
 

@@ -64,8 +64,8 @@ function ExtrudedArray(arg::ExtrudedArray, keeps)
     return ExtrudedArray(arg.arg, keeps)
 end
 
-Base.parent(arr::ExtrudedArray) = arr.arg
-WrapperArrays.adopt(arg::AbstractArray, arr::ExtrudedArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), typeof(arr.keeps)}(arg, arr.keeps)
+@inline Base.parent(arr::ExtrudedArray) = arr.arg
+@inline WrapperArrays.adopt(arr::ExtrudedArray, arg::AbstractArray) = ExtrudedArray{eltype(arg), ndims(arr), typeof(arg), typeof(arr.keeps)}(arg, arr.keeps)
 
 #keeps returns a tuple where each element of the tuple specifies whether the
 #corresponding dimension is intended to have size 1, possibly using the traits
@@ -113,16 +113,16 @@ end
 
 import Base.Broadcast
 
-Base.Broadcast.extrude(x::Extruded) = x
+@inline Base.Broadcast.extrude(x::Extruded) = x
 Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::CartesianIndex) = CartesianIndex(Base.Broadcast._newindex(I.I, keeps(arg), maptuple(first, axes(arg)...)))
 Base.@propagate_inbounds Base.Broadcast.newindex(arg::ExtrudedArray, I::Integer) = CartesianIndex(Base.Broadcast._newindex((I,), keeps(arg), maptuple(first, axes(arg)...)))
 @inline Base.Broadcast.newindexer(A::ExtrudedArray) = (keeps(A), maptuple(first, axes(A)...))
 @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Keep}, idefault) = i
 @inline Base.Broadcast.newindex(i::Integer, ::Tuple{Extrude}, idefault) = idefault[i]
-@inline Base.Broadcast._newindex(I, keep::Tuple{Keep, Vararg{Any}}, Idefault) =
-    (I[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
-@inline Base.Broadcast._newindex(I, keep::Tuple{Extrude, Vararg{Any}}, Idefault) =
-    (Idefault[1], Base.Broadcast._newindex(tail(I), tail(keep), tail(Idefault))...)
+@inline Base.Broadcast._newindex(I, keeps::Tuple{Keep, Vararg{Any}}, Idefault) =
+    (I[1], Base.Broadcast._newindex(tail(I), tail(keeps), tail(Idefault))...)
+@inline Base.Broadcast._newindex(I, keeps::Tuple{Extrude, Vararg{Any}}, Idefault) =
+    (Idefault[1], Base.Broadcast._newindex(tail(I), tail(keeps), tail(Idefault))...)
 
 
 

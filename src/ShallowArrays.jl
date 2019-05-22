@@ -20,14 +20,13 @@ See also: [`parent`](@ref), [`adopt`](@ref)
 abstract type ShallowArray{T, N, Arg} <: AbstractArray{T, N} end
 
 Base.parent(arr::ShallowArray) = throw(MethodError(parent, (arr)))
-
 iswrapper(arr::ShallowArray) = true
 
 IndexStyle(arr::ShallowArray) = IndexStyle(parent(arr))
 
 Base.dataids(arr::ShallowArray) = dataids(parent(arr))
-Base.unaliascopy(arr::A) where {A <:ShallowArray} = adopt(unaliascopy(parent(arr)), arr)::A
-Base.unalias(dest, arr::A) where {A <:ShallowArray} = adopt(unalias(dest, arr.arg), arr)::A
+Base.unaliascopy(arr::A) where {A <:ShallowArray} = adopt(arr, unaliascopy(parent(arr)))::A
+Base.unalias(dest, arr::A) where {A <:ShallowArray} = adopt(arr, unalias(dest, parent(arr)))::A
 
 Base.eltype(::Type{<:ShallowArray{T}}) where {T} = T
 Base.eltype(::ShallowArray{T}) where {T} = T
@@ -41,7 +40,7 @@ Base.axes(arr::ShallowArray{<:Any, <:Any, <:AbstractArray}) = axes(parent(arr))
 
 Base.@propagate_inbounds Base.getindex(arr::ShallowArray, inds...) = getindex(parent(arr), inds...)
 
-Base.@propagate_inbounds  Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
+Base.@propagate_inbounds Base.setindex!(arr::ShallowArray, val, inds...) = setindex!(parent(arr), val, inds...)
 
 Base.eachindex(arr::ShallowArray) = eachindex(parent(arr))
 

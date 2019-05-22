@@ -39,7 +39,7 @@ Base.size(::ValArray) = ()
 end
 @inline function lift_vals(arr::AbstractArray)
     if iswrapper(arr)
-        return adopt(lift_vals(parent(arr)), arr)
+        return adopt(arr, lift_vals(parent(arr)))
     else
         return arr
     end

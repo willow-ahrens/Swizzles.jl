@@ -20,7 +20,7 @@ end
 
 @inline Base.parent(arr::EachindexArray) = arr.arg
 @inline WrapperArrays.iswrapper(arr::EachindexArray) = true
-@inline WrapperArrays.adopt(arg, arr::EachindexArray) = EachindexArray(arg, arr.indices)
+@inline WrapperArrays.adopt(arr::EachindexArray, arg) = EachindexArray(arg, arr.indices)
 
 @inline function Base.eachindex(arr::EachindexArray)
     return arr.indices
