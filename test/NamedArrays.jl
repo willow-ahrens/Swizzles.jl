@@ -1,7 +1,9 @@
 using Base.Broadcast: broadcastable, Broadcasted, materialize
-using Swizzles.NamedArrays
-using Swizzles.ArrayifiedArrays
+
 using Swizzles
+using Swizzles.ArrayifiedArrays
+using Swizzles.NamedArrays
+using Swizzles.ValArrays
 
 foo(x) = x
 
@@ -18,5 +20,5 @@ foo(x) = x
     @test materialize(lift_names(bc)) == materialize(bc)
 
     bc = Delay().(Swizzle(+).(A .+ B))
-    @test typeof(lift_names(bc)) <: Swizzles.SwizzledArray{<:Any, <:Any, typeof(+), (), <:Any, <:ArrayifiedArray{<:Any, <:Any, <:Broadcasted{<:Any, <:Any, typeof(+), <:Tuple{<:NamedArray{<:Any, <:Any, <:Any, :obj1}, <:NamedArray{<:Any, <:Any, <:Any, :obj2}}}}}
+    @test typeof(bc |> lift_vals |> lift_names) <: Swizzles.SwizzledArray{<:Any, <:Any, typeof(+), (), <:Any, <:ArrayifiedArray{<:Any, <:Any, <:Broadcasted{<:Any, <:Any, typeof(+), <:Tuple{<:NamedArray{<:Any, <:Any, <:Any, :obj1}, <:NamedArray{<:Any, <:Any, <:Any, :obj2}}}}}
 end

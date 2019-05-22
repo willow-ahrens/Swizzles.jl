@@ -2,7 +2,6 @@ using Swizzles
 using Test
 
 @testset "Swizzles" begin
-#=
     include("Swizzles.jl")
     include("ShallowArrays.jl")
     include("EachindexArrays.jl")
@@ -15,6 +14,4 @@ using Test
     include("StylishArrays.jl")
     include("PermutedArrays.jl")
     include("util.jl")
-=#
-    include("SimplifyStyles.jl")
 end

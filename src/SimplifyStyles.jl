@@ -3,7 +3,6 @@ module SimplifyStyles
 using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted, Style, AbstractArrayStyle, DefaultArrayStyle, result_style
 
 using LinearAlgebra
-using LinearAlgebra.BLAS
 using MacroTools
 using Rewrite
 using Rewrite: Rule, PatternRule, Property
@@ -308,27 +307,28 @@ and returns either Some(matched_kernel_expression) or nothing.
 COPY_MATCHERS = Array{Function, 1}([
     # gemm(tA, tB, A, B)
     term -> begin
-        Core.println("gemming...")
-
-        io = IOBuffer()
-        dump(io, term |> prettify; maxdepth=9)
-        Core.println(String(take!(io)))
-
-        @vars _mask_out _mask_in1 _mask_in2 _arr1 _arr2
+        @vars _mask_out _mask_in1 _mask_in2 _arr1 _T1 _arr2 _T2
         for σ in match(
             @term(
                 Swizzle(+, _mask_out)(
                     Antenna(*)(
-                        Swizzle(nothing, _mask_in1)(_arr1),
-                        Swizzle(nothing, _mask_in2)(_arr2)
+                        Swizzle(nothing, _mask_in1)(_arr1::_T1),
+                        Swizzle(nothing, _mask_in2)(_arr2::_T2)
                     )
                 )
             ),
             term
         )
-            mask_out, mask_in1, mask_in2, arr1, arr2 = map(
+            mask_out, mask_in1, mask_in2, arr1, arr2, T1, T2 = map(
                 _v -> σ[_v],
-                (_mask_out, _mask_in1, _mask_in2, _arr1, _arr2))
+                (_mask_out, _mask_in1, _mask_in2, _arr1, _arr2, _T1, _T2))
+
+            # Type checking
+            any([
+                (   T1 <: ExtrudedArray{et, 2, <:Any, <:Any}
+                 && T2 <: ExtrudedArray{et, 2, <:Any, <:Any})
+                for et in [Float64, Float32, ComplexF64, ComplexF32]
+            ]) || continue
 
             # Check dimensions of masks are ok.
             (length(mask_out) == 2 &&
@@ -341,18 +341,20 @@ COPY_MATCHERS = Array{Function, 1}([
             imask2 = imasktuple(_ -> nil, identity, mask_in2, 2)
 
             gemm_patterns = Dict(
-                ((1, 2), (1, 3), (3, 2)) => @term( BLAS.gemm('N', 'N', arr1, arr2) ),
-                ((1, 2), (3, 1), (3, 2)) => @term( BLAS.gemm('Y', 'N', arr1, arr2) ),
-                ((1, 2), (1, 3), (2, 3)) => @term( BLAS.gemm('N', 'Y', arr1, arr2) ),
-                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm('Y', 'Y', arr1, arr2) ),
+                ((1, 2), (1, 3), (3, 2)) => @term( BLAS.gemm('N', 'N', parent(arr1), parent(arr2)) ),
+                ((1, 2), (3, 1), (3, 2)) => @term( BLAS.gemm('T', 'N', parent(arr1), parent(arr2)) ),
+                ((1, 2), (1, 3), (2, 3)) => @term( BLAS.gemm('N', 'T', parent(arr1), parent(arr2)) ),
+                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm('T', 'T', parent(arr1), parent(arr2)) ),
 
-                ((1, 2), (3, 2), (1, 3)) => @term( BLAS.gemm('N', 'N', arr2, arr1) ),
-                ((1, 2), (3, 2), (3, 1)) => @term( BLAS.gemm('Y', 'N', arr2, arr1) ),
-                ((1, 2), (2, 3), (1, 3)) => @term( BLAS.gemm('N', 'Y', arr2, arr1) ),
-                ((1, 2), (2, 3), (3, 1)) => @term( BLAS.gemm('Y', 'Y', arr2, arr1) )
+                ((1, 2), (3, 2), (1, 3)) => @term( BLAS.gemm('N', 'N', parent(arr2), parent(arr1)) ),
+                ((1, 2), (3, 2), (3, 1)) => @term( BLAS.gemm('T', 'N', parent(arr2), parent(arr1)) ),
+                ((1, 2), (2, 3), (1, 3)) => @term( BLAS.gemm('N', 'T', parent(arr2), parent(arr1)) ),
+                ((1, 2), (2, 3), (3, 1)) => @term( BLAS.gemm('T', 'T', parent(arr2), parent(arr1)) )
             )
             rmasks = reindex_masks(mask_out, imask1, imask2)
             haskey(gemm_patterns, rmasks) || continue
+
+            @debug "matched gemm(tA, tB, A, B)"
             return gemm_patterns[rmasks]
         end
     end
@@ -402,14 +404,10 @@ Does the following:
 @generated function simplify_and_copy(arr, dst::Union{Some{<:Any}, Nothing})
     normal_term, syms = normalize(:arr, arr)
 
-    Core.println("matching...")
     matched_expr = match_term(normal_term, dst, syms)
-    Core.println("done matching.")
     if !isnothing(matched_expr)
-        Core.println("SOMETHING MATCHED!!!!")
         return matched_expr
     end
-    Core.println("nothing matched.")
 
     normal_expr = evaluable(normal_term, syms)
     return ((dst <: Nothing) ?
