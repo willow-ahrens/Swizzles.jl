@@ -299,6 +299,33 @@ function reindex_masks(masks...) :: Tuple
 end
 
 """
+    get_imasks_for_gemm_match(T1, T2, mask_out, mask_in1, mask_in2)
+
+Returns a normalized tuple of (mask_out, mask_in1, mask_in2) if types and masks
+are of the correct format -- otherwise returns nothing.
+"""
+function normalize_masks(T1, T2, mask_out, mask_in1, mask_in2)
+    any([
+        (   T1 <: ExtrudedArray{et, 2, <:Any, <:Any}
+            && T2 <: ExtrudedArray{et, 2, <:Any, <:Any})
+        for et in [Float64, Float32, ComplexF64, ComplexF32]
+    ]) || return
+
+    # Check dimensions of masks are ok.
+    (length(mask_out) == 2 &&
+        findfirst(isequal(2), mask_in1) !== nothing &&
+        findfirst(isequal(2), mask_in2) !== nothing &&
+        findfirst(isequal(3), mask_in1) === nothing &&
+        findfirst(isequal(3), mask_in2) === nothing) || return
+
+    imask1 = imasktuple(_ -> nil, identity, mask_in1, 2)
+    imask2 = imasktuple(_ -> nil, identity, mask_in2, 2)
+
+    rmasks = reindex_masks(mask_out, imask1, imask2)
+    return rmasks
+end
+
+"""
     COPY_MATCHERS
 
 An array of functions which take in a normalized array term destined for a copy
@@ -323,53 +350,74 @@ COPY_MATCHERS = Array{Function, 1}([
                 _v -> σ[_v],
                 (_mask_out, _mask_in1, _mask_in2, _arr1, _arr2, _T1, _T2))
 
-            # Type checking
-            any([
-                (   T1 <: ExtrudedArray{et, 2, <:Any, <:Any}
-                 && T2 <: ExtrudedArray{et, 2, <:Any, <:Any})
-                for et in [Float64, Float32, ComplexF64, ComplexF32]
-            ]) || continue
-
-            # Check dimensions of masks are ok.
-            (length(mask_out) == 2 &&
-                findfirst(isequal(2), mask_in1) !== nothing &&
-                findfirst(isequal(2), mask_in2) !== nothing &&
-                findfirst(isequal(3), mask_in1) === nothing &&
-                findfirst(isequal(3), mask_in2) === nothing) || continue
-
-            imask1 = imasktuple(_ -> nil, identity, mask_in1, 2)
-            imask2 = imasktuple(_ -> nil, identity, mask_in2, 2)
+            nmasks = normalize_masks(T1, T2, mask_out, mask_in1, mask_in2)
+            !isnothing(nmasks) || continue
+            if minimum(nmasks[2]) > 1
+                nmasks = (nmasks[1], nmasks[3], nmasks[2])
+                tmp = arr1; arr1 = arr2; arr2 = tmp
+            end
 
             gemm_patterns = Dict(
                 ((1, 2), (1, 3), (3, 2)) => @term( BLAS.gemm('N', 'N', parent(arr1), parent(arr2)) ),
                 ((1, 2), (3, 1), (3, 2)) => @term( BLAS.gemm('T', 'N', parent(arr1), parent(arr2)) ),
                 ((1, 2), (1, 3), (2, 3)) => @term( BLAS.gemm('N', 'T', parent(arr1), parent(arr2)) ),
-                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm('T', 'T', parent(arr1), parent(arr2)) ),
-
-                ((1, 2), (3, 2), (1, 3)) => @term( BLAS.gemm('N', 'N', parent(arr2), parent(arr1)) ),
-                ((1, 2), (3, 2), (3, 1)) => @term( BLAS.gemm('T', 'N', parent(arr2), parent(arr1)) ),
-                ((1, 2), (2, 3), (1, 3)) => @term( BLAS.gemm('N', 'T', parent(arr2), parent(arr1)) ),
-                ((1, 2), (2, 3), (3, 1)) => @term( BLAS.gemm('T', 'T', parent(arr2), parent(arr1)) )
+                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm('T', 'T', parent(arr1), parent(arr2)) )
             )
-            rmasks = reindex_masks(mask_out, imask1, imask2)
-            haskey(gemm_patterns, rmasks) || continue
+            haskey(gemm_patterns, (nmasks)) || continue
 
             @debug "matched gemm(tA, tB, A, B)"
-            return gemm_patterns[rmasks]
+            return gemm_patterns[nmasks]
         end
     end
 ])
 
 """
-    COPY_MATCHERS
+    COPYTO_MATCHERS
 
 An array of functions which take in a normalized array term destined for a
 copyto! and returns either Some(matched_kernel_expression) or nothing.
 """
-COPYTO_MATCHERS = begin
-    # TODO: Add basic gemm matcher
-    Array{Function, 1}([])
-end
+COPYTO_MATCHERS = Array{Function, 1}([
+    # gemm!(tA, tB, 1, A, B, 0, C)
+    term -> begin
+        @vars _mask_out _mask_in1 _mask_in2 _arr1 _T1 _arr2 _T2
+        for σ in match(
+            @term(
+                Swizzle(+, _mask_out)(
+                    Antenna(*)(
+                        Swizzle(nothing, _mask_in1)(_arr1::_T1),
+                        Swizzle(nothing, _mask_in2)(_arr2::_T2)
+                    )
+                )
+            ),
+            term
+        )
+            mask_out, mask_in1, mask_in2, arr1, arr2, T1, T2 = map(
+                _v -> σ[_v],
+                (_mask_out, _mask_in1, _mask_in2, _arr1, _arr2, _T1, _T2))
+
+            nmasks = normalize_masks(T1, T2, mask_out, mask_in1, mask_in2)
+            !isnothing(nmasks) || continue
+            if minimum(nmasks[2]) > 1
+                nmasks = (nmasks[1], nmasks[3], nmasks[2])
+                tmp = arr1; arr1 = arr2; arr2 = tmp
+            end
+
+            eltype = T1.parameters[1]
+            dst = Symbolic(DST_SYMBOL)
+            gemm_patterns = Dict(
+                ((1, 2), (1, 3), (3, 2)) => @term( BLAS.gemm!('N', 'N', eltype(1), parent(arr1), parent(arr2), eltype(0), dst) ),
+                ((1, 2), (3, 1), (3, 2)) => @term( BLAS.gemm!('T', 'N', eltype(1), parent(arr1), parent(arr2), eltype(0), dst) ),
+                ((1, 2), (1, 3), (2, 3)) => @term( BLAS.gemm!('N', 'T', eltype(1), parent(arr1), parent(arr2), eltype(0), dst) ),
+                ((1, 2), (3, 1), (2, 3)) => @term( BLAS.gemm!('T', 'T', eltype(1), parent(arr1), parent(arr2), eltype(0), dst) )
+            )
+            haskey(gemm_patterns, nmasks) || continue
+
+            @debug "matched gemm!(tA, tB, alpha, A, B, beta, C)"
+            return gemm_patterns[nmasks]
+        end
+    end
+])
 
 """
     match_term(term::Term, dst::Union{Type{<:Some}, Type{Nothing}}, syms)
@@ -403,6 +451,7 @@ Does the following:
 """
 @generated function simplify_and_copy(arr, dst::Union{Some{<:Any}, Nothing})
     normal_term, syms = normalize(:arr, arr)
+    syms[Symbolic(DST_SYMBOL)] = :(something($DST_SYMBOL))
 
     matched_expr = match_term(normal_term, dst, syms)
     if !isnothing(matched_expr)
@@ -471,11 +520,12 @@ Base.@propagate_inbounds function Base.copy(bc::Broadcasted{SimplifyStyle{S}}) w
     simplify_and_copy(lbc, nothing)
 end
 
+DST_SYMBOL = :dst
 Base.@propagate_inbounds function Base.copyto!(dst::AbstractArray,
                                                src::Broadcasted{<:SimplifyStyle{S}}) where {S <: AbstractArrayStyle}
     bc = Broadcasted{S}(src.f, src.args)
     sbc = lift_names(bc |> lift_vals |> lift_keeps,
-                     IdDict{Any, Any}(dst => Symbol("dst")))
+                     IdDict{Any, Any}(dst => DST_SYMBOL))
     simplify_and_copy(sbc, Some(dst))
 end
 

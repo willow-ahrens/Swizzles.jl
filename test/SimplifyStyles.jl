@@ -75,10 +75,6 @@ using Swizzles.SimplifyStyles: rewriteable, evaluable, veval, normalize,
     end
 end
 
-macro test_simplify_with_logs(msg, ex)
-    return :( @test (@test_logs (:debug, $msg) min_level=Logging.Debug Simplify().($ex)) ≈ $ex ) |> esc
-end
-
 @testset "Simplify and friends" begin
     # Helper function
     @generated function normalize_helper(arr)
@@ -120,47 +116,85 @@ end
         @test simplify_and_copy(s1(s2(A)) |> lift_vals, nothing) ≈ s1(s2(A)) |> copy
     end
 
-    @testset "gemm(tA, tB, A, B) matcher" begin
-        A, B = [1. 2.; 3. 4.], [200. 300.; 400. 700.]
+    @testset "matching gemm" begin
+        function get_gemm_patterns()
+            patterns = []
+            for reduction_idx in 1:3
+                nr_idxs = filter!(x -> x ≠ reduction_idx, Array(1:3)) # non-reduction indices
+                for rpos1 in 1:2
+                    for rpos2 in 1:2
+                        for nr_ord in 1:2
+                            nr1, nr2 = nr_idxs[nr_ord], nr_idxs[3 - nr_ord]
 
-        LOG_MSG = "matched gemm(tA, tB, A, B)"
+                            a_idxs = zeros(Int64, 2)
+                            a_idxs[rpos1] = reduction_idx
+                            a_idxs[3 - rpos1] = nr1
 
-        patterns_to_test = []
-        for reduction_idx in 1:3
-            nr_idxs = filter!(x -> x ≠ reduction_idx, Array(1:3)) # non-reduction indices
-            for rpos1 in 1:2
-                for rpos2 in 1:2
-                    for nr_ord in 1:2
-                        nr1, nr2 = nr_idxs[nr_ord], nr_idxs[3 - nr_ord]
+                            b_idxs = zeros(Int64, 2)
+                            b_idxs[rpos2] = reduction_idx
+                            b_idxs[3 - rpos2] = nr2
 
-                        a_idxs = zeros(Int64, 2)
-                        a_idxs[rpos1] = reduction_idx
-                        a_idxs[3 - rpos1] = nr1
-
-                        b_idxs = zeros(Int64, 2)
-                        b_idxs[rpos2] = reduction_idx
-                        b_idxs[3 - rpos2] = nr2
-
-                        push!(patterns_to_test, ([nr1, nr2], a_idxs, b_idxs))
-                        push!(patterns_to_test, ([nr2, nr1], a_idxs, b_idxs))
+                            push!(patterns, ([nr1, nr2], a_idxs, b_idxs))
+                            push!(patterns, ([nr2, nr1], a_idxs, b_idxs))
+                        end
                     end
+                end
+            end
+            return patterns
+        end
+
+        @testset "gemm(tA, tB, A, B) matcher" begin
+            A, B = [1. 2.; 3. 4.], [200. 300.; 400. 700.]
+
+            LOG_MSG = "matched gemm(tA, tB, A, B)"
+
+            patterns_to_test = get_gemm_patterns()
+
+            idx_maps_to_test = [
+                (1, 2, 3),
+                (3, 5, 8)
+            ]
+
+            for idx_map in idx_maps_to_test
+                for pat in patterns_to_test
+                    oidxs, aidxs, bidxs = map(p -> map(x -> idx_map[x], p), pat)
+
+                    @test (
+                        @test_logs(
+                            (:debug, LOG_MSG),
+                            min_level=Logging.Debug,
+                            Simplify().(Swizzle(+, oidxs...).(Beam(aidxs...).(A) .* Beam(bidxs...).(B)))
+                        )
+                    ) ≈ Swizzle(+, oidxs...).(Beam(aidxs...).(A) .* Beam(bidxs...).(B))
                 end
             end
         end
 
-        idx_maps_to_test = [
-            (1, 2, 3),
-            (3, 5, 8)
-        ]
+        @testset "gemm!(tA, tB, alpha, A, B, beta, C) matcher" begin
+            A, B = [1. 2.; 3. 4.], [200. 300.; 400. 700.]
+            C = [0. 0.; 0. 0.]
 
-        for idx_map in idx_maps_to_test
-            for pat in patterns_to_test
-                oidxs, aidxs, bidxs = map(p -> map(x -> idx_map[x], p), pat)
+            LOG_MSG = "matched gemm!(tA, tB, alpha, A, B, beta, C)"
 
-                @test_simplify_with_logs(
-                    LOG_MSG,
-                    Swizzle(+, oidxs...).(Beam(aidxs...).(A) .* Beam(bidxs...).(B))
-                )
+            patterns_to_test = get_gemm_patterns()
+
+            idx_maps_to_test = [
+                (1, 2, 3),
+                (3, 5, 8)
+            ]
+
+            for idx_map in idx_maps_to_test
+                for pat in patterns_to_test
+                    oidxs, aidxs, bidxs = map(p -> map(x -> idx_map[x], p), pat)
+
+                    @test (
+                        @test_logs(
+                            (:debug, LOG_MSG),
+                            min_level=Logging.Debug,
+                            C .= Simplify().(Swizzle(+, oidxs...).(Beam(aidxs...).(A) .* Beam(bidxs...).(B)))
+                        ) ≈ Swizzle(+, oidxs...).(Beam(aidxs...).(A) .* Beam(bidxs...).(B))
+                    )
+                end
             end
         end
     end
