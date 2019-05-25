@@ -4,8 +4,10 @@ using Base.Broadcast: BroadcastStyle, Broadcasted, broadcasted, Style, AbstractA
 
 using LinearAlgebra
 using MacroTools
-using Rewrite
-using Rewrite: Rule, PatternRule, Property
+
+# Vendored Deps
+using Swizzles.Rewrite
+using Swizzles.Rewrite: Rule, PatternRule, Property
 
 using Swizzles
 using Swizzles.Antennae
