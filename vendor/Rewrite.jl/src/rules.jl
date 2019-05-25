@@ -1,4 +1,4 @@
-using SpecialSets
+using Swizzles.SpecialSets
 
 export rules
 
@@ -129,14 +129,14 @@ function rules(::Val{:BOOLEAN}; and=&, or=|, xor= ⊻, neg=!)
             (xor(x, xor(y, z)) => xor(x, y, z))  where {_bool(x, y, z)}
             (xor(xor(x, y), z) => xor(x, y, z))  where {_bool(x, y, z)}
 
-            (xor(x, false) => x)  where {_bool(x)}            
+            (xor(x, false) => x)  where {_bool(x)}
             (or(x, false)  => x)  where {_bool(x)}
             (and(x, true)  => x)  where {_bool(x)}
 
-            (xor(x, true)  => neg(x))  where {_bool(x)}            
+            (xor(x, true)  => neg(x))  where {_bool(x)}
             (or(x, true)   => true )   where {_bool(x)}
             (and(x, false) => false)   where {_bool(x)}
-            
+
             (xor(x, x) => false)  where {_bool(x)}
             (or(x, x)  => x)      where {_bool(x)}
             (and(x, x) => x)      where {_bool(x)}

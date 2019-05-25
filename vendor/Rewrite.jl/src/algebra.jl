@@ -1,4 +1,4 @@
-using SpecialSets
+using Swizzles.SpecialSets
 
 set_context!(Context([
     Associative.([

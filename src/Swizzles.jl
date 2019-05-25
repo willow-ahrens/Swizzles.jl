@@ -418,7 +418,10 @@ See also: [`Reduce`](@ref).
 @inline Sum(dims...) = Reduce(Base.FastMath.add_fast, dims...)
 
 
+include("../vendor/SpecialSets.jl/src/SpecialSets.jl")
+include("../vendor/Rewrite.jl/src/Rewrite.jl")
 include("SimplifyStyles.jl")
+
 include("sugar.jl")
 
 end
